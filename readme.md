@@ -14,6 +14,7 @@ project from Robodream Python course
       - [Ostatní upomínky](#ostatní-upomínky)
     - [GUI](#gui)
       - [Obsah webu](#obsah-webu)
+  - [Backlog](#backlog)
 
 
 ## Hlavní funkce aplikace
@@ -30,8 +31,10 @@ Základní informace o vozidle, ke kterému budou vázány další záznamy v da
 - Značka
 - Model
 - Rok výroby
+- Barva
 - SPZ
 - VIN
+- Poznámka
 - Zakoupeno
 - Prodáno
 - Aktivní
@@ -45,22 +48,25 @@ Informace o tankování s automatickou konverzí cizích měn a s výpočtěm sp
 - Tachometr
 - Typ paliva
 - Objem
-- Cena - zaplacená
+- Cena - zaplacená (v měně platby)
 - Cena - v Kč (přes ČNB API)
+- Platební metoda (hotovost, karta, DKV, CCS)
 - Spotřeba (výpočet)
 - Vynechané tankování
+- Poznámka
 
 
 #### Servis
 
-Zátnamy o provedení servisu na vozidle. 
+Záznamy o provedení servisu na vozidle. 
 - Datum
 - Čas
 - Tachometr
 - Místo
-- Cena - zaplacená
+- Cena - zaplacená (v měně platby)
 - Cena - v Kč (přes ČNB API)
 - Typ servisu (olej, brzdy, atd.)
+- Poznámka
 
 
 #### Pravidelný servis
@@ -89,3 +95,13 @@ Bude sloužit jednorázové nebo opakované upozornění na základě data nebo 
 - formuláře pro zápis a editaci záznamů do výše uvedených částí
 - prohlížeč zadaných údajů s vyhledáváním a filtrováním záznamů
 - grafy (spotřeba, výdaje, cena za litr paliva)
+
+## Backlog
+
+- Část "Výdaje" (dílniční známka, provozní kapaliny, myčka, pojištění, atd.)
+- Opakované výdaje (pojištení)
+- Víceuživatelská aplikace s možností sdílení vozidel (pro editaci nebo jen náhled)
+- možnost instalace jako webové aplikace
+- možnost vložení fotografie k vozidlu a fotografií dokladů k výdajům
+- Část "Pokuty" - sledování pokud a bodového konta uživatele (nutné ruční zadání)
+- Zobrazení údajů z velkého TP přes API Datové kostky ministerstva dopravy pomocí zadaného VIN v části "Správa vozidla"

@@ -14,3 +14,32 @@ class FuelRecordService:
             .order_by(FuelRecord.refuel_date.desc(), FuelRecord.refuel_time.desc())
             .all()
         )
+    
+    def create_fuel_record(self, vehicle_id, refuel_date, refuel_time, odometer, fuel_type, volume_liters, unit_price, price_paid, currency_code, unit_price_local, price_local, payment_method=None, station_name=None, full_tank=False, skipped_refuel=False, consumption=None, note=None):
+        if not vehicle_id or not refuel_date or not odometer or not fuel_type or volume_liters is None or price_paid is None or not currency_code:
+            raise ValueError("Některé povinné údaje chybí.")
+
+        fuel_record = FuelRecord(
+            vehicle_id=vehicle_id,
+            refuel_date=refuel_date,
+            refuel_time=refuel_time,
+            odometer=odometer,
+            fuel_type=fuel_type,
+            volume_liters=volume_liters,
+            unit_price=unit_price,
+            price_paid=price_paid,
+            currency_code=currency_code,
+            unit_price_local=unit_price_local,
+            price_local=price_local,
+            payment_method=payment_method,
+            station_name=station_name,
+            full_tank=full_tank,
+            skipped_refuel=skipped_refuel,
+            consumption=consumption,
+            note=note
+        )
+
+        self.session.add(fuel_record)
+        self.session.commit()
+
+        return fuel_record

@@ -1,6 +1,8 @@
 from services.db import SessionLocal
 from services.vehicle_service import VehicleService
 from services.fuel_record_service import FuelRecordService
+from services.exchange_rate import ExchangeRate
+from datetime import datetime, date
 
 # **********************************************
 # --------------- MENU APLIKACE ----------------
@@ -92,7 +94,7 @@ def show_vehicle_menu():
                     if sub_choice == "T":                                               # Tankování
                         list_fuel_records_for_vehicle(FuelService, vehicle_id)
                     elif sub_choice == "P":                                             # Přidat tankování
-                        pass
+                        create_fuel_record_for_vehicle(FuelService, vehicle_id)
                     elif sub_choice == "E":                                             # Editovat vozidlo
                         edit_vehicle(service, vehicle_id)
                     elif sub_choice == "D":                                             # Smazat vozidlo   
@@ -297,3 +299,85 @@ def list_fuel_records_for_vehicle(service, vehicle_id):
             f"Datum: {record.refuel_date} | Čas: {record.refuel_time} | "
             f"Objem: {record.volume_liters} | Cena: {record.price_local}"
         )
+
+def create_fuel_record_for_vehicle(service, vehicle_id):
+    """
+    Umožní přidat nové tankování pro konkrétní vozidlo
+    """
+    date_today = date_value = date.today().isoformat()
+    time_now = datetime.now().strftime("%H:%M")
+
+    print("\n--- Přidání tankování ---")
+    
+# Datum tankování
+    while True:
+        user_input = input(f"Datum tankování (rrrr-mm-dd) [{date_today}]: ").strip() or date_today
+        try:
+            refuel_date = datetime.strptime(user_input, "%Y-%m-%d").date().isoformat()
+            break
+        except ValueError:
+            print("Zadáno neplatné datum. Zadekte datum ve formátu rrrr-mm-dd.")
+
+# Čas tankování    
+    while True:
+        user_input = input(f"Zadej čas (HH:MM) [{time_now}]: ").strip() or time_now
+        try:
+            refuel_time = datetime.strptime(
+                user_input,
+                "%H:%M"
+            ).time()
+            break
+        except ValueError:
+            print("Neplatný čas nebo formát (HH:MM).")
+    odometer = int(input("Stav tachometru: ").strip())
+    fuel_type = input("Typ paliva: ").strip()
+    volume_liters = float(input("Objem v litrech: ").strip())
+    unit_price = float(input("Cena za litr: ").strip())
+    price_paid = unit_price * volume_liters
+    currency_code = input("Měna [CZK]: ").strip() or "CZK"
+    print(f"Celková cena: {price_paid} {currency_code}")
+    if currency_code != "CZK":  
+        try:
+            unit_price_local = ExchangeRate(refuel_date, currency_code, unit_price).ConvertToCZK()
+        except Exception as e:
+            print(f"\n❌ Chyba při získávání kurzu: {e}")
+            return
+        price_local = unit_price_local * volume_liters
+        print(f"Celková cena: {price_local} CZK")
+    else:
+        unit_price_local = unit_price
+        price_local = price_paid
+    payment_method = input("Způsob platby (nepovinné): ").strip() or None
+    station_name = input("Název čerpací stanice (nepovinné): ").strip() or None
+    full_tank_input = input("Plná nádrž? (ano/ne): ").strip().lower()
+    full_tank = full_tank_input == "ano"
+    skipped_refuel_input = input("Vynechané tankování? (ano/ne): ").strip().lower()
+    skipped_refuel = skipped_refuel_input == "ano"
+    consumption_input = input("Spotřeba (nepovinné): ").strip() or None
+    consumption = float(consumption_input) if consumption_input else None
+    note = input("Poznámka (nepovinné): ").strip() or None
+
+    try:
+        fuel_record = service.create_fuel_record(
+            vehicle_id=vehicle_id,
+            refuel_date=refuel_date,
+            refuel_time=refuel_time,
+            odometer=odometer,
+            fuel_type=fuel_type,
+            volume_liters=volume_liters,
+            unit_price=unit_price,
+            price_paid=price_paid,
+            currency_code=currency_code,
+            unit_price_local=unit_price_local,
+            price_local=price_local,
+            payment_method=payment_method,
+            station_name=station_name,
+            full_tank=full_tank,
+            skipped_refuel=skipped_refuel,
+            consumption=consumption,
+            note=note
+        )
+        print(f"\n✅ Tankování vytvořeno (ID: {fuel_record.id})")
+
+    except ValueError as e: 
+        print(f"\n❌ Chyba hodnoty: {e}")   

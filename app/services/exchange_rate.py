@@ -7,7 +7,7 @@ class ExchangeRate:
         self.amount = amount
 
     def ConvertToCZK(self):
-        response = requests.get(f"shttps://api.cnb.cz/cnbapi/exrates/daily?date={self.date}&lang=CZ")
+        response = requests.get(f"https://api.cnb.cz/cnbapi/exrates/daily?date={self.date}&lang=CZ")
         if response.status_code != 200:
             raise Exception(f"Nepodařilo se získat kurzovní lístek z ČNB. \n Status code: {response.status_code} \n Response: {response.text}")
         

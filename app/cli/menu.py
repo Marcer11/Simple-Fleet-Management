@@ -401,7 +401,7 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
             else:            
                 return
         price_local = unit_price_local * volume_liters
-        print(f"Celková cena tankování: {price_local} CZK")
+        print(f"Celková cena tankování: {price_local:.2f} CZK")
     else:
         unit_price_local = unit_price
         price_local = price_paid

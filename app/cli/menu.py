@@ -320,41 +320,102 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
 
 # Čas tankování    
     while True:
-        user_input = input(f"Zadej čas (HH:MM) [{time_now}]: ").strip() or time_now
+        user_input = input(f"Zadej čas (hh:mm) [{time_now}]: ").strip() or time_now
         try:
-            refuel_time = datetime.strptime(
-                user_input,
-                "%H:%M"
-            ).time()
+            refuel_time = datetime.strptime(user_input, "%H:%M").time()
             break
         except ValueError:
-            print("Neplatný čas nebo formát (HH:MM).")
-    odometer = int(input("Stav tachometru: ").strip())
-    fuel_type = input("Typ paliva: ").strip()
-    volume_liters = float(input("Objem v litrech: ").strip())
-    unit_price = float(input("Cena za litr: ").strip())
+            print("Zadán neplatný čas. Zadejte čas ve formátu (hh:mm).")
+
+# Stav tachometru
+# TODO - kontrola konzistence timestamp-odometr
+    while True:
+        try:
+            odometer = int(input("Stav tachometru: ").strip())
+            if odometer >= 0:
+                break
+            print("Stav tachometru nemůže být záporné číslo.")
+        except ValueError:
+            print("Zadán neplatný stav tachometru. Zadejte celé číslo.")
+
+# Typ paliva
+# TODO - zobrazení použitých možností a možnost přidat nový typ.
+    while True:
+        fuel_type = input("Typ paliva: ").strip()
+        if fuel_type:
+            break
+        else:
+            print("Typ paliva je povinná položka.")
+
+# Tankováno litrů
+    while True:
+        try:
+            volume_liters = float(input("Objem v litrech: ").strip().replace(",", "."))
+            if volume_liters > 0:
+                break
+            print("Objem musí být větší než nula.")
+        except ValueError:
+            print("Zadán neplatný objem. Zadejte číslo (může být i desetinné).")
+
+# Cena za litr
+    while True:
+        try:
+            unit_price = float(input("Cena za litr: ").strip().replace(",", "."))
+            if unit_price >= 0:
+                break
+            print("Cena za litr nemůže být záporná.")
+        except ValueError:
+            print("Zadána neplatná cena. Zadejte číslo (může být i desetinné).")
+
+# Celková cena
     price_paid = unit_price * volume_liters
-    currency_code = input("Měna [CZK]: ").strip() or "CZK"
+
+# Měna
+    while True:
+        currency_code = input("Měna [CZK]: ").strip() or "CZK"
+        if len(currency_code) == 3 and currency_code.isalpha():
+            break
+        print("Zadejte třípísmenný kód měny (např. CZK, EUR, USD).")
+
+# Výpis celkové ceny
     print(f"Celková cena: {price_paid} {currency_code}")
+
+# Konverzce ceny na CZK
+# TODO - místo pevně nastavené CZK umožnit nastavení měny v .env
     if currency_code != "CZK":  
         try:
             unit_price_local = ExchangeRate(refuel_date, currency_code, unit_price).ConvertToCZK()
         except Exception as e:
-            print(f"\n❌ Chyba při získávání kurzu: {e}")
-            return
+            print(f"Chyba při získávání kurzu: {e}")
+            manual_fx_rate = input("Chcete zadat směnný kurz ručně? (ano/ne): ").strip().lower()
+            if manual_fx_rate in ["ano", "a"]:
+                while True:
+                    try:
+                        fx_rate = float(input(f"Zadejte hodnotu 1 {currency_code} v CZK: ").strip().replace(",", "."))
+                        if fx_rate > 0:
+                            unit_price_local = unit_price * fx_rate
+                            break
+                        print("Hodnota musí být větší než nula.")
+                    except ValueError:
+                        print("Zadaná hodnota je neplatná. Zadejte číslo (může být i desetinné).")
+            else:            
+                return
         price_local = unit_price_local * volume_liters
-        print(f"Celková cena: {price_local} CZK")
+        print(f"Celková cena tankování: {price_local} CZK")
     else:
         unit_price_local = unit_price
         price_local = price_paid
-    payment_method = input("Způsob platby (nepovinné): ").strip() or None
-    station_name = input("Název čerpací stanice (nepovinné): ").strip() or None
+
+# Platební metoda
     full_tank_input = input("Plná nádrž? (ano/ne): ").strip().lower()
     full_tank = full_tank_input == "ano"
     skipped_refuel_input = input("Vynechané tankování? (ano/ne): ").strip().lower()
     skipped_refuel = skipped_refuel_input == "ano"
-    consumption_input = input("Spotřeba (nepovinné): ").strip() or None
-    consumption = float(consumption_input) if consumption_input else None
+# TODO - výpočet spotřeby
+#    consumption = input("Spotřeba (nepovinné): ").strip() or None
+    consumption = 0
+    payment_method = input("Způsob platby (nepovinné): ").strip() or None
+    station_name = input("Název čerpací stanice (nepovinné): ").strip() or None
     note = input("Poznámka (nepovinné): ").strip() or None
 
     try:

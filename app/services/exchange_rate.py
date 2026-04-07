@@ -3,13 +3,13 @@ import requests
 class ExchangeRate:
     def __init__(self, date: str, currency_code: str, amount: float):
         self.date = date
-        self.currency_code = currency_code
+        self.currency_code = currency_code.upper()
         self.amount = amount
 
     def ConvertToCZK(self):
-        response = requests.get(f"https://api.cnb.cz/cnbapi/exratesa/daily?date={self.date}&lang=CZ")
+        response = requests.get(f"shttps://api.cnb.cz/cnbapi/exrates/daily?date={self.date}&lang=CZ")
         if response.status_code != 200:
-            raise Exception("Nepodařilo se získat kurzovní lístek z ČNB.")
+            raise Exception(f"Nepodařilo se získat kurzovní lístek z ČNB. \n Status code: {response.status_code} \n Response: {response.text}")
         
         data = response.json()
         for rate in data["rates"]:
@@ -19,4 +19,4 @@ class ExchangeRate:
                 print(f"Načtěný kurz ČNB: {amount} {self.currency_code} = {rate_value} CZK")
                 return (self.amount / amount) * rate_value
 
-        raise ValueError(f"Nenalezen kurz pro měnu {self.currency_code} k datu {self.date}.")
+        raise ValueError(f"V kurzovním lístku nebyl nenalezen kurz pro měnu {self.currency_code} k datu {self.date}.")

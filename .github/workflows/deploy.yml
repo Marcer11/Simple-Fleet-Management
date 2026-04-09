@@ -1,0 +1,78 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: ${{ secrets.APP_DIR }}
+    steps:
+      - name: Checkout (metadata only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify SSH connectivity (optional)
+        run: |
+          echo "Testing SSH to ${{ secrets.SSH_HOST }} as ${{ secrets.SSH_USER }}"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: APP_DIR,SERVICE_NAME
+          script: |
+            set -e
+            echo "===================="
+            echo "Deploy skript startuje"
+            echo "APP_DIR=$APP_DIR"
+            echo "SERVICE_NAME=$SERVICE_NAME"
+            echo "Aktuální uživatel: $(whoami)"
+            echo "Aktuální hostname: $(hostname)"
+            echo "Datum a čas: $(date)"
+            echo "===================="
+            
+            echo "[0/7] Připravuji SSH known_hosts pro GitHub…"
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            touch ~/.ssh/known_hosts
+            chmod 644 ~/.ssh/known_hosts
+            # Přidá GitHub host key (vyhne se interaktivnímu promptu)
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+            echo "[1/6] Přecházím do adresáře: $APP_DIR"
+            cd "$APP_DIR"
+
+            echo "[2/6] Fetch z origin..."
+            git fetch --all
+
+            echo "[3/6] Reset na origin/main..."
+            git reset --hard origin/main
+
+            echo "[4/6] Zobrazuji aktuální commit:"
+            git rev-parse --short HEAD
+
+            echo "[5/6] Aktivace virtuálního prostředí..."
+            if [ ! -d ".venv" ]; then
+              echo "  Venv neexistuje – vytvářím..."
+              python3 -m venv .venv
+            else
+              echo "  Venv už existuje."
+            fi
+            . .venv/bin/activate
+
+            echo "[6/6] Instalace/aktualizace závislostí..."
+            python -m pip install -U pip
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            else
+              echo "  Soubor requirements.txt nenalezen."
+            fi
+
+            echo "Deploy dokončen!"

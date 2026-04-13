@@ -276,8 +276,8 @@ def list_fuel_records(service):
 
     for record in fuel_records:
         print(
-            f"- ID: {record.id} | Vozidlo: {record.vehicle.brand} {record.vehicle.model} | "
-            f"Datum: {record.refuel_date} | Čas: {record.refuel_time} | "
+            f"Vozidlo: {record.vehicle.brand} {record.vehicle.model} | "
+            f"Datum a čas: {record.refuel_datetime} | "
             f"Objem: {record.volume_liters} | Cena: {record.price_local}"
         )
 
@@ -295,8 +295,8 @@ def list_fuel_records_for_vehicle(service, vehicle_id):
 
     for record in fuel_records:
         print(
-            f"- ID: {record.id} | Vozidlo: {record.vehicle.brand} {record.vehicle.model} | "
-            f"Datum: {record.refuel_date} | Čas: {record.refuel_time} | "
+            f"Vozidlo: {record.vehicle.brand} {record.vehicle.model} | "
+            f"Datum a čas: {record.refuel_datetime} | "
             f"Objem: {record.volume_liters} | Cena: {record.price_local}"
         )
 
@@ -313,7 +313,7 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
     while True:
         user_input = input(f"Datum tankování (rrrr-mm-dd) [{date_today}]: ").strip() or date_today
         try:
-            refuel_date = datetime.strptime(user_input, "%Y-%m-%d").date().isoformat()
+            refuel_date = datetime.strptime(user_input, "%Y-%m-%d").date()
             break
         except ValueError:
             print("Zadáno neplatné datum. Zadekte datum ve formátu rrrr-mm-dd.")
@@ -326,6 +326,9 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
             break
         except ValueError:
             print("Zadán neplatný čas. Zadejte čas ve formátu (hh:mm).")
+
+# Timestamp tankování pro uložení do DB
+    refuel_datetime = datetime.combine(refuel_date, refuel_time)
 
 # Stav tachometru
 # TODO - kontrola konzistence timestamp-odometr
@@ -378,7 +381,7 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
         print("Zadejte třípísmenný kód měny (např. CZK, EUR, USD).")
 
 # Výpis celkové ceny
-    print(f"Celková cena: {price_paid} {currency_code}")
+    print(f"Celková cena: {price_paid:.3f} {currency_code}")
 
 # Konverzce ceny na CZK
 # TODO - místo pevně nastavené CZK umožnit nastavení měny v .env
@@ -421,8 +424,7 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
     try:
         fuel_record = service.create_fuel_record(
             vehicle_id=vehicle_id,
-            refuel_date=refuel_date,
-            refuel_time=refuel_time,
+            refuel_datetime=refuel_datetime,
             odometer=odometer,
             fuel_type=fuel_type,
             volume_liters=volume_liters,

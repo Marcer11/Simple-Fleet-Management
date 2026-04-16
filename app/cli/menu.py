@@ -3,6 +3,8 @@ from services.vehicle_service import VehicleService
 from services.fuel_record_service import FuelRecordService
 from services.exchange_rate import ExchangeRate
 from datetime import datetime, date
+from rich.console import Console
+from rich.table import Table
 
 # **********************************************
 # --------------- MENU APLIKACE ----------------
@@ -267,6 +269,12 @@ def list_fuel_records(service):
     Vypíše všechna tankování z databáze
     """
     fuel_records = service.get_all_fuel_records()
+    console = Console()
+    table = Table(title="Tankování")
+    table.add_column("Vozidlo", style="cyan", no_wrap=True)
+    table.add_column("Datum a čas", style="magenta")
+    table.add_column("Objem", style="green")
+    table.add_column("Cena", style="yellow")
 
     if not fuel_records:
         print("\nŽádná tankování nenalezena.")
@@ -280,25 +288,30 @@ def list_fuel_records(service):
             f"Datum a čas: {record.refuel_datetime} | "
             f"Objem: {record.volume_liters} | Cena: {record.price_local}"
         )
+        table.add_row(f"{record.vehicle.brand} {record.vehicle.model}", f"{record.refuel_datetime}", f"{record.volume_liters}", f"{record.price_local}")
+    console.print(table)
 
 def list_fuel_records_for_vehicle(service, vehicle_id):
     """
     Vypíše všechna tankování pro konkrétní vozidlo
     """
     fuel_records = service.get_fuel_records_for_vehicle(vehicle_id)
+    console = Console()
+    table = Table()
+    table.add_column("Vozidlo", style="cyan", no_wrap=True)
+    table.add_column("Datum a čas", style="magenta")
+    table.add_column("Objem", style="green",  justify="right")
+    table.add_column("Cena", style="yellow",  justify="right")
 
     if not fuel_records:
         print("\nŽádná tankování nenalezena.")
         return
 
-    print("\nSeznam tankování:\n")
+    
 
     for record in fuel_records:
-        print(
-            f"Vozidlo: {record.vehicle.brand} {record.vehicle.model} | "
-            f"Datum a čas: {record.refuel_datetime} | "
-            f"Objem: {record.volume_liters} | Cena: {record.price_local}"
-        )
+        table.add_row(f"{record.vehicle.brand} {record.vehicle.model}", f"{record.refuel_datetime}", f"{record.volume_liters}", f"{record.price_local}")
+    console.print(table)
 
 def create_fuel_record_for_vehicle(service, vehicle_id):
     """

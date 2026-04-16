@@ -2,3 +2,4 @@ sqlalchemy==2.0.48
 mysql-connector-python==9.6.0
 python-dotenv==1.2.2
 requests==2.33.1
+rich==15.0.0

@@ -36,7 +36,7 @@ class VehicleService:
         self.session.delete(vehicle)
         self.session.commit()
 
-    def edit_vehicle(self, vehicle_id, brand=None, model=None, license_plate=None, color=None):
+    def edit_vehicle(self, vehicle_id, brand=None, model=None, license_plate=None, color=None, is_active=None):
         vehicle = self.get_vehicle(vehicle_id)
         if not vehicle:
             raise ValueError("Vozidlo s daným ID nebylo nalezeno.")
@@ -49,6 +49,8 @@ class VehicleService:
             vehicle.license_plate = license_plate
         if color is not None:
             vehicle.color = color
+        if is_active is not None:
+            vehicle.is_active = is_active
 
         self.session.commit()
         return vehicle
@@ -56,5 +58,5 @@ class VehicleService:
     def activate_vehicle(self, vehicle_id):
         self.edit_vehicle(vehicle_id, is_active=True)
 
-    def deactivate_vehicle():
-        pass
+    def deactivate_vehicle(self, vehicle_id):
+        self.edit_vehicle(vehicle_id, is_active=False)

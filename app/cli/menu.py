@@ -34,7 +34,7 @@ def print_vehiclle_list_menu():
     """
     Zobrazí menu pro vozidlo
     """
-    print("\nT - Zobrazit tankování | P - Přidat tankování | E - editovat vozidlo | D - Smazat vozidlo | 0 - Zpět")
+    print("\nT - Zobrazit tankování | P - Přidat tankování | E - Editovat | S - Smazat | A - Aktivovat | D - Deaktivovat |0 - Zpět")
 
 def print_refueling_menu():
     """
@@ -88,23 +88,33 @@ def show_vehicle_menu():
                 list_vehicles(service)
                 vehicle_id = input("\nZadejte ID vozidla: ").strip()
                 print("\x1b[2J")
-                show_vehicle_details(service, vehicle_id)
-                
-                while True:
-                    print_vehiclle_list_menu()
-                    sub_choice = input("Vyber akci: ").strip().upper()
-                    if sub_choice == "T":                                               # Tankování
-                        list_fuel_records_for_vehicle(FuelService, vehicle_id)
-                    elif sub_choice == "P":                                             # Přidat tankování
-                        create_fuel_record_for_vehicle(FuelService, vehicle_id)
-                    elif sub_choice == "E":                                             # Editovat vozidlo
-                        edit_vehicle(service, vehicle_id)
-                    elif sub_choice == "D":                                             # Smazat vozidlo   
-                        pass
-                    elif sub_choice == "0":
-                        break
-                    else:
-                        print("Neplatná volba.")
+                try:
+                    show_vehicle_details(service, vehicle_id)
+                    while True:
+                        print_vehiclle_list_menu()
+                        sub_choice = input("Vyber akci: ").strip().upper()
+                        print("\x1b[2J")
+                        if sub_choice == "T":                                               # Tankování
+                            list_fuel_records_for_vehicle(FuelService, vehicle_id)
+                        elif sub_choice == "P":                                             # Přidat tankování
+                            create_fuel_record_for_vehicle(service, FuelService, vehicle_id)
+                        elif sub_choice == "E":                                             # Editovat vozidlo
+                            edit_vehicle(service, vehicle_id)
+                            show_vehicle_details(service, vehicle_id)
+                        elif sub_choice == "S":                                             # Smazat vozidlo   
+                            delete_vehicle(service, vehicle_id)
+                        elif sub_choice == "D":                                             # Deaktivovat vozidlo
+                            deactivate_vehicle(service, vehicle_id)
+                            show_vehicle_details(service, vehicle_id)
+                        elif sub_choice == "A":                                             # Aktivovat vozidlo
+                            activate_vehicle(service, vehicle_id)
+                            show_vehicle_details(service, vehicle_id)
+                        elif sub_choice == "0":
+                            break
+                        else:
+                            print("Neplatná volba.")
+                except ValueError as e:
+                    print(f"\n❌ Chyba hodnoty: {e}")
             elif choice == "2":                                                         # Přidat vozidlo
                 add_vehicle(service)
             elif choice == "0":                                                         # Zpět
@@ -134,8 +144,9 @@ def show_refueling_menu():
                 print("\x1b[2J")
                 vehicle_id = input("Zadejte ID vozidla: ").strip()
                 list_fuel_records_for_vehicle(FuelService, vehicle_id)
-            elif choice == "3":                                                 # Přidat tankování                       
-                pass
+            elif choice == "3":                                                 # Přidat tankování
+                VehicleService_temp = VehicleService(session)
+                create_fuel_record_for_vehicle(VehicleService_temp, FuelService, 0)
             elif choice == "0":                                                 # Zpět           
                 break
             else:
@@ -153,19 +164,22 @@ def list_vehicles(service):
     """
     vehicles = service.get_all_vehicles()
 
+    console = Console()
+    table = Table(title="Vozidla")
+    table.add_column("ID", style="dim", width=6)
+    table.add_column("Vozidlo", style="cyan", no_wrap=True)
+    table.add_column("SPZ", style="magenta")
+    table.add_column("Barva", style="green")
+    table.add_column("Aktivní", style="yellow")
+
     if not vehicles:
         print("\nŽádná vozidla nenalezena.")
         return
 
-    print("\nSeznam vozidel:\n")
-
     for v in vehicles:
-        print(
-            f"- ID: {v.id} | {v.brand} {v.model} | "
-            f"SPZ: {v.license_plate or '-'} | "
-            f"Barva: {v.color or '-'} | "
-            f"Aktivní: {'ano' if v.is_active else 'ne'}"
-        )
+        table.add_row(f"{v.id}", f"{v.brand} {v.model}", f"{v.license_plate or '-'}", f"{v.color or '-'}", f"{'ano' if v.is_active else 'ne'}")
+    console.print(table)
+
 
 def edit_vehicle(service, vehicle_id):
     """
@@ -204,16 +218,17 @@ def show_vehicle_details(service, vehicle_id):
     """
     vehicle = service.get_vehicle(vehicle_id)
 
-    if not vehicle:
-        print("\nVozidlo nenalezeno.")
-        return
+    console = Console(highlight=False)       
 
-    print(f"\n--- Detail vozidla ID {vehicle.id} ---")
-    print(f"Značka: {vehicle.brand}")
-    print(f"Model: {vehicle.model}")
-    print(f"SPZ: {vehicle.license_plate or '-'}")
-    print(f"Barva: {vehicle.color or '-'}")
-    print(f"Aktivní: {'ano' if vehicle.is_active else 'ne'}")
+    if not vehicle:
+        raise ValueError("Vozidlo nenalezeno.")
+
+    console.print(f"[bold blue]--- DETAIL VOZIDLA ID {vehicle.id} ---[/bold blue]")
+    console.print(f"[bold]Značka:[/bold] {vehicle.brand}")
+    console.print(f"[bold]Model:[/bold] {vehicle.model}")
+    console.print(f"[bold]SPZ:[/bold] {vehicle.license_plate or '-'}")
+    console.print(f"[bold]Barva:[/bold] {vehicle.color or '-'}")
+    console.print(f"[bold]Aktivní:[/bold] {'ano' if vehicle.is_active else 'ne'}")
 
 def add_vehicle(service):
     """
@@ -242,23 +257,38 @@ def add_vehicle(service):
     except Exception as e:
         print(f"\n❌ Neočekávaná chyba: {e}")
 
-def delete_vehicle(service):
+def delete_vehicle(service, vehicle_id):
     """
-    Odstraní vozidlo z databáze dle zadaného ID
+    Smaže vozidlo z databáze
     """
-    print("\n--- Odstranění vozidla ---")
-    vehicle_id = input("Zadejte ID vozidla k odstranění: ").strip()
-
-    if vehicle_id != "":
-        delete_confirm = input(f"Opravdu chcete odstranit vozidlo s ID {vehicle_id}? (ano/ne): ").strip().lower()
-    if delete_confirm == "ano":
+    confirm = input(f"Opravdu chcete smazat vozidlo ID {vehicle_id}? (ano/ne): ").strip().lower()
+    
+    if confirm in ["ano", "a"]:
         try:
             service.delete_vehicle(vehicle_id)
-            print(f"\n✅ Vozidlo s ID {vehicle_id} bylo odstraněno.")
-        except ValueError as e:
-            print(f"\n❌ Chyba hodnoty: {e}")
+            print(f"\n Vozidlo ID {vehicle_id} bylo odstraněno.")
         except Exception as e:
-            print(f"\n❌ Neočekávaná chyba: {e}")
+            print(f"\n Neočekávaná chyba: {e}")
+
+def deactivate_vehicle(service, vehicle_id):
+    """
+    Deaktivuje vozidlo
+    """
+    try:
+        service.deactivate_vehicle(vehicle_id)
+        print(f"\n Vozidlo ID {vehicle_id} bylo deaktivováno.")
+    except Exception as e:
+        print(f"\n Neočekávaná chyba: {e}")
+
+def activate_vehicle(service, vehicle_id):
+    """
+    Aktivuje vozidlo
+    """
+    try:
+        service.activate_vehicle(vehicle_id)
+        print(f"\n Vozidlo ID {vehicle_id} bylo aktivováno.")
+    except Exception as e:
+        print(f"\n Neočekávaná chyba: {e}")
 
 # **********************************************
 # ------------ FUNKCE PRO TANKOVÁNÍ ------------
@@ -283,12 +313,7 @@ def list_fuel_records(service):
     print("\nSeznam tankování:\n")
 
     for record in fuel_records:
-        print(
-            f"Vozidlo: {record.vehicle.brand} {record.vehicle.model} | "
-            f"Datum a čas: {record.refuel_datetime} | "
-            f"Objem: {record.volume_liters} | Cena: {record.price_local}"
-        )
-        table.add_row(f"{record.vehicle.brand} {record.vehicle.model}", f"{record.refuel_datetime}", f"{record.volume_liters}", f"{record.price_local}")
+         table.add_row(f"{record.vehicle.brand} {record.vehicle.model}", f"{record.refuel_datetime}", f"{record.volume_liters}", f"{record.price_local}")
     console.print(table)
 
 def list_fuel_records_for_vehicle(service, vehicle_id):
@@ -298,22 +323,39 @@ def list_fuel_records_for_vehicle(service, vehicle_id):
     fuel_records = service.get_fuel_records_for_vehicle(vehicle_id)
     console = Console()
     table = Table()
-    table.add_column("Vozidlo", style="cyan", no_wrap=True)
+    table.add_column("ID", style="dim")
     table.add_column("Datum a čas", style="magenta")
+    table.add_column("Tachometr", style="blue", justify="right")
+    table.add_column("Palivo", style="cyan")
     table.add_column("Objem", style="green",  justify="right")
     table.add_column("Cena", style="yellow",  justify="right")
+    table.add_column("Pumpa", style="magenta")
+    table.add_column("Plná", style="red", justify="center")
+    table.add_column("Vynecháno", style="red", justify="center")
+    table.add_column("Spotřeba", style="blue", justify="right")
+    table.add_column("Poznámka", style="dim")
 
     if not fuel_records:
         print("\nŽádná tankování nenalezena.")
         return
 
-    
-
     for record in fuel_records:
-        table.add_row(f"{record.vehicle.brand} {record.vehicle.model}", f"{record.refuel_datetime}", f"{record.volume_liters}", f"{record.price_local}")
+        table.add_row(
+            f"{record.id}",
+            f"{record.refuel_datetime}",
+            f"{record.odometer}",
+            f"{record.fuel_type}",
+            f"{record.volume_liters}",
+            f"{record.price_local or ''}",
+            f"{record.station_name or ''}",
+            "✓" if record.full_tank else "",
+            "✓" if record.skipped_refuel else "",
+            f"{record.consumption or ''}",
+            f"{record.note or ''}"
+        )
     console.print(table)
 
-def create_fuel_record_for_vehicle(service, vehicle_id):
+def create_fuel_record_for_vehicle(vehicle_service, fuel_service, vehicle_id):
     """
     Umožní přidat nové tankování pro konkrétní vozidlo
     """
@@ -321,7 +363,22 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
     time_now = datetime.now().strftime("%H:%M")
 
     print("\n--- Přidání tankování ---")
-    
+
+# ID vozidla - pouze pokud nebylo předáno v parametru
+    if vehicle_id == 0:
+        while True:
+            try:
+                vehicle_id = int(input("Zadejte ID vozidla: ").strip())
+                vehicles = vehicle_service.get_all_vehicles()
+                vehicle = next((v for v in vehicles if v.id == vehicle_id), None)
+                if vehicle:
+                    print(f"Vozidlo: {vehicle.brand} {vehicle.model} (SPZ: {vehicle.license_plate or '-'})")
+                    break
+                else:
+                    print("Zadáno neexistující ID vozidla.")
+            except ValueError:
+                print("Zadána neplatná hodnota pro ID vozidla.")
+
 # Datum tankování
     while True:
         user_input = input(f"Datum tankování (rrrr-mm-dd) [{date_today}]: ").strip() or date_today
@@ -435,7 +492,7 @@ def create_fuel_record_for_vehicle(service, vehicle_id):
     note = input("Poznámka (nepovinné): ").strip() or None
 
     try:
-        fuel_record = service.create_fuel_record(
+        fuel_record = fuel_service.create_fuel_record(
             vehicle_id=vehicle_id,
             refuel_datetime=refuel_datetime,
             odometer=odometer,

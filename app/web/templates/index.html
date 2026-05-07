@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Domů - Simple Fleet Manager{% endblock %}
+
+{% block content %}
+<h2>Správa databáze</h2>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+    <div class="vehicle-card">
+        <h4>Vozidla</h4>
+        <p style="font-size: 24px; font-weight: bold; color: #3498db; margin: 10px 0;">{{ vehicles_count }}</p>
+        <p style="color: #7f8c8d; margin: 0;">Vozidel v databázi</p>
+        <a href="/vehicles" class="btn btn-primary" style="margin-top: 10px;">Spravovat vozidla</a>
+        <a href="/vehicles/add" class="btn btn-success">Přidat vozidlo</a>
+    </div>
+    
+    <div class="vehicle-card">
+        <h4>Tankování</h4>
+        <p style="font-size: 24px; font-weight: bold; color: #27ae60; margin: 10px 0;">{{ fuel_records_count }}</p>
+        <p style="color: #7f8c8d; margin: 0;">Záznamů o tankování</p>
+        <a href="/fuel-records" class="btn btn-primary" style="margin-top: 10px;">Spravovat tankování</a>
+        <a href="/fuel-records/add" class="btn btn-success">Přidat tankování</a>
+    </div>
+</div>
+
+
+{% endblock %}

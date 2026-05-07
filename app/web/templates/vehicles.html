@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Vozidla - Simple Fleet Manager{% endblock %}
+
+{% block content %}
+<h2>Vozidla</h2>
+
+<div class="actions">
+    <a href="/vehicles/add" class="btn btn-success">Přidat nové vozidlo</a>
+</div>
+
+{% if vehicles %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Výrobce</th>
+            <th>Model</th>
+            <th>SPZ</th>
+            <th>Barva</th>
+            <th>Stav</th>
+            <th>Akce</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for vehicle in vehicles %}
+        <tr>
+            <td>{{ vehicle.id }}</td>
+            <td>{{ vehicle.brand }}</td>
+            <td>{{ vehicle.model }}</td>
+            <td>{{ vehicle.license_plate or '-' }}</td>
+            <td>
+                {% if vehicle.color_hex %}
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ vehicle.color_hex }}; border: 1px solid #ccc; border-radius: 3px; vertical-align: middle;" title="{{ vehicle.color }}"></span>
+                    {{ vehicle.color or '-' }}
+                {% else %}
+                    {{ vehicle.color or '-' }}
+                {% endif %}
+            </td>
+            <td>
+                {% if vehicle.is_active %}
+                    <span class="badge badge-success">Aktivní</span>
+                {% else %}
+                    <span class="badge badge-danger">Neaktivní</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="/vehicles/{{ vehicle.id }}" class="btn btn-primary">Detail</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="no-data">
+    <p>Zatím nejsou žádná vozidla.</p>
+    <a href="/vehicles/add" class="btn btn-success">Přidat první vozidlo</a>
+</div>
+{% endif %}
+
+{% endblock %}

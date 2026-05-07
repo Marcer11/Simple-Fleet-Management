@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Editovat vozidlo - Simple Fleet Manager{% endblock %}
+
+{% block content %}
+<h2>Upravit vozidlo</h2>
+
+<form method="post" style="max-width: 500px;">
+    <div class="form-group">
+        <label for="brand">Výrobce vozidla *</label>
+        <input type="text" id="brand" name="brand" required value="{{ vehicle.brand }}">
+    </div>
+    
+    <div class="form-group">
+        <label for="model">Model vozidla *</label>
+        <input type="text" id="model" name="model" required value="{{ vehicle.model }}">
+    </div>
+    
+    <div class="form-group">
+        <label for="license_plate">SPZ</label>
+        <input type="text" id="license_plate" name="license_plate" value="{{ vehicle.license_plate or '' }}" placeholder="např. 1A23456">
+    </div>
+    
+    <div class="form-group">
+        <label for="color">Barva</label>
+        <input type="text" id="color" name="color" value="{{ vehicle.color or '' }}" placeholder="např. černá, stříbrná">
+    </div>
+    
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Uložit změny</button>
+        <a href="/vehicles/{{ vehicle.id }}" class="btn btn-secondary">Zrušit</a>
+    </div>
+</form>
+
+{% endblock %}

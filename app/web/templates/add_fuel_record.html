@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Přidat tankování - Simple Fleet Manager{% endblock %}
+
+{% block content %}
+<h2>Přidat tankování</h2>
+
+<form method="post" style="max-width: 600px;">
+    <div class="form-group">
+        <label for="vehicle_id">Vozidlo *</label>
+        <select id="vehicle_id" name="vehicle_id" required>
+            <option value="">-- Vyberte vozidlo --</option>
+            {% for vehicle in vehicles %}
+            <option value="{{ vehicle.id }}" {% if vehicle.id == vehicle_id %}selected{% endif %}>
+                {{ vehicle.brand }} {{ vehicle.model }} (SPZ: {{ vehicle.license_plate }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="refuel_date">Datum tankování *</label>
+            <input type="date" id="refuel_date" name="refuel_date" required value="{{ today }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="refuel_time">Čas tankování *</label>
+            <input type="time" id="refuel_time" name="refuel_time" required value="{{ now }}">
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="odometer">Stav tachometru (km) *</label>
+        <input type="number" id="odometer" name="odometer" required min="0">
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="fuel_type">Typ paliva *</label>
+            <input type="text" id="fuel_type" name="fuel_type" required placeholder="např. Benzin, Diesel, LPG">
+        </div>
+        
+        <div class="form-group">
+            <label for="volume_liters">Objem (litry) *</label>
+            <input type="number" id="volume_liters" name="volume_liters" required min="0.01" step="0.01" placeholder="0.00">
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="unit_price">Cena za litr *</label>
+            <input type="number" id="unit_price" name="unit_price" required min="0" step="0.001" placeholder="0.000">
+        </div>
+        
+        <div class="form-group">
+            <label for="currency_code">Měna *</label>
+            <input type="text" id="currency_code" name="currency_code" required maxlength="3" value="CZK" placeholder="CZK">
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="station_name">Čerpací stanice</label>
+            <input type="text" id="station_name" name="station_name" placeholder="např. Shell, OMV">
+        </div>
+        
+        <div class="form-group">
+            <label for="payment_method">Způsob platby</label>
+            <input type="text" id="payment_method" name="payment_method" placeholder="např. Kartou, Hotovost">
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="note">Poznámka</label>
+        <textarea id="note" name="note" placeholder="Další informace o tankování..."></textarea>
+    </div>
+    
+    <div class="form-group">
+        <div class="checkbox-wrapper">
+            <input type="checkbox" id="full_tank" name="full_tank" value="on">
+            <label for="full_tank" style="margin: 0;">Plná nádrž</label>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <div class="checkbox-wrapper">
+            <input type="checkbox" id="skipped_refuel" name="skipped_refuel" value="on">
+            <label for="skipped_refuel" style="margin: 0;">Vynechané tankování</label>
+        </div>
+    </div>
+
+    
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Uložit tankování</button>
+        <a href="/fuel-records" class="btn btn-secondary">Zrušit</a>
+    </div>
+</form>
+
+{% endblock %}

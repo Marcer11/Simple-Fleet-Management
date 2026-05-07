@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Přidat vozidlo - Simple Fleet Manager{% endblock %}
+
+{% block content %}
+<h2>Přidat nové vozidlo</h2>
+
+<form method="post" style="max-width: 500px;">
+    <div class="form-group">
+        <label for="brand">Výrobce vozidla *</label>
+        <input type="text" id="brand" name="brand" required value="{{ brand or '' }}">
+    </div>
+    
+    <div class="form-group">
+        <label for="model">Model vozidla *</label>
+        <input type="text" id="model" name="model" required value="{{ model or '' }}">
+    </div>
+    
+    <div class="form-group">
+        <label for="license_plate">SPZ</label>
+        <input type="text" id="license_plate" name="license_plate" value="{{ license_plate or '' }}" placeholder="např. 1A23456">
+    </div>
+    
+    <div class="form-group">
+        <label for="color">Barva</label>
+        <input type="text" id="color" name="color" value="{{ color or '' }}" placeholder="např. černá, stříbrná">
+    </div>
+    
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Uložit vozidlo</button>
+        <a href="/vehicles" class="btn btn-secondary">Zrušit</a>
+    </div>
+</form>
+
+{% endblock %}

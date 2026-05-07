@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Tankování - Simple Fleet Manager{% endblock %}
+
+{% block content %}
+<h2>Přehled tankování</h2>
+
+<div class="actions">
+    <a href="/fuel-records/add" class="btn btn-success">Přidat nové tankování</a>
+</div>
+
+{% if fuel_records %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Vozidlo</th>
+            <th>Datum a čas</th>
+            <th>Tachometr</th>
+            <th>Palivo</th>
+            <th>Objem (l)</th>
+            <th>Cena (CZK)</th>
+            <th>Pumpa</th>
+            <th>Plná</th>
+            <th>Vynecháno</th>
+            <th>Akce</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for record in fuel_records %}
+        <tr>
+            <td>{{ record.id }}</td>
+            <td><a href="/vehicles/{{ record.vehicle.id }}">{{ record.vehicle.brand }} {{ record.vehicle.model }}</a></td>
+            <td>{{ format_datetime(record.refuel_datetime) }}</td>
+            <td>{{ record.odometer }}</td>
+            <td>{{ record.fuel_type }}</td>
+            <td>{{ record.volume_liters }}</td>
+            <td>{{ "%.2f"|format(record.price_local or 0) }}</td>
+            <td>{{ record.station_name or '-' }}</td>
+            <td>{% if record.full_tank %}✓{% endif %}</td>
+            <td>{% if record.skipped_refuel %}✓{% endif %}</td>
+            <td>
+                <a href="/vehicles/{{ record.vehicle.id }}" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;">Detail</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="no-data">
+    <p>Zatím nejsou žádné záznamy o tankování.</p>
+    <a href="/fuel-records/add" class="btn btn-success">Přidat první tankování</a>
+</div>
+{% endif %}
+
+{% endblock %}

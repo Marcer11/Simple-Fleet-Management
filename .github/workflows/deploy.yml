@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_DIR: ${{ secrets.APP_DIR }}
+      SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+
     steps:
       - name: Checkout (metadata only)
         uses: actions/checkout@v5

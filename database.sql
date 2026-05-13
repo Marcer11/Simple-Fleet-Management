@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS `fuel_records` (
   `note` TEXT COMMENT 'Additional notes',
   PRIMARY KEY (`id`),
   KEY `idx_fuel_records_vehicle_id` (`vehicle_id`),
-  KEY `idx_fuel_records_refuel_date` (`refuel_date`),
+  KEY `idx_fuel_records_refuel_daterite` (`refuel_datetime`),
   CONSTRAINT `fk_fuel_records_vehicle`
     FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles` (`id`)
     ON DELETE CASCADE

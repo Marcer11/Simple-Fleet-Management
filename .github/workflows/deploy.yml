@@ -46,19 +46,19 @@ jobs:
             # Přidá GitHub host key (vyhne se interaktivnímu promptu)
             ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
 
-            echo "[1/6] Přecházím do adresáře: $APP_DIR"
+            echo "[1/7] Přecházím do adresáře: $APP_DIR"
             cd "$APP_DIR"
 
-            echo "[2/6] Fetch z origin..."
+            echo "[2/7] Fetch z origin..."
             git fetch --all
 
-            echo "[3/6] Reset na origin/main..."
+            echo "[3/7] Reset na origin/main..."
             git reset --hard origin/main
 
-            echo "[4/6] Zobrazuji aktuální commit:"
+            echo "[4/7] Zobrazuji aktuální commit:"
             git rev-parse --short HEAD
 
-            echo "[5/6] Aktivace virtuálního prostředí..."
+            echo "[5/7] Aktivace virtuálního prostředí..."
             if [ ! -d ".venv" ]; then
               echo "  Venv neexistuje – vytvářím..."
               python3 -m venv .venv
@@ -67,12 +67,16 @@ jobs:
             fi
             . .venv/bin/activate
 
-            echo "[6/6] Instalace/aktualizace závislostí..."
+            echo "[6/7] Instalace/aktualizace závislostí..."
             python -m pip install -U pip
             if [ -f requirements.txt ]; then
               pip install -r requirements.txt
             else
               echo "  Soubor requirements.txt nenalezen."
             fi
+
+            echo "[7/7] Restart služby: $SERVICE_NAME"
+            sudo /usr/bin/systemctl restart "$SERVICE_NAME"
+            sudo /usr/bin/systemctl --no-pager --full status "$SERVICE_NAME" || true
 
             echo "Deploy dokončen!"

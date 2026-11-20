@@ -1,0 +1,30 @@
+{# Seznam upozornění. Očekává proměnnou alerts a volitelně show_vehicle. #}
+{% import "_macros.html" as m with context %}
+<ul class="alert-list">
+    {% for a in alerts %}
+    <li>
+        {{ m.status_badge(a.status) }}
+        <span class="what">
+            <strong>{{ a.title }}</strong>
+            <span class="muted small">· {{ "Pravidelný servis" if a.kind == "interval" else "Upomínka" }}</span>
+            {% if show_vehicle %}<br><a class="small" href="/vehicles/{{ a.vehicle.id }}">{{ m.color_dot(a.vehicle) }} {{ a.vehicle.display_name }}</a>{% endif %}
+        </span>
+        <span class="small">
+            {{ a.status.summary }}
+            {% if a.status.due_date %}<span class="muted">({{ a.status.due_date|date }}{% if a.status.due_km %}, {{ a.status.due_km|km }}{% endif %})</span>
+            {% elif a.status.due_km %}<span class="muted">({{ a.status.due_km|km }})</span>{% endif %}
+        </span>
+        <span class="actions">
+            {% if a.kind == "reminder" %}
+            <form method="post" action="/reminders/{{ a.item.id }}/done">
+                {{ m.csrf() }}
+                <input type="hidden" name="next" value="{{ path }}">
+                <button class="btn btn-sm" type="submit">Vyřízeno</button>
+            </form>
+            {% else %}
+            <a class="btn btn-sm" href="/services/add?vehicle_id={{ a.vehicle.id }}">Zapsat servis</a>
+            {% endif %}
+        </span>
+    </li>
+    {% endfor %}
+</ul>

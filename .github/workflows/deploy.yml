@@ -5,7 +5,21 @@ on:
     branches: [ "main" ]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalace závislostí
+        run: pip install -r requirements-dev.txt
+      - name: Testy
+        run: python -m pytest -q
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     env:
       APP_DIR: ${{ secrets.APP_DIR }}
@@ -40,7 +54,7 @@ jobs:
             echo "Datum a čas: $(date)"
             echo "===================="
             
-            echo "[0/7] Připravuji SSH known_hosts pro GitHub…"
+            echo "[0/8] Připravuji SSH known_hosts pro GitHub…"
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
             touch ~/.ssh/known_hosts
@@ -48,19 +62,19 @@ jobs:
             # Přidá GitHub host key (vyhne se interaktivnímu promptu)
             ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
 
-            echo "[1/7] Přecházím do adresáře: $APP_DIR"
+            echo "[1/8] Přecházím do adresáře: $APP_DIR"
             cd "$APP_DIR"
 
-            echo "[2/7] Fetch z origin..."
+            echo "[2/8] Fetch z origin..."
             git fetch --all
 
-            echo "[3/7] Reset na origin/main..."
+            echo "[3/8] Reset na origin/main..."
             git reset --hard origin/main
 
-            echo "[4/7] Zobrazuji aktuální commit:"
+            echo "[4/8] Zobrazuji aktuální commit:"
             git rev-parse --short HEAD
 
-            echo "[5/7] Aktivace virtuálního prostředí..."
+            echo "[5/8] Aktivace virtuálního prostředí..."
             if [ ! -d ".venv" ]; then
               echo "  Venv neexistuje – vytvářím..."
               python3 -m venv .venv
@@ -69,7 +83,7 @@ jobs:
             fi
             . .venv/bin/activate
 
-            echo "[6/7] Instalace/aktualizace závislostí..."
+            echo "[6/8] Instalace/aktualizace závislostí..."
             python -m pip install -U pip
             if [ -f requirements.txt ]; then
               pip install -r requirements.txt
@@ -77,7 +91,10 @@ jobs:
               echo "  Soubor requirements.txt nenalezen."
             fi
 
-            echo "[7/7] Restart služby: $SERVICE_NAME"
+            echo "[7/8] Migrace databáze (alembic upgrade head)..."
+            alembic upgrade head
+
+            echo "[8/8] Restart služby: $SERVICE_NAME"
             sudo /usr/bin/systemctl restart "$SERVICE_NAME"
             sudo /usr/bin/systemctl --no-pager --full status "$SERVICE_NAME" || true
 

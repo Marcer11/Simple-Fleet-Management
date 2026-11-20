@@ -1,0 +1,18 @@
+{% extends "maintenance/_record_form.html" %}
+{% import "_macros.html" as m with context %}
+{% set heading = "Upravit servis" if record else "Nový servis" %}
+{% set back_url = "/services" %}
+{% set delete_url = "/services/%d/delete"|format(record.id) if record else "" %}
+{% block fields %}
+{{ m.field("service_date", "Datum", "date", required=true, max=today.isoformat()) }}
+{{ m.field("odometer", "Stav tachometru (km)", "number", min=0, step=1, inputmode="numeric") }}
+<div class="field">
+    <label for="f-service_type">Typ servisu <span class="req">*</span></label>
+    <input id="f-service_type" name="service_type" type="text" required maxlength="50" list="service-types" value="{{ m.val('service_type') }}" autocomplete="off">
+    {{ m.datalist("service-types", service_types) }}
+    <small class="help">Stejný název jako u pravidelného servisu → interval se počítá od tohoto záznamu.</small>
+</div>
+{{ m.field("place", "Místo / servis", maxlength=100) }}
+{{ m.price_fields(currencies, "Cena") }}
+{{ m.textarea("note", "Poznámka / provedené práce") }}
+{% endblock %}

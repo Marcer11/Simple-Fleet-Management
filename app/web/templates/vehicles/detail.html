@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ vehicle.display_name }}{% endblock %}
+{% block content %}
+{% set can_edit = role in ("owner", "editor") %}
+{% set is_owner = role == "owner" %}
+<div class="page-head">
+    <div>
+        <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }}</h1>
+        <div class="sub">
+            {{ vehicle.license_plate or "bez SPZ" }}
+            {% if not vehicle.is_active %}<span class="badge">Neaktivní</span>{% endif %}
+            {{ m.role_badge(role) }}
+            {% if not is_owner and owner %}<span class="small">· vlastník {{ owner.name }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="actions">
+        {% if can_edit %}<a class="btn btn-primary" href="/fuel-records/add?vehicle_id={{ vehicle.id }}">+ Tankování</a>{% endif %}
+        <a class="btn" href="/vehicles/{{ vehicle.id }}/stats">Statistiky</a>
+    </div>
+</div>
+
+<div class="kpis">
+    <div class="kpi"><div class="label">Tachometr</div><div class="value">{{ odometer|km }}</div></div>
+    <div class="kpi">
+        <div class="label">Průměrná spotřeba</div>
+        <div class="value">
+            {% for ft, info in avg_consumption.items() %}{{ info.value|num(1) }}<span class="small"> {{ info.unit }}/100 km</span>{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}
+        </div>
+        {% if avg_consumption|length > 1 %}<div class="hint">{{ avg_consumption.keys()|join(" / ") }}</div>{% endif %}
+    </div>
+    <div class="kpi"><div class="label">Náklady {{ today.year }}</div><div class="value">{{ year_cost|czk(0) if year_cost else "–" }}</div></div>
+    <div class="kpi"><div class="label">Upozornění</div><div class="value">{{ alerts|length }}</div></div>
+</div>
+
+{% if alerts %}
+<div class="card">
+    <h2>Upozornění</h2>
+    {% with show_vehicle=false %}{% include "_alerts.html" %}{% endwith %}
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-head">
+        <h2>Údaje o vozidle</h2>
+        <div class="actions">
+            {% if can_edit %}
+            <a class="btn btn-sm" href="/vehicles/{{ vehicle.id }}/edit">Upravit</a>
+            <form method="post" action="/vehicles/{{ vehicle.id }}/{{ 'deactivate' if vehicle.is_active else 'activate' }}">
+                {{ m.csrf() }}
+                <button class="btn btn-sm" type="submit">{{ "Deaktivovat" if vehicle.is_active else "Aktivovat" }}</button>
+            </form>
+            {% endif %}
+            {% if is_owner %}
+            <a class="btn btn-sm" href="/vehicles/{{ vehicle.id }}/sharing">Sdílení</a>
+            {{ m.delete_button("/vehicles/%d/delete"|format(vehicle.id), "Opravdu smazat vozidlo včetně všech tankování, servisů, výdajů a upomínek?", "Smazat") }}
+            {% else %}
+            <form method="post" action="/vehicles/{{ vehicle.id }}/leave" data-confirm="Opravdu ukončit sdílení tohoto vozidla?">
+                {{ m.csrf() }}
+                <button class="btn btn-sm" type="submit">Ukončit sdílení</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <div class="details">
+        <div><div class="label">Značka</div><div class="value">{{ vehicle.brand }}</div></div>
+        <div><div class="label">Model</div><div class="value">{{ vehicle.model }}</div></div>
+        <div><div class="label">SPZ</div><div class="value">{{ vehicle.license_plate or "–" }}</div></div>
+        <div><div class="label">Rok výroby</div><div class="value">{{ vehicle.production_year or "–" }}</div></div>
+        <div><div class="label">VIN</div><div class="value">{{ vehicle.vin or "–" }}</div></div>
+        <div><div class="label">Barva</div><div class="value">{{ vehicle.color or "–" }}</div></div>
+        <div><div class="label">Zakoupeno</div><div class="value">{{ vehicle.purchase_date|date or "–" }}</div></div>
+        <div><div class="label">Prodáno</div><div class="value">{{ vehicle.sale_date|date or "–" }}</div></div>
+    </div>
+    {% if vehicle.note %}<p style="white-space: pre-line; margin-bottom: 0">{{ vehicle.note }}</p>{% endif %}
+</div>
+
+{# ------------------------------------------------ tankování #}
+<div class="card">
+    <div class="card-head">
+        <h2>Tankování</h2>
+        <div class="actions">
+            <a class="small" href="/fuel-records?vehicle_id={{ vehicle.id }}&all=1">Celá historie</a>
+            {% if can_edit %}<a class="btn btn-sm btn-primary" href="/fuel-records/add?vehicle_id={{ vehicle.id }}">+ Přidat</a>{% endif %}
+        </div>
+    </div>
+    {% if fuel_records %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr>
+            <th>Datum</th><th class="num">Tachometr</th><th>Palivo</th><th class="num">Množství</th>
+            <th class="num">Cena</th><th class="num">Spotřeba</th><th>Stanice</th>{% if can_edit %}<th></th>{% endif %}
+        </tr></thead>
+        <tbody>
+        {% for r in fuel_records %}
+        <tr>
+            <td class="nowrap">{{ r.refuel_datetime|datetime }}</td>
+            <td class="num">{{ r.odometer|km }}</td>
+            <td>{{ r.fuel_type }}{% if not r.full_tank %} <span class="badge" title="Nedotankováno do plna">částečně</span>{% endif %}{% if r.skipped_refuel %} <span class="badge badge-warning" title="Předchozí tankování nebylo zapsáno">vynecháno</span>{% endif %}</td>
+            <td class="num">{{ r.volume_liters|qty }} {{ r.unit }}</td>
+            <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
+            <td class="num">{% if r.consumption %}{{ r.consumption|num(2) }}{% else %}<span class="muted">–</span>{% endif %}</td>
+            <td>{{ r.station_name or "" }}</td>
+            {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/fuel-records/{{ r.id }}/edit">Upravit</a></td>{% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty">Zatím žádná tankování.</div>{% endif %}
+</div>
+
+<div class="grid grid-2">
+    {# ------------------------------------------------ pravidelný servis #}
+    <div class="card">
+        <div class="card-head">
+            <h2>Pravidelný servis</h2>
+            {% if can_edit %}<a class="btn btn-sm" href="/intervals/add?vehicle_id={{ vehicle.id }}">+ Nastavit</a>{% endif %}
+        </div>
+        {% if intervals %}
+        <ul class="alert-list">
+            {% for i, s in intervals %}
+            <li>
+                {% if i.is_active %}{{ m.status_badge(s) }}{% else %}<span class="badge">Vypnuto</span>{% endif %}
+                <span class="what">
+                    <strong>{{ i.service_type }}</strong>
+                    <span class="muted small">· každých {% if i.interval_months %}{{ i.interval_months }} měs.{% endif %}{% if i.interval_months and i.interval_km %} / {% endif %}{% if i.interval_km %}{{ i.interval_km|km }}{% endif %}</span><br>
+                    <span class="small">Další: {% if s.due_date %}{{ s.due_date|date }}{% endif %}{% if s.due_date and s.due_km %}, {% endif %}{% if s.due_km %}{{ s.due_km|km }}{% endif %}{% if not s.due_date and not s.due_km %}neznámé – zapište servis nebo výchozí stav{% endif %}
+                    {% if s.days_left is not none or s.km_left is not none %}<span class="muted">({{ s.summary }})</span>{% endif %}</span>
+                </span>
+                {% if can_edit %}<a class="btn btn-sm" href="/intervals/{{ i.id }}/edit">Upravit</a>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}<div class="empty small">Nastavte intervaly např. pro výměnu oleje nebo STK a aplikace vás upozorní.</div>{% endif %}
+    </div>
+
+    {# ------------------------------------------------ upomínky #}
+    <div class="card">
+        <div class="card-head">
+            <h2>Upomínky</h2>
+            {% if can_edit %}<a class="btn btn-sm" href="/reminders/add?vehicle_id={{ vehicle.id }}">+ Přidat</a>{% endif %}
+        </div>
+        {% if reminders %}
+        <ul class="alert-list">
+            {% for r, s in reminders %}
+            <li>
+                {{ m.status_badge(s) }}
+                <span class="what">
+                    <strong>{{ r.title }}</strong>{% if r.repeat != "none" or r.repeat_km %} <span class="muted small">↻</span>{% endif %}<br>
+                    <span class="small">{% if r.due_date %}{{ r.due_date|date }}{% endif %}{% if r.due_date and r.due_odometer %}, {% endif %}{% if r.due_odometer %}{{ r.due_odometer|km }}{% endif %} <span class="muted">({{ s.summary }})</span></span>
+                </span>
+                {% if can_edit %}
+                <span class="actions">
+                    <form method="post" action="/reminders/{{ r.id }}/done">{{ m.csrf() }}<input type="hidden" name="next" value="{{ path }}"><button class="btn btn-sm" type="submit">Vyřízeno</button></form>
+                    <a class="btn btn-sm" href="/reminders/{{ r.id }}/edit">Upravit</a>
+                </span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}<div class="empty small">Žádné aktivní upomínky (STK, pojištění, dálniční známka, přezutí…).</div>{% endif %}
+    </div>
+</div>
+
+<div class="grid grid-2">
+    {# ------------------------------------------------ servis #}
+    <div class="card">
+        <div class="card-head">
+            <h2>Servis</h2>
+            <div class="actions">
+                <a class="small" href="/services?vehicle_id={{ vehicle.id }}&all=1">Vše</a>
+                {% if can_edit %}<a class="btn btn-sm" href="/services/add?vehicle_id={{ vehicle.id }}">+ Přidat</a>{% endif %}
+            </div>
+        </div>
+        {% if service_records %}
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Datum</th><th>Typ</th><th class="num">Tachometr</th><th class="num">Cena</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for s in service_records %}
+            <tr>
+                <td class="nowrap">{{ s.service_date|date }}</td>
+                <td>{{ s.service_type }}{% if s.place %}<br><span class="muted small">{{ s.place }}</span>{% endif %}</td>
+                <td class="num">{{ s.odometer|km }}</td>
+                <td class="num">{{ s.price_local|czk }}</td>
+                {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/services/{{ s.id }}/edit">Upravit</a></td>{% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}<div class="empty small">Zatím žádný servis.</div>{% endif %}
+    </div>
+
+    {# ------------------------------------------------ výdaje #}
+    <div class="card">
+        <div class="card-head">
+            <h2>Výdaje</h2>
+            <div class="actions">
+                <a class="small" href="/expenses?vehicle_id={{ vehicle.id }}&all=1">Vše</a>
+                {% if can_edit %}<a class="btn btn-sm" href="/expenses/add?vehicle_id={{ vehicle.id }}">+ Přidat</a>{% endif %}
+            </div>
+        </div>
+        {% if expenses %}
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Datum</th><th>Kategorie</th><th class="num">Částka</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for e in expenses %}
+            <tr>
+                <td class="nowrap">{{ e.expense_date|date }}</td>
+                <td>{{ e.category }}{% if e.description %}<br><span class="muted small">{{ e.description }}</span>{% endif %}</td>
+                <td class="num">{{ e.price_local|czk }}</td>
+                {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/expenses/{{ e.id }}/edit">Upravit</a></td>{% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}<div class="empty small">Zatím žádné výdaje.</div>{% endif %}
+    </div>
+</div>
+{% endblock %}

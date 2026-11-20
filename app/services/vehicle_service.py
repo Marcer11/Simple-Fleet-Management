@@ -1,62 +1,290 @@
-from models import Vehicle
+import re
+from datetime import date
+
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
+
+from models import Vehicle, VehicleShare, FuelRecord, ServiceRecord, Expense
+from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
+from services.errors import ValidationError, NotFoundError, PermissionDeniedError
+from services.user_service import normalize_email
+
+HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
+
+# Pole, která lze u vozidla nastavit
+VEHICLE_FIELDS = (
+    "brand", "model", "production_year", "color", "color_hex", "license_plate",
+    "vin", "note", "purchase_date", "sale_date", "is_active",
+)
+
+
+def normalize_plate(value):
+    if value is None:
+        return None
+    value = re.sub(r"[\s-]", "", str(value)).upper()
+    return value or None
 
 
 class VehicleService:
     def __init__(self, session):
         self.session = session
 
+    # ------------------------------------------------------------------
+    # Původní rozhraní (používá i konzolová aplikace)
+    # ------------------------------------------------------------------
+
     def get_all_vehicles(self):
-        return self.session.query(Vehicle).all()
-    
+        return self.session.query(Vehicle).order_by(Vehicle.id).all()
+
     def get_vehicle(self, vehicle_id):
         return (self.session.query(Vehicle)
-        .filter(Vehicle.id == vehicle_id)
-        .first())
+                .filter(Vehicle.id == vehicle_id)
+                .first())
 
-    def create_vehicle(self, brand, model, license_plate=None, color=None):
-        if not brand or not model:
-            raise ValueError("Značka a model jsou povinné.")
+    def create_vehicle(self, brand, model, license_plate=None, color=None, owner_id=None, **extra):
+        data = {"brand": brand, "model": model, "license_plate": license_plate, "color": color, **extra}
+        data = self._validate(data)
 
-        vehicle = Vehicle(
-            brand=brand,
-            model=model,
-            license_plate=license_plate,
-            color=color
-        )
-
+        vehicle = Vehicle(owner_id=owner_id, **data)
+        if vehicle.color_hex is None:
+            vehicle.color_hex = "#FFFFFF"
+        if vehicle.is_active is None:
+            vehicle.is_active = True
         self.session.add(vehicle)
-        self.session.commit()
-
+        self._commit()
         return vehicle
-    
+
     def delete_vehicle(self, vehicle_id):
-        vehicle = self.session.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+        vehicle = self.get_vehicle(vehicle_id)
         if not vehicle:
             raise ValueError("Vozidlo s daným ID nebylo nalezeno.")
         self.session.delete(vehicle)
         self.session.commit()
 
     def edit_vehicle(self, vehicle_id, brand=None, model=None, license_plate=None, color=None, is_active=None):
+        """Mění jen předané hodnoty (None = beze změny). Pro úplnou úpravu viz update_vehicle()."""
         vehicle = self.get_vehicle(vehicle_id)
         if not vehicle:
             raise ValueError("Vozidlo s daným ID nebylo nalezeno.")
 
-        if brand is not None:
-            vehicle.brand = brand
-        if model is not None:
-            vehicle.model = model
-        if license_plate is not None:
-            vehicle.license_plate = license_plate
-        if color is not None:
-            vehicle.color = color
-        if is_active is not None:
-            vehicle.is_active = is_active
-
-        self.session.commit()
-        return vehicle
+        changes = {
+            key: value for key, value in {
+                "brand": brand, "model": model, "license_plate": license_plate,
+                "color": color, "is_active": is_active,
+            }.items() if value is not None
+        }
+        return self.update_vehicle(vehicle, changes)
 
     def activate_vehicle(self, vehicle_id):
         self.edit_vehicle(vehicle_id, is_active=True)
 
     def deactivate_vehicle(self, vehicle_id):
         self.edit_vehicle(vehicle_id, is_active=False)
+
+    # ------------------------------------------------------------------
+    # Úprava a validace
+    # ------------------------------------------------------------------
+
+    def update_vehicle(self, vehicle, data):
+        """Nastaví všechna předaná pole - i na None (tím jde hodnotu smazat)."""
+        current = {field: getattr(vehicle, field) for field in VEHICLE_FIELDS}
+        current.update(data)
+        validated = self._validate(current)
+        for key in data:
+            setattr(vehicle, key, validated[key])
+        self._commit()
+        return vehicle
+
+    def _validate(self, data):
+        data = {key: value for key, value in data.items() if key in VEHICLE_FIELDS}
+        errors = []
+
+        for key in ("brand", "model", "color", "note"):
+            if key in data and isinstance(data[key], str):
+                data[key] = data[key].strip() or None
+
+        if not data.get("brand") or not data.get("model"):
+            errors.append("Značka a model jsou povinné.")
+        if data.get("brand") and len(data["brand"]) > 50:
+            errors.append("Značka může mít nejvýše 50 znaků.")
+        if data.get("model") and len(data["model"]) > 50:
+            errors.append("Model může mít nejvýše 50 znaků.")
+        if data.get("color") and len(data["color"]) > 30:
+            errors.append("Barva může mít nejvýše 30 znaků.")
+
+        if "license_plate" in data:
+            data["license_plate"] = normalize_plate(data["license_plate"])
+            if data["license_plate"] and len(data["license_plate"]) > 10:
+                errors.append("SPZ může mít nejvýše 10 znaků.")
+
+        if data.get("vin"):
+            data["vin"] = re.sub(r"\s", "", data["vin"]).upper()
+            if not VIN_RE.match(data["vin"]):
+                errors.append("VIN musí mít 17 znaků (písmena bez I, O, Q a číslice).")
+        elif "vin" in data:
+            data["vin"] = None
+
+        if data.get("color_hex"):
+            if not HEX_RE.match(data["color_hex"]):
+                errors.append("Barva musí být ve formátu #RRGGBB.")
+            else:
+                data["color_hex"] = data["color_hex"].upper()
+
+        year = data.get("production_year")
+        if year is not None and not (1901 <= int(year) <= date.today().year + 1):
+            errors.append("Neplatný rok výroby.")
+
+        purchase, sale = data.get("purchase_date"), data.get("sale_date")
+        if purchase and sale and sale < purchase:
+            errors.append("Datum prodeje nemůže být před datem nákupu.")
+
+        if errors:
+            raise ValidationError(" ".join(errors), errors)
+        return data
+
+    def _commit(self):
+        try:
+            self.session.commit()
+        except IntegrityError as e:
+            self.session.rollback()
+            raise ValidationError("Záznam se nepodařilo uložit - porušení integrity dat.") from e
+
+    # ------------------------------------------------------------------
+    # Přístupová práva (víceuživatelský režim)
+    # ------------------------------------------------------------------
+
+    def get_role(self, vehicle, user):
+        """Vrátí roli uživatele k vozidlu (owner/editor/viewer) nebo None."""
+        if user is None or vehicle is None:
+            return None
+        if vehicle.owner_id == user.id:
+            return ROLE_OWNER
+        share = (self.session.query(VehicleShare)
+                 .filter(VehicleShare.vehicle_id == vehicle.id, VehicleShare.user_id == user.id)
+                 .first())
+        return share.role if share else None
+
+    def get_vehicle_for_user(self, vehicle_id, user, min_role=ROLE_VIEWER):
+        """Vrátí vozidlo, pokud k němu má uživatel alespoň danou roli."""
+        vehicle = self.get_vehicle(vehicle_id)
+        role = self.get_role(vehicle, user)
+        if vehicle is None or role is None:
+            raise NotFoundError("Vozidlo nenalezeno.")
+        if ROLE_LEVELS[role] < ROLE_LEVELS[min_role]:
+            raise PermissionDeniedError("K této akci nemáte oprávnění.")
+        return vehicle
+
+    def _accessible_query(self, user):
+        shared_ids = (self.session.query(VehicleShare.vehicle_id)
+                      .filter(VehicleShare.user_id == user.id))
+        return self.session.query(Vehicle).filter(
+            or_(Vehicle.owner_id == user.id, Vehicle.id.in_(shared_ids))
+        )
+
+    def get_vehicles_for_user(self, user, only_active=False):
+        query = self._accessible_query(user)
+        if only_active:
+            query = query.filter(Vehicle.is_active.is_(True))
+        return query.order_by(Vehicle.is_active.desc(), Vehicle.brand, Vehicle.model).all()
+
+    def get_roles_for_user(self, user):
+        """{vehicle_id: role} pro všechna vozidla dostupná uživateli."""
+        roles = {v.id: ROLE_OWNER for v in self.session.query(Vehicle).filter(Vehicle.owner_id == user.id)}
+        for share in self.session.query(VehicleShare).filter(VehicleShare.user_id == user.id):
+            roles.setdefault(share.vehicle_id, share.role)
+        return roles
+
+    def get_accessible_ids(self, user, min_role=ROLE_VIEWER):
+        return [vid for vid, role in self.get_roles_for_user(user).items()
+                if ROLE_LEVELS[role] >= ROLE_LEVELS[min_role]]
+
+    # ------------------------------------------------------------------
+    # Sdílení
+    # ------------------------------------------------------------------
+
+    def get_shares(self, vehicle):
+        return (self.session.query(VehicleShare)
+                .filter(VehicleShare.vehicle_id == vehicle.id)
+                .order_by(VehicleShare.created_at)
+                .all())
+
+    def share_vehicle(self, vehicle, email, role=ROLE_VIEWER):
+        from services.user_service import UserService
+
+        if role not in SHARE_ROLES:
+            raise ValidationError("Neplatná role.")
+        target = UserService(self.session).get_by_email(normalize_email(email))
+        if target is None:
+            raise ValidationError("Uživatel s tímto e-mailem není registrován.")
+        if target.id == vehicle.owner_id:
+            raise ValidationError("Vlastníkovi vozidla nelze vozidlo sdílet.")
+
+        share = (self.session.query(VehicleShare)
+                 .filter(VehicleShare.vehicle_id == vehicle.id, VehicleShare.user_id == target.id)
+                 .first())
+        if share:
+            share.role = role
+        else:
+            share = VehicleShare(vehicle_id=vehicle.id, user_id=target.id, role=role)
+            self.session.add(share)
+        self._commit()
+        return share
+
+    def _get_share(self, vehicle, share_id):
+        share = self.session.get(VehicleShare, share_id)
+        if share is None or share.vehicle_id != vehicle.id:
+            raise NotFoundError("Sdílení nenalezeno.")
+        return share
+
+    def update_share_role(self, vehicle, share_id, role):
+        if role not in SHARE_ROLES:
+            raise ValidationError("Neplatná role.")
+        share = self._get_share(vehicle, share_id)
+        share.role = role
+        self._commit()
+        return share
+
+    def remove_share(self, vehicle, share_id):
+        share = self._get_share(vehicle, share_id)
+        self.session.delete(share)
+        self.session.commit()
+
+    def leave_vehicle(self, vehicle, user):
+        """Uživatel sám ukončí sdílení vozidla, které mu někdo nasdílel."""
+        share = (self.session.query(VehicleShare)
+                 .filter(VehicleShare.vehicle_id == vehicle.id, VehicleShare.user_id == user.id)
+                 .first())
+        if share is None:
+            raise ValidationError("Toto vozidlo s vámi není sdíleno.")
+        self.session.delete(share)
+        self.session.commit()
+
+    def transfer_ownership(self, vehicle, new_owner_share_id):
+        """Předá vozidlo uživateli, se kterým je sdíleno; původní vlastník zůstane jako editor."""
+        share = self._get_share(vehicle, new_owner_share_id)
+        old_owner_id = vehicle.owner_id
+        new_owner_id = share.user_id
+        self.session.delete(share)
+        self.session.flush()
+        vehicle.owner_id = new_owner_id
+        if old_owner_id is not None:
+            self.session.add(VehicleShare(vehicle_id=vehicle.id, user_id=old_owner_id, role=ROLE_EDITOR))
+        self._commit()
+
+    # ------------------------------------------------------------------
+    # Pomocné výpočty
+    # ------------------------------------------------------------------
+
+    def get_current_odometer(self, vehicle_id):
+        """Nejvyšší známý stav tachometru ze všech záznamů vozidla."""
+        values = [
+            self.session.query(func.max(FuelRecord.odometer)).filter(FuelRecord.vehicle_id == vehicle_id).scalar(),
+            self.session.query(func.max(ServiceRecord.odometer)).filter(ServiceRecord.vehicle_id == vehicle_id).scalar(),
+            self.session.query(func.max(Expense.odometer)).filter(Expense.vehicle_id == vehicle_id).scalar(),
+        ]
+        values = [v for v in values if v is not None]
+        return max(values) if values else None
+
+    def get_orphan_vehicles(self):
+        return self.session.query(Vehicle).filter(Vehicle.owner_id.is_(None)).all()

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ "Upravit vozidlo" if vehicle else "Nové vozidlo" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>{{ "Upravit vozidlo" if vehicle else "Nové vozidlo" }}</h1>
+</div>
+
+<form method="post" class="card">
+    {{ m.csrf() }}
+    <div class="form-grid">
+        {{ m.field("brand", "Značka", required=true, maxlength=50, placeholder="např. Škoda") }}
+        {{ m.field("model", "Model", required=true, maxlength=50, placeholder="např. Octavia") }}
+        {{ m.field("license_plate", "SPZ", maxlength=12, placeholder="např. 1A2 3456", style="text-transform: uppercase") }}
+        {{ m.field("production_year", "Rok výroby", "number", min=1901, max=today.year + 1) }}
+        {{ m.field("vin", "VIN", maxlength=20, style="text-transform: uppercase", help="17 znaků z velkého TP") }}
+        {{ m.field("color", "Barva", maxlength=30, placeholder="např. stříbrná") }}
+        <div class="field">
+            <label for="f-color_hex">Barva pro zobrazení</label>
+            <div class="inline-color">
+                <input type="color" id="f-color_hex_picker" value="{{ m.val('color_hex') or '#FFFFFF' }}" aria-label="Výběr barvy">
+                <input type="text" id="f-color_hex" name="color_hex" value="{{ m.val('color_hex') or '#FFFFFF' }}" maxlength="7" pattern="#[0-9A-Fa-f]{6}">
+            </div>
+        </div>
+        {{ m.field("purchase_date", "Datum nákupu", "date") }}
+        {{ m.field("sale_date", "Datum prodeje", "date") }}
+        {{ m.textarea("note", "Poznámka") }}
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a class="btn" href="{{ '/vehicles/%d'|format(vehicle.id) if vehicle else '/vehicles' }}">Zrušit</a>
+    </div>
+</form>
+{% endblock %}

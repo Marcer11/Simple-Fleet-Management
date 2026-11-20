@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ "Upravit tankování" if record else "Nové tankování" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>{{ "Upravit tankování" if record else "Nové tankování" }}</h1>
+</div>
+
+{% if not vehicles %}
+<div class="card empty">
+    <p>Nemáte žádné vozidlo, do kterého můžete zapisovat.</p>
+    <a class="btn btn-primary" href="/vehicles/add">Přidat vozidlo</a>
+</div>
+{% else %}
+<form method="post" class="card">
+    {{ m.csrf() }}
+    <div class="form-grid">
+        {{ m.vehicle_select(vehicles, last_odometers, last_fuel_types) }}
+        {{ m.field("refuel_date", "Datum", "date", required=true, max=today.isoformat()) }}
+        {{ m.field("refuel_time", "Čas", "time", required=true) }}
+        <div class="field">
+            <label for="f-odometer">Stav tachometru (km) <span class="req">*</span></label>
+            <input id="f-odometer" name="odometer" type="number" min="0" step="1" required inputmode="numeric" value="{{ m.val('odometer') }}">
+            <small class="help" id="odometer-hint"></small>
+        </div>
+        <div class="field">
+            <label for="f-fuel_type">Palivo <span class="req">*</span></label>
+            <input id="f-fuel_type" name="fuel_type" type="text" required maxlength="15" list="fuel-types" value="{{ m.val('fuel_type') }}" autocomplete="off">
+            {{ m.datalist("fuel-types", fuel_types) }}
+        </div>
+        {{ m.field("volume_liters", "Množství (l / kWh / kg)", required=true, inputmode="decimal", placeholder="0,00", autocomplete="off") }}
+        {{ m.field("unit_price", "Cena za jednotku", inputmode="decimal", placeholder="0,000", autocomplete="off", help="Stačí vyplnit jednu z cen, druhá se dopočítá.") }}
+        {{ m.price_fields(currencies, "Celková cena") }}
+    </div>
+
+    <fieldset>
+        <legend>Výpočet spotřeby</legend>
+        <div class="form-grid">
+            {{ m.checkbox("full_tank", "Natankováno do plna", "Spotřeba se počítá mezi dvěma plnými nádržemi.") }}
+            {{ m.checkbox("skipped_refuel", "Předchozí tankování nebylo zapsáno", "Úsek se pak do spotřeby nezapočítá.") }}
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Doplňující údaje</legend>
+        <div class="form-grid">
+            <div class="field">
+                <label for="f-station_name">Čerpací stanice</label>
+                <input id="f-station_name" name="station_name" type="text" maxlength="100" list="stations" value="{{ m.val('station_name') }}">
+                {{ m.datalist("stations", stations) }}
+            </div>
+            <div class="field">
+                <label for="f-payment_method">Způsob platby</label>
+                <input id="f-payment_method" name="payment_method" type="text" maxlength="20" list="payment-methods" value="{{ m.val('payment_method') }}">
+                {{ m.datalist("payment-methods", payment_methods) }}
+            </div>
+            {{ m.textarea("note", "Poznámka") }}
+        </div>
+    </fieldset>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        {% if not record %}<button type="submit" class="btn" name="next" value="add">Uložit a přidat další</button>{% endif %}
+        <a class="btn" href="{{ '/vehicles/%d'|format(record.vehicle_id) if record else '/fuel-records' }}">Zrušit</a>
+    </div>
+</form>
+
+{% if record %}
+<div class="card">
+    <div class="card-head">
+        <span class="muted small">Smazáním se přepočítá spotřeba ostatních tankování.</span>
+        {{ m.delete_button("/fuel-records/%d/delete"|format(record.id), "Opravdu smazat toto tankování?", "Smazat tankování", small=false) }}
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,306 @@
+"""Servis, pravidelný servis, upomínky a výdaje."""
+from datetime import date
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import RedirectResponse
+
+from models.maintenance import SERVICE_TYPES, EXPENSE_CATEGORIES, REPEAT_OPTIONS
+from models.vehicle import ROLE_EDITOR
+from services.maintenance_service import (
+    ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
+)
+from services.vehicle_service import VehicleService
+from web.common import (
+    visible_vehicles, check_record_access, default_filter_period, csv_response, decimal_csv,
+)
+from web.crud import CrudConfig, register_crud
+from web.deps import get_db, get_current_user, flash, render
+from web.forms import iso, parse_filter_date, parse_filter_int, rate_from_record
+
+router = APIRouter()
+
+
+def _list_filters(request, db, user):
+    q = request.query_params
+    vehicles = visible_vehicles(db, user)
+    vehicle_id = parse_filter_int(q.get("vehicle_id"))
+    ids = [v.id for v in vehicles if vehicle_id in (None, v.id)]
+    if q.get("all"):
+        date_from = date_to = None
+    else:
+        date_from, date_to = default_filter_period(parse_filter_date(q.get("date_from")),
+                                                   parse_filter_date(q.get("date_to")))
+    filters = {"vehicle_id": vehicle_id, "date_from": iso(date_from), "date_to": iso(date_to),
+               "all": q.get("all", ""), "category": q.get("category", ""), "service_type": q.get("service_type", "")}
+    return vehicles, ids, date_from, date_to, filters
+
+
+def _check_not_future(d, label):
+    from services.errors import ValidationError
+    if d and d > date.today():
+        raise ValidationError(f"{label} nemůže být v budoucnosti.")
+
+
+# ======================================================================
+# Servis
+# ======================================================================
+
+def _read_service(form):
+    data = {
+        "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
+        "service_date": form.date("service_date", "Datum", required=True),
+        "odometer": form.int("odometer", "Stav tachometru", min_value=0),
+        "service_type": form.str("service_type", "Typ servisu", required=True, max_len=50),
+        "place": form.str("place", "Místo", max_len=100),
+        "price_paid": form.decimal("price_paid", "Cena", min_value=0),
+        "currency_code": form.str("currency_code", "Měna") or "CZK",
+        "manual_rate": form.decimal("manual_rate", "Kurz", positive=True),
+        "note": form.str("note", "Poznámka"),
+    }
+    form.check()
+    _check_not_future(data["service_date"], "Datum servisu")
+    return data
+
+
+def _service_values(r):
+    return {
+        "vehicle_id": str(r.vehicle_id), "service_date": iso(r.service_date), "odometer": iso(r.odometer),
+        "service_type": r.service_type, "place": r.place or "", "price_paid": iso(r.price_paid),
+        "currency_code": r.currency_code, "manual_rate": rate_from_record(r), "note": r.note or "",
+    }
+
+
+register_crud(router, CrudConfig(
+    prefix="/services",
+    service_cls=ServiceRecordService,
+    template="maintenance/service_form.html",
+    read_form=_read_service,
+    to_values=_service_values,
+    default_values=lambda vid: {"service_date": date.today().isoformat(), "currency_code": "CZK"},
+    extra_context=lambda db, user: {"service_types": SERVICE_TYPES},
+    messages={"created": "Servis byl uložen.", "deleted": "Servisní záznam byl smazán."},
+))
+
+
+@router.get("/services")
+async def list_services(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    vehicles, ids, date_from, date_to, filters = _list_filters(request, db, user)
+    records = ServiceRecordService(db).search(ids, date_from, date_to, service_type=filters["service_type"])
+
+    # Přehled pravidelných servisů všech vybraných vozidel
+    vehicle_service = VehicleService(db)
+    interval_service = ServiceIntervalService(db)
+    odometers = {vid: vehicle_service.get_current_odometer(vid) for vid in ids}
+    intervals = [(i, interval_service.get_status(i, odometers[i.vehicle_id]))
+                 for i in interval_service.list_for_vehicles(ids, only_active=False)]
+
+    return render(request, "maintenance/service_list.html", vehicles=vehicles, records=records,
+                  intervals=intervals, filters=filters,
+                  total=sum((r.price_local or 0 for r in records), 0),
+                  service_types=ServiceRecordService(db).get_service_types(ids),
+                  editable_ids=set(vehicle_service.get_accessible_ids(user, ROLE_EDITOR)))
+
+
+@router.get("/services/export.csv")
+async def export_services(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    _, ids, date_from, date_to, filters = _list_filters(request, db, user)
+    records = ServiceRecordService(db).search(ids, date_from, date_to, service_type=filters["service_type"])
+    rows = [(r.vehicle.display_name, r.service_date, r.odometer, r.service_type, r.place,
+             decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local), r.note) for r in records]
+    return csv_response("servis.csv", ["Vozidlo", "Datum", "Tachometr", "Typ", "Místo", "Cena", "Měna",
+                                       "Cena CZK", "Poznámka"], rows)
+
+
+# ======================================================================
+# Pravidelný servis (intervaly)
+# ======================================================================
+
+def _read_interval(form):
+    data = {
+        "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
+        "service_type": form.str("service_type", "Typ servisu", required=True, max_len=50),
+        "interval_months": form.int("interval_months", "Interval (měsíce)", min_value=1, max_value=240),
+        "interval_km": form.int("interval_km", "Interval (km)", min_value=1),
+        "start_date": form.date("start_date", "Výchozí datum"),
+        "start_odometer": form.int("start_odometer", "Výchozí tachometr", min_value=0),
+        "note": form.str("note", "Poznámka"),
+        "is_active": form.bool("is_active"),
+    }
+    form.check()
+    return data
+
+
+def _interval_values(i):
+    return {
+        "vehicle_id": str(i.vehicle_id), "service_type": i.service_type,
+        "interval_months": iso(i.interval_months), "interval_km": iso(i.interval_km),
+        "start_date": iso(i.start_date), "start_odometer": iso(i.start_odometer),
+        "note": i.note or "", "is_active": "on" if i.is_active else "",
+    }
+
+
+register_crud(router, CrudConfig(
+    prefix="/intervals",
+    service_cls=ServiceIntervalService,
+    template="maintenance/interval_form.html",
+    read_form=_read_interval,
+    to_values=_interval_values,
+    default_values=lambda vid: {"is_active": "on", "start_date": date.today().isoformat()},
+    extra_context=lambda db, user: {"service_types": SERVICE_TYPES},
+    messages={"created": "Pravidelný servis byl nastaven.", "deleted": "Pravidelný servis byl odstraněn."},
+))
+
+
+# ======================================================================
+# Upomínky
+# ======================================================================
+
+def _read_reminder(form):
+    data = {
+        "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
+        "title": form.str("title", "Název", required=True, max_len=100),
+        "due_date": form.date("due_date", "Datum"),
+        "due_odometer": form.int("due_odometer", "Stav tachometru", min_value=0),
+        "repeat": form.choice("repeat", "Opakování", REPEAT_OPTIONS, default="none"),
+        "repeat_km": form.int("repeat_km", "Opakovat po km", min_value=1),
+        "notify_days_before": form.int("notify_days_before", "Upozornit dní předem", min_value=0, max_value=365),
+        "notify_km_before": form.int("notify_km_before", "Upozornit km předem", min_value=0),
+        "note": form.str("note", "Poznámka"),
+        "is_done": form.bool("is_done"),
+    }
+    form.check()
+    return data
+
+
+def _reminder_values(r):
+    return {
+        "vehicle_id": str(r.vehicle_id), "title": r.title, "due_date": iso(r.due_date),
+        "due_odometer": iso(r.due_odometer), "repeat": r.repeat, "repeat_km": iso(r.repeat_km),
+        "notify_days_before": iso(r.notify_days_before), "notify_km_before": iso(r.notify_km_before),
+        "note": r.note or "", "is_done": "on" if r.is_done else "",
+    }
+
+
+register_crud(router, CrudConfig(
+    prefix="/reminders",
+    service_cls=ReminderService,
+    template="maintenance/reminder_form.html",
+    read_form=_read_reminder,
+    to_values=_reminder_values,
+    default_values=lambda vid: {"repeat": "none", "notify_days_before": "14", "notify_km_before": "500"},
+    extra_context=lambda db, user: {"repeat_options": REPEAT_OPTIONS},
+    messages={"created": "Upomínka byla uložena.", "deleted": "Upomínka byla smazána."},
+))
+
+
+@router.get("/reminders")
+async def list_reminders(request: Request, show: str = "open", user=Depends(get_current_user), db=Depends(get_db)):
+    vehicles = visible_vehicles(db, user)
+    ids = [v.id for v in vehicles]
+    vehicle_service = VehicleService(db)
+    service = ReminderService(db)
+    odometers = {vid: vehicle_service.get_current_odometer(vid) for vid in ids}
+    reminders = [(r, service.get_status(r, odometers[r.vehicle_id]))
+                 for r in service.list_for_vehicles(ids, include_done=(show == "all"))]
+    return render(request, "maintenance/reminder_list.html", reminders=reminders, show=show,
+                  repeat_options=REPEAT_OPTIONS,
+                  editable_ids=set(vehicle_service.get_accessible_ids(user, ROLE_EDITOR)))
+
+
+@router.post("/reminders/{record_id}/done")
+async def reminder_done(request: Request, record_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    service = ReminderService(db)
+    reminder = service.get(record_id)
+    vehicle = check_record_access(db, user, reminder, ROLE_EDITOR)
+    service.complete(reminder, VehicleService(db).get_current_odometer(vehicle.id))
+    if reminder.is_done:
+        flash(request, f"Upomínka „{reminder.title}“ byla vyřízena.")
+    else:
+        flash(request, f"Upomínka „{reminder.title}“ byla posunuta na další termín.")
+    next_url = (await request.form()).get("next") or ""
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = f"/vehicles/{vehicle.id}"
+    return RedirectResponse(next_url, status_code=303)
+
+
+@router.post("/reminders/{record_id}/reopen")
+async def reminder_reopen(request: Request, record_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    service = ReminderService(db)
+    reminder = service.get(record_id)
+    check_record_access(db, user, reminder, ROLE_EDITOR)
+    service.reopen(reminder)
+    flash(request, "Upomínka byla znovu otevřena.")
+    return RedirectResponse("/reminders?show=all", status_code=303)
+
+
+# ======================================================================
+# Výdaje
+# ======================================================================
+
+def _read_expense(form):
+    data = {
+        "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
+        "expense_date": form.date("expense_date", "Datum", required=True),
+        "category": form.str("category", "Kategorie", required=True, max_len=30),
+        "description": form.str("description", "Popis", max_len=200),
+        "odometer": form.int("odometer", "Stav tachometru", min_value=0),
+        "price_paid": form.decimal("price_paid", "Částka", required=True, min_value=0),
+        "currency_code": form.str("currency_code", "Měna") or "CZK",
+        "manual_rate": form.decimal("manual_rate", "Kurz", positive=True),
+        "note": form.str("note", "Poznámka"),
+    }
+    form.check()
+    return data
+
+
+def _expense_values(e):
+    return {
+        "vehicle_id": str(e.vehicle_id), "expense_date": iso(e.expense_date), "category": e.category,
+        "description": e.description or "", "odometer": iso(e.odometer), "price_paid": iso(e.price_paid),
+        "currency_code": e.currency_code, "manual_rate": rate_from_record(e), "note": e.note or "",
+    }
+
+
+register_crud(router, CrudConfig(
+    prefix="/expenses",
+    service_cls=ExpenseService,
+    template="maintenance/expense_form.html",
+    read_form=_read_expense,
+    to_values=_expense_values,
+    default_values=lambda vid: {"expense_date": date.today().isoformat(), "currency_code": "CZK"},
+    extra_context=lambda db, user: {"categories": EXPENSE_CATEGORIES},
+    messages={"created": "Výdaj byl uložen.", "deleted": "Výdaj byl smazán."},
+))
+
+
+@router.get("/expenses")
+async def list_expenses(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    vehicles, ids, date_from, date_to, filters = _list_filters(request, db, user)
+    records = ExpenseService(db).search(ids, date_from, date_to, category=filters["category"])
+    by_category = {}
+    for r in records:
+        by_category[r.category] = by_category.get(r.category, 0) + (r.price_local or 0)
+    return render(request, "maintenance/expense_list.html", vehicles=vehicles, records=records, filters=filters,
+                  total=sum(by_category.values(), 0),
+                  by_category=sorted(by_category.items(), key=lambda kv: -kv[1]),
+                  categories=EXPENSE_CATEGORIES,
+                  editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)))
+
+
+@router.get("/expenses/export.csv")
+async def export_expenses(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    _, ids, date_from, date_to, filters = _list_filters(request, db, user)
+    records = ExpenseService(db).search(ids, date_from, date_to, category=filters["category"])
+    rows = [(r.vehicle.display_name, r.expense_date, r.category, r.description, r.odometer,
+             decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local), r.note) for r in records]
+    return csv_response("vydaje.csv", ["Vozidlo", "Datum", "Kategorie", "Popis", "Tachometr", "Částka", "Měna",
+                                       "Částka CZK", "Poznámka"], rows)
+
+
+# ======================================================================
+# Přehled upozornění (pro dashboard)
+# ======================================================================
+
+def alerts_for_user(db, user):
+    vehicles = VehicleService(db).get_vehicles_for_user(user, only_active=True)
+    return collect_alerts(db, vehicles)

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Servis{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>Servis</h1>
+    <div class="actions">
+        <a class="btn" href="/intervals/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Pravidelný servis</a>
+        <a class="btn btn-primary" href="/services/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Zapsat servis</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Pravidelný servis</h2>
+    {% if intervals %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Stav</th><th>Vozidlo</th><th>Typ</th><th>Interval</th><th>Naposledy</th><th>Příště</th><th></th></tr></thead>
+        <tbody>
+        {% for i, s in intervals %}
+        <tr>
+            <td>{% if i.is_active %}{{ m.status_badge(s) }}{% else %}<span class="badge">Vypnuto</span>{% endif %}</td>
+            <td>{{ m.color_dot(i.vehicle) }} <a href="/vehicles/{{ i.vehicle.id }}">{{ i.vehicle.display_name }}</a></td>
+            <td>{{ i.service_type }}</td>
+            <td class="nowrap">{% if i.interval_months %}{{ i.interval_months }} měs.{% endif %}{% if i.interval_months and i.interval_km %} / {% endif %}{% if i.interval_km %}{{ i.interval_km|km }}{% endif %}</td>
+            <td class="nowrap">{{ s.last_date|date or "–" }}{% if s.last_km is not none %}<br><span class="muted small">{{ s.last_km|km }}</span>{% endif %}</td>
+            <td class="nowrap">{% if s.due_date %}{{ s.due_date|date }}{% endif %}{% if s.due_km %}<br><span class="small">{{ s.due_km|km }}</span>{% endif %}
+                {% if s.days_left is not none or s.km_left is not none %}<br><span class="muted small">{{ s.summary }}</span>{% endif %}</td>
+            <td class="actions-cell">{% if i.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/intervals/{{ i.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty small">Nastavte pravidelný servis (olej, STK, rozvody…) a aplikace vás upozorní, když bude zbývat méně než 10 % intervalu.</div>{% endif %}
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>Historie servisu</h2>
+        <a class="btn btn-sm" href="/services/export.csv?{{ request.query_params }}">Export CSV</a>
+    </div>
+    {% call m.period_filter("/services", vehicles, filters) %}
+    <div class="field">
+        <label for="flt-type">Typ</label>
+        <select id="flt-type" name="service_type">
+            <option value="">Vše</option>
+            {% for t in service_types %}<option{% if filters.service_type == t %} selected{% endif %}>{{ t }}</option>{% endfor %}
+        </select>
+    </div>
+    {% endcall %}
+    {% if records %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Datum</th><th>Vozidlo</th><th>Typ</th><th>Místo</th><th class="num">Tachometr</th><th class="num">Cena</th><th></th></tr></thead>
+        <tbody>
+        {% for r in records %}
+        <tr>
+            <td class="nowrap">{{ r.service_date|date }}</td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>
+            <td>{{ r.service_type }}{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
+            <td>{{ r.place or "" }}</td>
+            <td class="num">{{ r.odometer|km }}</td>
+            <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" and r.price_paid %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
+            <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/services/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><td colspan="5">Celkem</td><td class="num">{{ total|czk }}</td><td></td></tr></tfoot>
+    </table>
+    </div>
+    {% else %}<div class="empty">Ve zvoleném období není žádný servis.</div>{% endif %}
+</div>
+{% endblock %}

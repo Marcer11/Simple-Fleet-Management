@@ -1,0 +1,17 @@
+{% extends "maintenance/_record_form.html" %}
+{% import "_macros.html" as m with context %}
+{% set heading = "Upravit výdaj" if record else "Nový výdaj" %}
+{% set back_url = "/expenses" %}
+{% set delete_url = "/expenses/%d/delete"|format(record.id) if record else "" %}
+{% block fields %}
+{{ m.field("expense_date", "Datum", "date", required=true, max=today.isoformat()) }}
+<div class="field">
+    <label for="f-category">Kategorie <span class="req">*</span></label>
+    <input id="f-category" name="category" type="text" required maxlength="30" list="categories" value="{{ m.val('category') }}" autocomplete="off">
+    {{ m.datalist("categories", categories) }}
+</div>
+{{ m.field("description", "Popis", maxlength=200) }}
+{{ m.field("odometer", "Stav tachometru (km)", "number", min=0, step=1) }}
+{{ m.price_fields(currencies, "Částka", required=true) }}
+{{ m.textarea("note", "Poznámka") }}
+{% endblock %}

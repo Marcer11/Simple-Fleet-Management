@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Profil{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Profil</h1>
+        <div class="sub">{{ current_user.email }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Osobní údaje</h2>
+        <form method="post" action="/profile">
+            {{ m.csrf() }}
+            <input type="hidden" name="action" value="profile">
+            {{ m.field("name", "Jméno", required=true, maxlength=100, autocomplete="name") }}
+            <div class="form-actions"><button class="btn btn-primary" type="submit">Uložit</button></div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Změna hesla</h2>
+        <form method="post" action="/profile">
+            {{ m.csrf() }}
+            <input type="hidden" name="action" value="password">
+            <div class="grid" style="gap: 14px">
+                <div class="field">
+                    <label for="f-current_password">Současné heslo</label>
+                    <input id="f-current_password" name="current_password" type="password" required autocomplete="current-password">
+                </div>
+                <div class="field">
+                    <label for="f-new_password">Nové heslo</label>
+                    <input id="f-new_password" name="new_password" type="password" required minlength="8" autocomplete="new-password">
+                </div>
+                <div class="field">
+                    <label for="f-new_password_confirm">Nové heslo znovu</label>
+                    <input id="f-new_password_confirm" name="new_password_confirm" type="password" required minlength="8" autocomplete="new-password">
+                </div>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary" type="submit">Změnit heslo</button></div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Tankování{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>Tankování</h1>
+    <div class="actions">
+        <a class="btn" href="/fuel-records/export.csv?{{ request.query_params }}">Export CSV</a>
+        <a class="btn btn-primary" href="/fuel-records/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Přidat tankování</a>
+    </div>
+</div>
+
+<div class="card">
+    {% call m.period_filter("/fuel-records", vehicles, filters) %}
+    <div class="field">
+        <label for="flt-fuel">Palivo</label>
+        <select id="flt-fuel" name="fuel_type">
+            <option value="">Vše</option>
+            {% for ft in fuel_types %}<option{% if filters.fuel_type == ft %} selected{% endif %}>{{ ft }}</option>{% endfor %}
+        </select>
+    </div>
+    {% endcall %}
+
+    {% if records %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr>
+            <th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Palivo</th><th class="num">Množství</th>
+            <th class="num">Cena/jedn.</th><th class="num">Cena</th><th class="num">Spotřeba</th><th>Stanice</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for r in records %}
+        <tr>
+            <td class="nowrap">{{ r.refuel_datetime|datetime }}</td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>
+            <td class="num">{{ r.odometer|km }}</td>
+            <td>{{ r.fuel_type }}{% if not r.full_tank %} <span class="badge">částečně</span>{% endif %}{% if r.skipped_refuel %} <span class="badge badge-warning">vynecháno</span>{% endif %}</td>
+            <td class="num">{{ r.volume_liters|qty }} {{ r.unit }}</td>
+            <td class="num">{{ r.unit_price_local|num(2) }}</td>
+            <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
+            <td class="num">{% if r.consumption %}{{ r.consumption|num(2) }}{% else %}<span class="muted">–</span>{% endif %}</td>
+            <td>{{ r.station_name or "" }}</td>
+            <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/fuel-records/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><td colspan="6">Celkem ({{ totals.count }} tankování)</td><td class="num">{{ totals.price|czk }}</td><td colspan="3"></td></tr></tfoot>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty">Ve zvoleném období nejsou žádná tankování.</div>
+    {% endif %}
+</div>
+{% endblock %}

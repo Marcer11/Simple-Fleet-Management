@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Přihlášení{% endblock %}
+{% block content %}
+<div class="auth-box card">
+    <h1>Přihlášení</h1>
+    <form method="post" action="/login">
+        {{ m.csrf() }}
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="grid" style="gap: 14px">
+            {{ m.field("email", "E-mail", "email", required=true, autocomplete="username", autofocus=true) }}
+            <div class="field">
+                <label for="f-password">Heslo <span class="req">*</span></label>
+                <input id="f-password" name="password" type="password" required autocomplete="current-password">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Přihlásit se</button>
+        </div>
+    </form>
+    {% if allow_registration %}
+    <p class="muted small" style="margin-bottom: 0">Nemáte účet? <a href="/register">Zaregistrujte se</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}

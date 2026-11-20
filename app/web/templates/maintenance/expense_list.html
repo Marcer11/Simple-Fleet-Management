@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Výdaje{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>Výdaje</h1>
+    <div class="actions">
+        <a class="btn" href="/expenses/export.csv?{{ request.query_params }}">Export CSV</a>
+        <a class="btn btn-primary" href="/expenses/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Přidat výdaj</a>
+    </div>
+</div>
+
+<div class="card">
+    {% call m.period_filter("/expenses", vehicles, filters) %}
+    <div class="field">
+        <label for="flt-cat">Kategorie</label>
+        <select id="flt-cat" name="category">
+            <option value="">Vše</option>
+            {% for c in categories %}<option{% if filters.category == c %} selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+    </div>
+    {% endcall %}
+
+    {% if records %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Datum</th><th>Vozidlo</th><th>Kategorie</th><th>Popis</th><th class="num">Částka</th><th></th></tr></thead>
+        <tbody>
+        {% for r in records %}
+        <tr>
+            <td class="nowrap">{{ r.expense_date|date }}</td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>
+            <td>{{ r.category }}</td>
+            <td>{{ r.description or "" }}</td>
+            <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
+            <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/expenses/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><td colspan="4">Celkem</td><td class="num">{{ total|czk }}</td><td></td></tr></tfoot>
+    </table>
+    </div>
+    {% else %}<div class="empty">Ve zvoleném období nejsou žádné výdaje.</div>{% endif %}
+</div>
+
+{% if by_category|length > 1 %}
+<div class="card">
+    <h2>Podle kategorie</h2>
+    <div class="table-wrap">
+    <table>
+        <tbody>
+        {% for cat, amount in by_category %}
+        <tr><td>{{ cat }}</td><td class="num">{{ amount|czk }}</td><td class="num muted">{{ (amount / total * 100)|num(0) if total else 0 }} %</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

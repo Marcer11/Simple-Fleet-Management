@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Sdílení – {{ vehicle.display_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Sdílení vozidla</h1>
+        <div class="sub"><a href="/vehicles/{{ vehicle.id }}">{{ m.color_dot(vehicle) }} {{ vehicle.display_name }}</a></div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Sdílet s dalším uživatelem</h2>
+    <p class="muted small">Uživatel musí mít v aplikaci účet. <strong>Jen náhled</strong> – vidí vozidlo a všechny záznamy.
+        <strong>Úpravy</strong> – může navíc zapisovat tankování, servis, výdaje a upomínky a upravovat údaje vozidla.
+        Smazat vozidlo a měnit sdílení může jen vlastník.</p>
+    <form method="post" class="form-grid">
+        {{ m.csrf() }}
+        <input type="hidden" name="action" value="add">
+        {{ m.field("email", "E-mail uživatele", "email", required=true) }}
+        {{ m.select("role", "Oprávnění", share_roles.items()) }}
+        <div class="field" style="justify-content: flex-end">
+            <button type="submit" class="btn btn-primary">Sdílet</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Sdíleno s</h2>
+    {% if shares %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Uživatel</th><th>Oprávnění</th><th></th></tr></thead>
+        <tbody>
+        {% for s in shares %}
+        <tr>
+            <td>{{ s.user.name }}<br><span class="muted small">{{ s.user.email }}</span></td>
+            <td>
+                <form method="post" class="actions">
+                    {{ m.csrf() }}
+                    <input type="hidden" name="action" value="role">
+                    <input type="hidden" name="share_id" value="{{ s.id }}">
+                    <select name="role" aria-label="Oprávnění" onchange="this.form.submit()" style="width: auto">
+                        {% for value, label in share_roles.items() %}
+                        <option value="{{ value }}"{% if s.role == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <noscript><button class="btn btn-sm" type="submit">Změnit</button></noscript>
+                </form>
+            </td>
+            <td class="actions-cell">
+                <div class="actions" style="justify-content: flex-end">
+                    <form method="post" data-confirm="Předat vozidlo uživateli {{ s.user.name }}? Vy zůstanete jako editor a o vozidlo už nebudete moci rozhodovat.">
+                        {{ m.csrf() }}
+                        <input type="hidden" name="action" value="transfer">
+                        <input type="hidden" name="share_id" value="{{ s.id }}">
+                        <button class="btn btn-sm" type="submit">Předat vlastnictví</button>
+                    </form>
+                    <form method="post" data-confirm="Zrušit sdílení s uživatelem {{ s.user.name }}?">
+                        {{ m.csrf() }}
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="share_id" value="{{ s.id }}">
+                        <button class="btn btn-sm btn-danger" type="submit">Zrušit</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty">Vozidlo zatím s nikým nesdílíte.</div>{% endif %}
+</div>
+{% endblock %}

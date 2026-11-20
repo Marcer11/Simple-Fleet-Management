@@ -1,0 +1,430 @@
+import calendar
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+
+from sqlalchemy import func
+
+from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle
+from models.maintenance import REPEAT_OPTIONS, REPEAT_NONE
+from services.errors import ValidationError, NotFoundError
+from services.pricing import convert_price
+
+# Upozorňovat, pokud ze servisního intervalu zbývá méně než 10 %
+INTERVAL_WARNING_RATIO = 0.10
+
+LEVEL_OK = "ok"
+LEVEL_WARNING = "warning"
+LEVEL_OVERDUE = "overdue"
+LEVEL_UNKNOWN = "unknown"
+_LEVEL_ORDER = {LEVEL_UNKNOWN: 0, LEVEL_OK: 1, LEVEL_WARNING: 2, LEVEL_OVERDUE: 3}
+
+
+def add_months(d, months):
+    month_index = d.month - 1 + months
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def shift_by_repeat(d, repeat):
+    if repeat == "daily":
+        return d + timedelta(days=1)
+    if repeat == "weekly":
+        return d + timedelta(weeks=1)
+    if repeat == "monthly":
+        return add_months(d, 1)
+    if repeat == "yearly":
+        return add_months(d, 12)
+    return d
+
+
+@dataclass
+class DueStatus:
+    """Stav termínu (servisního intervalu nebo upomínky)."""
+    level: str = LEVEL_UNKNOWN
+    due_date: date = None
+    due_km: int = None
+    days_left: int = None
+    km_left: int = None
+    last_date: date = None
+    last_km: int = None
+    messages: list = field(default_factory=list)
+
+    @property
+    def is_alert(self):
+        return self.level in (LEVEL_WARNING, LEVEL_OVERDUE)
+
+    @property
+    def summary(self):
+        parts = []
+        if self.days_left is not None:
+            if self.days_left < 0:
+                parts.append(f"po termínu {-self.days_left} dní")
+            else:
+                parts.append(f"za {self.days_left} dní")
+        if self.km_left is not None:
+            if self.km_left < 0:
+                parts.append(f"překročeno o {-self.km_left:,} km".replace(",", " "))
+            else:
+                parts.append(f"za {self.km_left:,} km".replace(",", " "))
+        return ", ".join(parts) if parts else "termín nelze určit"
+
+
+def _worse(a, b):
+    return a if _LEVEL_ORDER[a] >= _LEVEL_ORDER[b] else b
+
+
+def _clean_str(value, max_len=None, label="Hodnota", required=False):
+    value = value.strip() if isinstance(value, str) else value
+    value = value or None
+    if required and not value:
+        raise ValidationError(f"{label} je povinná položka.")
+    if value and max_len and len(value) > max_len:
+        raise ValidationError(f"{label} může mít nejvýše {max_len} znaků.")
+    return value
+
+
+def _positive_int(value, label, allow_none=True):
+    if value is None or value == "":
+        if allow_none:
+            return None
+        raise ValidationError(f"{label} je povinná položka.")
+    value = int(value)
+    if value < 0:
+        raise ValidationError(f"{label} nemůže být záporné číslo.")
+    return value
+
+
+def _ensure_vehicle(session, vehicle_id):
+    if not vehicle_id or session.get(Vehicle, vehicle_id) is None:
+        raise NotFoundError("Vozidlo nenalezeno.")
+
+
+class _RecordServiceBase:
+    model = None
+    date_column = None
+
+    def __init__(self, session):
+        self.session = session
+
+    def get(self, record_id):
+        return self.session.get(self.model, record_id)
+
+    def search(self, vehicle_ids, date_from=None, date_to=None, **filters):
+        if not vehicle_ids:
+            return []
+        col = getattr(self.model, self.date_column)
+        query = self.session.query(self.model).filter(self.model.vehicle_id.in_(vehicle_ids))
+        if date_from:
+            query = query.filter(col >= date_from)
+        if date_to:
+            query = query.filter(col <= date_to)
+        for key, value in filters.items():
+            if value:
+                query = query.filter(getattr(self.model, key) == value)
+        return query.order_by(col.desc(), self.model.id.desc()).all()
+
+    def create(self, **data):
+        record = self.model(**self._validate(data))
+        self.session.add(record)
+        self.session.commit()
+        return record
+
+    def update(self, record, data):
+        current = {c.name: getattr(record, c.name) for c in self.model.__table__.columns if c.name != "id"}
+        current.update(data)
+        for key, value in self._validate(current).items():
+            setattr(record, key, value)
+        self.session.commit()
+        return record
+
+    def delete(self, record):
+        self.session.delete(record)
+        self.session.commit()
+
+    def _validate(self, data):
+        raise NotImplementedError
+
+
+# ----------------------------------------------------------------------
+# Servis
+# ----------------------------------------------------------------------
+
+class ServiceRecordService(_RecordServiceBase):
+    model = ServiceRecord
+    date_column = "service_date"
+
+    def _validate(self, data, manual_rate=None):
+        _ensure_vehicle(self.session, data.get("vehicle_id"))
+        if not data.get("service_date"):
+            raise ValidationError("Datum servisu je povinné.")
+        manual_rate = data.pop("manual_rate", None)
+        currency, price_paid, price_local = convert_price(
+            data.get("price_paid"), data.get("currency_code"), data["service_date"], manual_rate)
+        return {
+            "vehicle_id": data["vehicle_id"],
+            "service_date": data["service_date"],
+            "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
+            "service_type": _clean_str(data.get("service_type"), 50, "Typ servisu", required=True),
+            "place": _clean_str(data.get("place"), 100, "Místo"),
+            "price_paid": price_paid,
+            "currency_code": currency,
+            "price_local": price_local,
+            "note": _clean_str(data.get("note")),
+        }
+
+    def get_service_types(self, vehicle_ids):
+        if not vehicle_ids:
+            return []
+        rows = (self.session.query(ServiceRecord.service_type)
+                .filter(ServiceRecord.vehicle_id.in_(vehicle_ids)).distinct().all())
+        return sorted({r[0] for r in rows})
+
+    def get_last_service(self, vehicle_id, service_type):
+        return (self.session.query(ServiceRecord)
+                .filter(ServiceRecord.vehicle_id == vehicle_id,
+                        func.lower(ServiceRecord.service_type) == service_type.strip().lower())
+                .order_by(ServiceRecord.service_date.desc(), ServiceRecord.id.desc())
+                .first())
+
+
+# ----------------------------------------------------------------------
+# Výdaje
+# ----------------------------------------------------------------------
+
+class ExpenseService(_RecordServiceBase):
+    model = Expense
+    date_column = "expense_date"
+
+    def _validate(self, data):
+        _ensure_vehicle(self.session, data.get("vehicle_id"))
+        if not data.get("expense_date"):
+            raise ValidationError("Datum výdaje je povinné.")
+        if data.get("price_paid") in (None, ""):
+            raise ValidationError("Částka je povinná.")
+        manual_rate = data.pop("manual_rate", None)
+        currency, price_paid, price_local = convert_price(
+            data.get("price_paid"), data.get("currency_code"), data["expense_date"], manual_rate)
+        return {
+            "vehicle_id": data["vehicle_id"],
+            "expense_date": data["expense_date"],
+            "category": _clean_str(data.get("category"), 30, "Kategorie", required=True),
+            "description": _clean_str(data.get("description"), 200, "Popis"),
+            "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
+            "price_paid": price_paid,
+            "currency_code": currency,
+            "price_local": price_local,
+            "note": _clean_str(data.get("note")),
+        }
+
+
+# ----------------------------------------------------------------------
+# Pravidelný servis
+# ----------------------------------------------------------------------
+
+class ServiceIntervalService(_RecordServiceBase):
+    model = ServiceInterval
+    date_column = "id"
+
+    def list_for_vehicles(self, vehicle_ids, only_active=True):
+        if not vehicle_ids:
+            return []
+        query = self.session.query(ServiceInterval).filter(ServiceInterval.vehicle_id.in_(vehicle_ids))
+        if only_active:
+            query = query.filter(ServiceInterval.is_active.is_(True))
+        return query.order_by(ServiceInterval.vehicle_id, ServiceInterval.service_type).all()
+
+    def _validate(self, data):
+        _ensure_vehicle(self.session, data.get("vehicle_id"))
+        months = _positive_int(data.get("interval_months"), "Časový interval")
+        km = _positive_int(data.get("interval_km"), "Kilometrový interval")
+        if not months and not km:
+            raise ValidationError("Zadejte časový nebo kilometrový interval (nebo oba).")
+        return {
+            "vehicle_id": data["vehicle_id"],
+            "service_type": _clean_str(data.get("service_type"), 50, "Typ servisu", required=True),
+            "interval_months": months or None,
+            "interval_km": km or None,
+            "start_date": data.get("start_date") or None,
+            "start_odometer": _positive_int(data.get("start_odometer"), "Výchozí stav tachometru"),
+            "note": _clean_str(data.get("note")),
+            "is_active": True if data.get("is_active") is None else bool(data.get("is_active")),
+        }
+
+    def get_status(self, interval, current_odometer, today=None):
+        today = today or date.today()
+        last = ServiceRecordService(self.session).get_last_service(interval.vehicle_id, interval.service_type)
+        status = DueStatus()
+        status.last_date = last.service_date if last else interval.start_date
+        status.last_km = last.odometer if last and last.odometer is not None else interval.start_odometer
+
+        level = LEVEL_UNKNOWN
+        if interval.interval_months and status.last_date:
+            status.due_date = add_months(status.last_date, interval.interval_months)
+            status.days_left = (status.due_date - today).days
+            total_days = (status.due_date - status.last_date).days or 1
+            if status.days_left < 0:
+                level = _worse(level, LEVEL_OVERDUE)
+            elif status.days_left < total_days * INTERVAL_WARNING_RATIO:
+                level = _worse(level, LEVEL_WARNING)
+            else:
+                level = _worse(level, LEVEL_OK)
+
+        if interval.interval_km and status.last_km is not None:
+            status.due_km = status.last_km + interval.interval_km
+            if current_odometer is not None:
+                status.km_left = status.due_km - current_odometer
+                if status.km_left < 0:
+                    level = _worse(level, LEVEL_OVERDUE)
+                elif status.km_left < interval.interval_km * INTERVAL_WARNING_RATIO:
+                    level = _worse(level, LEVEL_WARNING)
+                else:
+                    level = _worse(level, LEVEL_OK)
+
+        status.level = level
+        return status
+
+
+# ----------------------------------------------------------------------
+# Upomínky
+# ----------------------------------------------------------------------
+
+class ReminderService(_RecordServiceBase):
+    model = Reminder
+    date_column = "due_date"
+
+    def list_for_vehicles(self, vehicle_ids, include_done=False):
+        if not vehicle_ids:
+            return []
+        query = self.session.query(Reminder).filter(Reminder.vehicle_id.in_(vehicle_ids))
+        if not include_done:
+            query = query.filter(Reminder.is_done.is_(False))
+        return query.order_by(Reminder.is_done, Reminder.due_date.is_(None), Reminder.due_date,
+                              Reminder.id).all()
+
+    def _validate(self, data):
+        _ensure_vehicle(self.session, data.get("vehicle_id"))
+        repeat = data.get("repeat") or REPEAT_NONE
+        if repeat not in REPEAT_OPTIONS:
+            raise ValidationError("Neplatné opakování.")
+        due_date = data.get("due_date") or None
+        due_odometer = _positive_int(data.get("due_odometer"), "Stav tachometru")
+        repeat_km = _positive_int(data.get("repeat_km"), "Opakování po km")
+        if not due_date and due_odometer is None:
+            raise ValidationError("Zadejte datum nebo stav tachometru (nebo obojí).")
+        if repeat != REPEAT_NONE and not due_date:
+            raise ValidationError("Opakování podle data vyžaduje zadané datum.")
+        if repeat_km and due_odometer is None:
+            raise ValidationError("Opakování po km vyžaduje zadaný stav tachometru.")
+        notify_days = _positive_int(data.get("notify_days_before"), "Upozornit dní předem")
+        notify_km = _positive_int(data.get("notify_km_before"), "Upozornit km předem")
+        return {
+            "vehicle_id": data["vehicle_id"],
+            "title": _clean_str(data.get("title"), 100, "Název", required=True),
+            "note": _clean_str(data.get("note")),
+            "due_date": due_date,
+            "due_odometer": due_odometer,
+            "repeat": repeat,
+            "repeat_km": repeat_km or None,
+            "notify_days_before": 14 if notify_days is None else notify_days,
+            "notify_km_before": 500 if notify_km is None else notify_km,
+            "is_done": bool(data.get("is_done")),
+        }
+
+    def get_status(self, reminder, current_odometer, today=None):
+        today = today or date.today()
+        status = DueStatus(due_date=reminder.due_date, due_km=reminder.due_odometer)
+        if reminder.is_done:
+            status.level = LEVEL_OK
+            return status
+
+        level = LEVEL_UNKNOWN
+        if reminder.due_date:
+            status.days_left = (reminder.due_date - today).days
+            if status.days_left < 0:
+                level = _worse(level, LEVEL_OVERDUE)
+            elif status.days_left <= reminder.notify_days_before:
+                level = _worse(level, LEVEL_WARNING)
+            else:
+                level = _worse(level, LEVEL_OK)
+        if reminder.due_odometer is not None and current_odometer is not None:
+            status.km_left = reminder.due_odometer - current_odometer
+            if status.km_left < 0:
+                level = _worse(level, LEVEL_OVERDUE)
+            elif status.km_left <= reminder.notify_km_before:
+                level = _worse(level, LEVEL_WARNING)
+            else:
+                level = _worse(level, LEVEL_OK)
+        status.level = level
+        return status
+
+    def complete(self, reminder, current_odometer=None, today=None):
+        """Označí upomínku jako vyřízenou; opakovanou posune na další termín."""
+        today = today or date.today()
+        if reminder.repeat == REPEAT_NONE and not reminder.repeat_km:
+            reminder.is_done = True
+        else:
+            if reminder.repeat != REPEAT_NONE and reminder.due_date:
+                next_date = shift_by_repeat(reminder.due_date, reminder.repeat)
+                # Pokud byla upomínka dlouho po termínu, posuneme ji až za dnešek
+                while next_date <= today:
+                    next_date = shift_by_repeat(next_date, reminder.repeat)
+                reminder.due_date = next_date
+            if reminder.repeat_km and reminder.due_odometer is not None:
+                next_km = reminder.due_odometer + reminder.repeat_km
+                while current_odometer is not None and next_km <= current_odometer:
+                    next_km += reminder.repeat_km
+                reminder.due_odometer = next_km
+        self.session.commit()
+        return reminder
+
+    def reopen(self, reminder):
+        reminder.is_done = False
+        self.session.commit()
+        return reminder
+
+
+# ----------------------------------------------------------------------
+# Přehled upozornění
+# ----------------------------------------------------------------------
+
+@dataclass
+class Alert:
+    vehicle: object
+    kind: str           # "interval" | "reminder"
+    title: str
+    status: DueStatus
+    item: object
+
+
+def collect_alerts(session, vehicles, only_alerts=True, today=None):
+    """Upozornění (servisní intervaly + upomínky) pro dané vozidla, seřazená podle naléhavosti."""
+    from services.vehicle_service import VehicleService
+
+    vehicle_service = VehicleService(session)
+    interval_service = ServiceIntervalService(session)
+    reminder_service = ReminderService(session)
+    vehicles_by_id = {v.id: v for v in vehicles}
+    ids = list(vehicles_by_id)
+    odometers = {vid: vehicle_service.get_current_odometer(vid) for vid in ids}
+
+    alerts = []
+    for interval in interval_service.list_for_vehicles(ids):
+        status = interval_service.get_status(interval, odometers[interval.vehicle_id], today)
+        if status.is_alert or not only_alerts:
+            alerts.append(Alert(vehicles_by_id[interval.vehicle_id], "interval",
+                                interval.service_type, status, interval))
+    for reminder in reminder_service.list_for_vehicles(ids):
+        status = reminder_service.get_status(reminder, odometers[reminder.vehicle_id], today)
+        if status.is_alert or not only_alerts:
+            alerts.append(Alert(vehicles_by_id[reminder.vehicle_id], "reminder",
+                                reminder.title, status, reminder))
+
+    def sort_key(alert):
+        s = alert.status
+        return (-_LEVEL_ORDER[s.level],
+                s.days_left if s.days_left is not None else 10 ** 6,
+                s.km_left if s.km_left is not None else 10 ** 9)
+
+    return sorted(alerts, key=sort_key)

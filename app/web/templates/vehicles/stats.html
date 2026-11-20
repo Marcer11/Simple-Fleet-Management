@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Statistiky – {{ vehicle.display_name }}{% endblock %}
+{% block head %}
+<style>
+    /* Barvy grafů - kategoriální paleta (sloty 1-3 ověřené pro barvoslepost), světlý a tmavý režim */
+    .viz-root {
+        --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+        --series-4: #eda100; --series-5: #e87ba4;
+        --grid: #e6e9ee; --axis-text: #52514e; --chart-surface: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+        .viz-root {
+            --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+            --series-4: #c98500; --series-5: #d55181;
+            --grid: #2c3846; --axis-text: #c3c2b7; --chart-surface: #182029;
+        }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Statistiky</h1>
+        <div class="sub"><a href="/vehicles/{{ vehicle.id }}">{{ m.color_dot(vehicle) }} {{ vehicle.display_name }}</a></div>
+    </div>
+</div>
+
+<div class="tabs">
+    <a href="?period=12m" class="{% if period == '12m' %}active{% endif %}">Posledních 12 měsíců</a>
+    {% for y in years %}<a href="?period={{ y }}" class="{% if period == y|string %}active{% endif %}">{{ y }}</a>{% endfor %}
+    <a href="?period=all" class="{% if period == 'all' %}active{% endif %}">Celá historie</a>
+</div>
+
+<div class="kpis">
+    <div class="kpi"><div class="label">Náklady celkem</div><div class="value">{{ summary.total_cost|czk(0) }}</div></div>
+    <div class="kpi"><div class="label">Palivo</div><div class="value">{{ summary.fuel_cost|czk(0) }}</div><div class="hint">{{ summary.fuel_count }} tankování</div></div>
+    <div class="kpi"><div class="label">Servis</div><div class="value">{{ summary.service_cost|czk(0) }}</div></div>
+    <div class="kpi"><div class="label">Ostatní výdaje</div><div class="value">{{ summary.expense_cost|czk(0) }}</div></div>
+    <div class="kpi"><div class="label">Ujeto</div><div class="value">{{ summary.distance|km }}</div></div>
+    <div class="kpi">
+        <div class="label">Náklady na km</div>
+        <div class="value">{{ summary.cost_per_km|czk(2) if summary.cost_per_km else "–" }}</div>
+        {% if summary.fuel_cost_per_km %}<div class="hint">z toho palivo {{ summary.fuel_cost_per_km|czk(2) }}</div>{% endif %}
+    </div>
+    {% for ft, info in summary.avg_consumption.items() %}
+    <div class="kpi"><div class="label">Spotřeba – {{ ft }}</div><div class="value">{{ info.value|num(2) if info.value else "–" }}</div><div class="hint">{{ info.unit }}/100 km</div></div>
+    {% endfor %}
+</div>
+
+<div class="viz-root">
+{% if summary.charts.monthly_labels %}
+<div class="card">
+    <h2>Náklady po měsících (Kč)</h2>
+    <div class="chart-box"><canvas id="chart-monthly" role="img" aria-label="Měsíční náklady podle kategorie"></canvas></div>
+    <details style="margin-top: 10px">
+        <summary class="small">Zobrazit jako tabulku</summary>
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Měsíc</th><th class="num">Palivo</th><th class="num">Servis</th><th class="num">Výdaje</th><th class="num">Celkem</th></tr></thead>
+            <tbody>
+            {% for label in summary.charts.monthly_labels %}
+            {% set i = loop.index0 %}
+            {% set f, s, e = summary.charts.monthly_fuel[i], summary.charts.monthly_service[i], summary.charts.monthly_expense[i] %}
+            <tr><td>{{ label }}</td><td class="num">{{ f|num(0) }}</td><td class="num">{{ s|num(0) }}</td><td class="num">{{ e|num(0) }}</td><td class="num">{{ (f + s + e)|num(0) }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </details>
+</div>
+{% endif %}
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Spotřeba</h2>
+        {% if summary.charts.consumption %}
+        <div class="chart-box"><canvas id="chart-consumption" role="img" aria-label="Spotřeba v čase"></canvas></div>
+        {% else %}<div class="empty small">Spotřeba se počítá mezi dvěma tankováními do plné nádrže.</div>{% endif %}
+    </div>
+    <div class="card">
+        <h2>Cena paliva za jednotku (Kč)</h2>
+        {% if summary.charts.unit_price %}
+        <div class="chart-box"><canvas id="chart-price" role="img" aria-label="Cena paliva v čase"></canvas></div>
+        {% else %}<div class="empty small">Žádná data.</div>{% endif %}
+    </div>
+</div>
+</div>
+
+{% if summary.expense_by_category %}
+<div class="card">
+    <h2>Ostatní výdaje podle kategorie</h2>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Kategorie</th><th class="num">Částka</th><th class="num">Podíl</th></tr></thead>
+        <tbody>
+        {% for cat, amount in summary.expense_by_category.items() %}
+        <tr><td>{{ cat }}</td><td class="num">{{ amount|czk(0) }}</td><td class="num">{{ (amount / summary.expense_cost * 100)|num(0) }} %</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+<script type="application/json" id="chart-data">{{ summary.charts|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function () {
+    if (!window.Chart) return;
+    const data = JSON.parse(document.getElementById("chart-data").textContent);
+    const root = document.querySelector(".viz-root");
+    const css = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+    const series = [1, 2, 3, 4, 5].map((i) => css("--series-" + i));
+    const grid = css("--grid"), axisText = css("--axis-text"), surface = css("--chart-surface");
+    const nf = (d) => new Intl.NumberFormat("cs-CZ", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+    Chart.defaults.color = axisText;
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.plugins.legend.labels.boxWidth = 12;
+    Chart.defaults.plugins.legend.labels.boxHeight = 12;
+
+    const axes = (yTitle) => ({
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 12 } },
+        y: { beginAtZero: true, grid: { color: grid }, border: { display: false },
+             title: { display: !!yTitle, text: yTitle } },
+    });
+
+    // Spojí datumové řady (různé typy paliva) do společné osy x
+    function lineChart(id, seriesByName, decimals, unitLabel) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const names = Object.keys(seriesByName);
+        const labels = [...new Set(names.flatMap((n) => seriesByName[n].map((p) => p.x)))].sort();
+        const datasets = names.map((name, i) => {
+            const byX = Object.fromEntries(seriesByName[name].map((p) => [p.x, p.y]));
+            return {
+                label: name,
+                data: labels.map((x) => (x in byX ? byX[x] : null)),
+                borderColor: series[i], backgroundColor: series[i],
+                borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+                pointBorderColor: surface, pointBorderWidth: 2,
+                spanGaps: true, cubicInterpolationMode: "monotone",
+            };
+        });
+        new Chart(el, {
+            type: "line",
+            data: { labels: labels.map((x) => x.split("-").reverse().join(".")), datasets },
+            options: {
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                scales: { ...axes(unitLabel), y: { ...axes(unitLabel).y, beginAtZero: false } },
+                plugins: {
+                    legend: { display: names.length > 1, position: "top", align: "start" },
+                    tooltip: { callbacks: { label: (c) => c.parsed.y == null ? null : `${c.dataset.label}: ${nf(decimals).format(c.parsed.y)} ${unitLabel}` } },
+                },
+            },
+        });
+    }
+
+    // Měsíční náklady - skládaný sloupcový graf
+    const monthly = document.getElementById("chart-monthly");
+    if (monthly) {
+        const mk = (label, values, color) => ({
+            label, data: values, backgroundColor: color,
+            borderColor: surface, borderWidth: { top: 2 }, borderRadius: 4, borderSkipped: "start",
+            maxBarThickness: 36,
+        });
+        new Chart(monthly, {
+            type: "bar",
+            data: {
+                labels: data.monthly_labels.map((l) => { const [y, mo] = l.split("-"); return `${+mo}/${y.slice(2)}`; }),
+                datasets: [
+                    mk("Palivo", data.monthly_fuel, series[0]),
+                    mk("Servis", data.monthly_service, series[1]),
+                    mk("Výdaje", data.monthly_expense, series[2]),
+                ],
+            },
+            options: {
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                scales: { x: { ...axes().x, stacked: true }, y: { ...axes("Kč").y, stacked: true } },
+                plugins: {
+                    legend: { position: "top", align: "start" },
+                    tooltip: {
+                        callbacks: {
+                            label: (c) => `${c.dataset.label}: ${nf(0).format(c.parsed.y)} Kč`,
+                            footer: (items) => `Celkem: ${nf(0).format(items.reduce((s, i) => s + i.parsed.y, 0))} Kč`,
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    const unitOf = (name) => /elekt/i.test(name) ? "kWh" : (/cng/i.test(name) ? "kg" : "l");
+    const consumptionUnits = [...new Set(Object.keys(data.consumption).map(unitOf))];
+    lineChart("chart-consumption", data.consumption, 2, consumptionUnits.map((u) => u + "/100 km").join(", "));
+    lineChart("chart-price", data.unit_price, 2, "Kč");
+})();
+</script>
+{% endblock %}

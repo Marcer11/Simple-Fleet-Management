@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Upomínky{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>Upomínky</h1>
+    <a class="btn btn-primary" href="/reminders/add">+ Přidat upomínku</a>
+</div>
+
+<div class="tabs">
+    <a href="/reminders" class="{% if show != 'all' %}active{% endif %}">Aktivní</a>
+    <a href="/reminders?show=all" class="{% if show == 'all' %}active{% endif %}">Včetně vyřízených</a>
+</div>
+
+<div class="card">
+    {% if reminders %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Stav</th><th>Upomínka</th><th>Vozidlo</th><th>Termín</th><th>Opakování</th><th></th></tr></thead>
+        <tbody>
+        {% for r, s in reminders %}
+        <tr>
+            <td>{% if r.is_done %}<span class="badge">Vyřízeno</span>{% else %}{{ m.status_badge(s) }}{% endif %}</td>
+            <td><strong>{{ r.title }}</strong>{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.display_name }}</a></td>
+            <td class="nowrap">{% if r.due_date %}{{ r.due_date|date }}{% endif %}{% if r.due_odometer %}<br><span class="small">{{ r.due_odometer|km }}</span>{% endif %}
+                {% if not r.is_done %}<br><span class="muted small">{{ s.summary }}</span>{% endif %}</td>
+            <td class="small">{{ repeat_options[r.repeat] }}{% if r.repeat_km %}<br>po {{ r.repeat_km|km }}{% endif %}</td>
+            <td class="actions-cell">
+                {% if r.vehicle_id in editable_ids %}
+                <div class="actions" style="justify-content: flex-end">
+                    {% if r.is_done %}
+                    <form method="post" action="/reminders/{{ r.id }}/reopen">{{ m.csrf() }}<button class="btn btn-sm" type="submit">Znovu otevřít</button></form>
+                    {% else %}
+                    <form method="post" action="/reminders/{{ r.id }}/done">{{ m.csrf() }}<input type="hidden" name="next" value="/reminders"><button class="btn btn-sm" type="submit">Vyřízeno</button></form>
+                    {% endif %}
+                    <a class="btn btn-sm" href="/reminders/{{ r.id }}/edit">Upravit</a>
+                </div>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <p>Žádné upomínky. Přidejte si např. konec pojištění, platnost dálniční známky nebo přezutí pneumatik.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

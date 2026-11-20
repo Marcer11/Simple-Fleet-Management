@@ -1,0 +1,124 @@
+{# Makra pro formuláře a opakované prvky. Importovat: {% import "_macros.html" as m with context %} #}
+
+{% macro csrf() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{%- endmacro %}
+
+{% macro val(name) -%}
+{{ values.get(name) if values and values.get(name) is not none else '' }}
+{%- endmacro %}
+
+{% macro field(name, label, type="text", required=false, help=none, wide=false) -%}
+<div class="field{% if wide %} field-wide{% endif %}">
+    <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req">*</span>{% endif %}</label>
+    <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ val(name) }}"{% if required %} required{% endif %}{{ kwargs|xmlattr }}>
+    {% if help %}<small class="help" id="{{ name }}-help">{{ help }}</small>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro textarea(name, label, wide=true) -%}
+<div class="field{% if wide %} field-wide{% endif %}">
+    <label for="f-{{ name }}">{{ label }}</label>
+    <textarea id="f-{{ name }}" name="{{ name }}"{{ kwargs|xmlattr }}>{{ val(name) }}</textarea>
+</div>
+{%- endmacro %}
+
+{% macro select(name, label, options, required=false, empty=none, help=none) -%}
+{# options: seznam dvojic (hodnota, popisek) #}
+<div class="field">
+    <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req">*</span>{% endif %}</label>
+    <select id="f-{{ name }}" name="{{ name }}"{% if required %} required{% endif %}{{ kwargs|xmlattr }}>
+        {% if empty is not none %}<option value="">{{ empty }}</option>{% endif %}
+        {% for value, text in options %}
+        <option value="{{ value }}"{% if val(name) == value|string %} selected{% endif %}>{{ text }}</option>
+        {% endfor %}
+    </select>
+    {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro datalist(id, items) -%}
+<datalist id="{{ id }}">{% for item in items %}<option value="{{ item }}">{% endfor %}</datalist>
+{%- endmacro %}
+
+{% macro checkbox(name, label, help=none) -%}
+<div class="field">
+    <label class="check"><input type="checkbox" id="f-{{ name }}" name="{{ name }}" value="on"{% if values.get(name) %} checked{% endif %}> {{ label }}</label>
+    {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro vehicle_select(vehicles, odometers=none, fuels=none) -%}
+<div class="field">
+    <label for="f-vehicle_id">Vozidlo <span class="req">*</span></label>
+    <select id="f-vehicle_id" name="vehicle_id" required>
+        <option value="">– vyberte vozidlo –</option>
+        {% for v in vehicles %}
+        <option value="{{ v.id }}"{% if val('vehicle_id') == v.id|string %} selected{% endif %}
+            {%- if odometers and odometers.get(v.id) %} data-odometer="{{ odometers.get(v.id) }}"{% endif %}
+            {%- if fuels and fuels.get(v.id) %} data-fuel="{{ fuels.get(v.id) }}"{% endif %}>{{ v.display_name }}{% if not v.is_active %} (neaktivní){% endif %}</option>
+        {% endfor %}
+    </select>
+</div>
+{%- endmacro %}
+
+{% macro price_fields(currencies, label="Cena", required=false) -%}
+{{ field("price_paid", label, "text", required=required, inputmode="decimal", placeholder="0,00", autocomplete="off") }}
+<div class="field">
+    <label for="f-currency_code">Měna</label>
+    <input id="f-currency_code" name="currency_code" type="text" value="{{ val('currency_code') or 'CZK' }}" maxlength="3" list="currencies" autocomplete="off" style="text-transform: uppercase">
+    {{ datalist("currencies", currencies) }}
+</div>
+<div class="field" id="rate-field">
+    <label for="f-manual_rate">Kurz (Kč za 1 jednotku)</label>
+    <input id="f-manual_rate" name="manual_rate" type="text" value="{{ val('manual_rate') }}" inputmode="decimal" autocomplete="off" placeholder="automaticky z ČNB">
+    <small class="help">Nechte prázdné pro kurz ČNB ke dni platby.</small>
+</div>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+{% set info = level_labels[status.level] %}
+<span class="badge badge-{{ info[1] }}">{{ info[0] }}</span>
+{%- endmacro %}
+
+{% macro color_dot(vehicle, size="") -%}
+<span class="color-dot {{ size }}" style="background: {{ vehicle.color_hex or '#FFFFFF' }}" title="{{ vehicle.color or '' }}"></span>
+{%- endmacro %}
+
+{% macro role_badge(role) -%}
+{% if role and role != 'owner' %}<span class="badge badge-info" title="Sdílené vozidlo">Sdíleno · {{ role_labels[role] }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro period_filter(action, vehicles, filters) -%}
+<form class="filters" method="get" action="{{ action }}" data-autosubmit>
+    <div class="field">
+        <label for="flt-vehicle">Vozidlo</label>
+        <select id="flt-vehicle" name="vehicle_id">
+            <option value="">Všechna vozidla</option>
+            {% for v in vehicles %}
+            <option value="{{ v.id }}"{% if filters.vehicle_id == v.id %} selected{% endif %}>{{ v.display_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% if caller is defined %}{{ caller() }}{% endif %}
+    <div class="field">
+        <label for="flt-from">Od</label>
+        <input id="flt-from" type="date" name="date_from" value="{{ filters.date_from }}">
+    </div>
+    <div class="field">
+        <label for="flt-to">Do</label>
+        <input id="flt-to" type="date" name="date_to" value="{{ filters.date_to }}">
+    </div>
+    <div class="field" style="flex: 0 0 auto">
+        <label class="check"><input type="checkbox" name="all" value="1"{% if filters.all %} checked{% endif %}> Celá historie</label>
+    </div>
+    <noscript><button class="btn" type="submit">Filtrovat</button></noscript>
+</form>
+{%- endmacro %}
+
+{% macro delete_button(action, confirm="Opravdu smazat?", label="Smazat", small=true) -%}
+<form method="post" action="{{ action }}" data-confirm="{{ confirm }}">
+    {{ csrf() }}
+    <button type="submit" class="btn btn-danger{% if small %} btn-sm{% endif %}">{{ label }}</button>
+</form>
+{%- endmacro %}

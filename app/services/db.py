@@ -1,13 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from services.config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT, validate_config
+from services.config import get_database_url
 
-validate_config()
 
-DATABASE_URL = (
-    f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+def make_engine(url):
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False})
+    # pool_pre_ping/pool_recycle: vzdálená MySQL zavírá neaktivní spojení
+    return create_engine(url, pool_pre_ping=True, pool_recycle=1800)
 
-engine = create_engine(DATABASE_URL)
+
+DATABASE_URL = get_database_url()
+
+engine = make_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Vozidla{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>Vozidla</h1>
+    <a class="btn btn-primary" href="/vehicles/add">+ Přidat vozidlo</a>
+</div>
+
+<div class="tabs">
+    <a href="/vehicles" class="{% if show != 'all' %}active{% endif %}">Aktivní</a>
+    <a href="/vehicles?show=all" class="{% if show == 'all' %}active{% endif %}">Všechna{% if inactive_count %} (+{{ inactive_count }} neaktivní){% endif %}</a>
+</div>
+
+<div class="card">
+{% if vehicles %}
+<div class="table-wrap">
+<table>
+    <thead>
+        <tr>
+            <th>Vozidlo</th>
+            <th>SPZ</th>
+            <th>Rok</th>
+            <th class="num">Tachometr</th>
+            <th>Stav</th>
+            <th>Přístup</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in vehicles %}
+        <tr>
+            <td>{{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a></td>
+            <td class="nowrap">{{ v.license_plate or "–" }}</td>
+            <td>{{ v.production_year or "–" }}</td>
+            <td class="num">{{ odometers.get(v.id)|km }}</td>
+            <td>{% if v.is_active %}<span class="badge badge-ok">Aktivní</span>{% else %}<span class="badge">Neaktivní</span>{% endif %}</td>
+            <td><span class="small">{{ role_labels[roles.get(v.id)] }}</span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty">
+    <p>Žádná vozidla.</p>
+    <a class="btn btn-primary" href="/vehicles/add">Přidat vozidlo</a>
+</div>
+{% endif %}
+</div>
+{% endblock %}

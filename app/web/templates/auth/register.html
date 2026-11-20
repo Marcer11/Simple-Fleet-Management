@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Registrace{% endblock %}
+{% block content %}
+<div class="auth-box card">
+    <h1>Registrace</h1>
+    {% if disabled %}
+    <p>Registrace nových uživatelů je vypnutá. Požádejte správce aplikace o vytvoření účtu.</p>
+    <p><a href="/login">Zpět na přihlášení</a></p>
+    {% else %}
+    <form method="post" action="/register">
+        {{ m.csrf() }}
+        <div class="grid" style="gap: 14px">
+            {{ m.field("name", "Jméno", required=true, autocomplete="name", maxlength=100) }}
+            {{ m.field("email", "E-mail", "email", required=true, autocomplete="email") }}
+            <div class="field">
+                <label for="f-password">Heslo <span class="req">*</span></label>
+                <input id="f-password" name="password" type="password" required minlength="8" autocomplete="new-password">
+                <small class="help">Alespoň 8 znaků.</small>
+            </div>
+            <div class="field">
+                <label for="f-password_confirm">Heslo znovu <span class="req">*</span></label>
+                <input id="f-password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Vytvořit účet</button>
+        </div>
+    </form>
+    <p class="muted small" style="margin-bottom: 0">Už máte účet? <a href="/login">Přihlaste se</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{# Společná kostra formuláře záznamu. Proměnné: heading, cancel_url, delete_url, delete_confirm; blok fields. #}
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ heading }}</h1></div>
+
+{% if not vehicles %}
+<div class="card empty">
+    <p>Nemáte žádné vozidlo, do kterého můžete zapisovat.</p>
+    <a class="btn btn-primary" href="/vehicles/add">Přidat vozidlo</a>
+</div>
+{% else %}
+<form method="post" class="card">
+    {{ m.csrf() }}
+    <div class="form-grid">
+        {{ m.vehicle_select(vehicles) }}
+        {% block fields %}{% endblock %}
+    </div>
+    {% block extra %}{% endblock %}
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a class="btn" href="{{ '/vehicles/%d'|format(record.vehicle_id) if record else back_url }}">Zrušit</a>
+    </div>
+</form>
+{% if record %}
+<div class="card">
+    <div class="card-head">
+        <span></span>
+        {{ m.delete_button(delete_url, "Opravdu smazat?", "Smazat", small=false) }}
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

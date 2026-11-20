@@ -77,3 +77,29 @@ def test_upgrade_existing_database_keeps_data(tmp_path):
     # stejná SPZ už může být u více vozidel (různí uživatelé)
     with engine.begin() as conn:
         conn.execute(text("INSERT INTO vehicles (brand, model, license_plate) VALUES ('Škoda', 'Fabia', '1A11111')"))
+
+
+def test_database_url_with_special_password(monkeypatch):
+    """Heslo se speciálními znaky musí projít do ovladače beze změny."""
+    from sqlalchemy.engine import make_url
+    from services import config
+
+    password = "p@ss%w rd+/:#?&=ž"
+    monkeypatch.setattr(config, "DATABASE_URL_OVERRIDE", None)
+    monkeypatch.setattr(config, "DB_HOST", "localhost")
+    monkeypatch.setattr(config, "DB_USER", "fleet-management")
+    monkeypatch.setattr(config, "DB_PASSWORD", password)
+    monkeypatch.setattr(config, "DB_NAME", "fleet")
+    url = make_url(config.get_database_url())
+    assert url.password == password
+    assert url.username == "fleet-management" and url.database == "fleet"
+    assert url.query["charset"] == "utf8mb4"
+
+
+def test_alembic_env_uses_url_unchanged(tmp_path):
+    """env.py nesmí URL upravovat (dříve zdvojoval % a rozbil tak heslo)."""
+    db = tmp_path / "a%b.db"
+    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg.attributes["database_url"] = f"sqlite:///{db}"
+    command.upgrade(cfg, "head")
+    assert db.exists()

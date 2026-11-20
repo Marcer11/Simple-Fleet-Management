@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 # Kořen aplikace (app/) musí být v sys.path kvůli importům "models" a "services"
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -45,9 +45,8 @@ def run_migrations_online():
         _run(connection)
         return
 
-    section = config.get_section(config.config_ini_section, {})
-    section["sqlalchemy.url"] = _url().replace("%", "%%")
-    connectable = engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)
+    # URL jde přímo do SQLAlchemy (ne přes configparser), takže se nesmí nijak escapovat
+    connectable = create_engine(_url(), poolclass=pool.NullPool)
     with connectable.connect() as connection:
         _run(connection)
 

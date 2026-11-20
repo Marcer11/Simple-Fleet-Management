@@ -57,11 +57,18 @@ def get_database_url():
     validate_config()
     if DATABASE_URL_OVERRIDE:
         return DATABASE_URL_OVERRIDE
-    from urllib.parse import quote_plus
-    return (
-        f"mysql+mysqlconnector://{quote_plus(DB_USER)}:{quote_plus(DB_PASSWORD)}"
-        f"@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
+    # URL.create správně zakóduje i hesla se speciálními znaky (@, %, #, mezera…)
+    from sqlalchemy.engine import URL
+    url = URL.create(
+        "mysql+mysqlconnector",
+        username=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=int(DB_PORT),
+        database=DB_NAME,
+        query={"charset": "utf8mb4"},
     )
+    return url.render_as_string(hide_password=False)
 
 
 def get_secret_key():

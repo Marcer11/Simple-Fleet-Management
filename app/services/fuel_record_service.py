@@ -123,7 +123,7 @@ class FuelRecordService:
     def create_fuel_record(self, vehicle_id, refuel_datetime, odometer, fuel_type, volume_liters, unit_price,
                            price_paid, currency_code, unit_price_local, price_local, payment_method=None,
                            station_name=None, full_tank=False, skipped_refuel=False, consumption=None, note=None,
-                           station_address=None):
+                           station_address=None, created_by_id=None):
         # Parametr consumption je zachován kvůli kompatibilitě - spotřeba se vždy dopočítá.
         data = self._validate({
             "vehicle_id": vehicle_id, "refuel_datetime": refuel_datetime, "odometer": odometer,
@@ -136,7 +136,7 @@ class FuelRecordService:
         })
         self._check_odometer(data["vehicle_id"], data["refuel_datetime"], data["odometer"])
 
-        fuel_record = FuelRecord(**data)
+        fuel_record = FuelRecord(**data, created_by_id=created_by_id)
         self.session.add(fuel_record)
         self.session.flush()
         self.recalculate_consumption(fuel_record.vehicle_id)

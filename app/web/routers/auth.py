@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from services import config
-from services import timeline
+from services import fleet_api, timeline
 from services.errors import ValidationError
 from services.user_service import UserService, normalize_email
 from web.deps import get_db, get_optional_user, get_current_user, login_user, logout_user, flash, render
@@ -126,6 +126,16 @@ async def profile_post(request: Request, user=Depends(get_current_user), db=Depe
         elif form.raw.get("action") == "timeline_remove":
             service.set_timeline_key(user, None)
             flash(request, "API klíč Timeline byl odebrán.")
+        elif form.raw.get("action") == "api_key_generate":
+            # klíč se ukáže jen v této odpovědi (bez přesměrování, neukládá se do session)
+            new_key = fleet_api.generate_key(db, user)
+            response = render(request, "auth/profile.html", values={"name": user.name},
+                              timeline_enabled=timeline.is_enabled(), new_api_key=new_key)
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        elif form.raw.get("action") == "api_key_revoke":
+            fleet_api.revoke_key(db, user)
+            flash(request, "API klíč pro Timeline byl zrušen.")
         else:
             service.update_profile(user, form.raw.get("name"))
             flash(request, "Profil byl uložen.")

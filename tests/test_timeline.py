@@ -75,7 +75,7 @@ def test_disabled_without_url(app, monkeypatch):
     client = register(app, "t@example.com")
     add_vehicle(client)
     assert "Načíst pumpu" not in client.get("/fuel-records/add").text
-    assert "Timeline" not in client.get("/profile").text
+    assert 'name="timeline_api_key"' not in client.get("/profile").text
     assert client.get("/fuel-records/timeline-stop?date=2026-11-20&time=14:35").json()["status"] == "error"
 
 

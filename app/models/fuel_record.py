@@ -43,9 +43,12 @@ class FuelRecord(Base):
     skipped_refuel = Column(Boolean, nullable=False, default=False)
     consumption = Column(DECIMAL(5, 2), nullable=True)
     note = Column(Text, nullable=True)
+    # Kdo tankování zapsal (u sdílených vozidel) - uživatel může být mezitím smazán
+    created_by_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
 
     # Napojení na tabulku vozidel
     vehicle = relationship('Vehicle', back_populates='fuel_records')
+    created_by = relationship('User')
 
     @property
     def unit(self):

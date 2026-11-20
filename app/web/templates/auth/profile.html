@@ -72,5 +72,41 @@
         {% endif %}
     </div>
     {% endif %}
+
+    <div class="card" id="api-key">
+        <h2>API klíč pro Timeline</h2>
+        <p class="small muted">Aplikace Timeline si s tímto klíčem načítá tankování vašich vozidel (i sdílených)
+            do výdajů výletů. Klíč vložte v Timeline do nastavení napojení na evidenci tankování.</p>
+        {% if new_api_key %}
+        <div class="alert alert-warning">Klíč si zkopírujte hned, znovu už ho nezobrazíme.</div>
+        <div class="field">
+            <label for="f-new_api_key">Nový klíč</label>
+            <div class="input-with-button">
+                <input id="f-new_api_key" type="text" value="{{ new_api_key }}" readonly spellcheck="false" autocomplete="off">
+                <button class="btn" type="button" data-copy="f-new_api_key">Kopírovat</button>
+            </div>
+        </div>
+        {% elif current_user.api_key_hash %}
+        <p>Klíč je aktivní, vytvořen {{ current_user.api_key_created_at|datetime }}.</p>
+        {% else %}
+        <p class="muted">Klíč zatím nemáte.</p>
+        {% endif %}
+        <div class="form-actions" style="align-items: center">
+            <form method="post" action="/profile"
+                  {% if current_user.api_key_hash %}data-confirm="Vygenerovat nový klíč? Dosavadní klíč přestane platit."{% endif %}>
+                {{ m.csrf() }}
+                <input type="hidden" name="action" value="api_key_generate">
+                <button class="btn {{ 'btn-primary' if not current_user.api_key_hash }}" type="submit">
+                    {{ "Vygenerovat nový klíč" if current_user.api_key_hash else "Vygenerovat klíč" }}</button>
+            </form>
+            {% if current_user.api_key_hash %}
+            <form method="post" action="/profile" data-confirm="Zrušit API klíč? Timeline přestane načítat tankování.">
+                {{ m.csrf() }}
+                <input type="hidden" name="action" value="api_key_revoke">
+                <button class="btn btn-danger btn-sm" type="submit">Zrušit klíč</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

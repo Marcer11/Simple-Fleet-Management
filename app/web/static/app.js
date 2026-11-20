@@ -225,6 +225,25 @@
         });
     }
 
+    // Kopírování do schránky: <button data-copy="id-pole">
+    document.querySelectorAll("[data-copy]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const input = document.getElementById(button.dataset.copy);
+            if (!input) return;
+            input.select();
+            const label = button.textContent;
+            const done = function () {
+                button.textContent = "Zkopírováno";
+                setTimeout(function () { button.textContent = label; }, 2000);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(input.value).then(done, function () { /* pole zůstane označené */ });
+            } else if (document.execCommand && document.execCommand("copy")) {
+                done();
+            }
+        });
+    });
+
     // PWA - registrace service workeru
     if ("serviceWorker" in navigator && window.isSecureContext) {
         window.addEventListener("load", function () {

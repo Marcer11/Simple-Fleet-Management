@@ -172,7 +172,7 @@ async def add_post(request: Request, user=Depends(get_current_user), db=Depends(
     try:
         data = _read_form(form)
         vehicle = vehicle_service.get_vehicle_for_user(data["vehicle_id"], user, ROLE_EDITOR)
-        record = FuelRecordService(db).create_fuel_record(**data)
+        record = FuelRecordService(db).create_fuel_record(**data, created_by_id=user.id)
     except (ValidationError, NotFoundError) as e:
         db.rollback()
         return render(request, "fuel/form.html", status_code=400, values=form.values, error=str(e),

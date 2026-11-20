@@ -15,6 +15,9 @@ class User(Base):
     # Osobní API klíč aplikace Timeline (dohledání pumpy podle polohy) - citlivý údaj,
     # nikdy se nezobrazuje celý ani neloguje
     timeline_api_key = Column(String(100), nullable=True)
+    # Klíč, kterým se do evidence přihlašuje Timeline (/api/refuels) - ukládá se jen SHA-256
+    api_key_hash = Column(String(64), nullable=True, unique=True, index=True)
+    api_key_created_at = Column(DateTime, nullable=True)
 
     # Vozidla, která uživatel vlastní
     vehicles = relationship("Vehicle", back_populates="owner")

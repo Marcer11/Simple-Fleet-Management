@@ -12,7 +12,7 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 - [Instalace a spuštění](#instalace-a-spuštění)
 - [Databáze a migrace](#databáze-a-migrace)
 - [Správa uživatelů](#správa-uživatelů)
-- [Napojení na Timeline](#napojení-na-timeline)
+- [Napojení na Timeline](#napojení-na-timeline) (dohledání pumpy, API pro Timeline)
 - [Nasazení na server](#nasazení-na-server)
 - [Struktura projektu](#struktura-projektu)
 - [Testy](#testy)
@@ -44,6 +44,7 @@ a prodeje, aktivní/neaktivní.
 - **dohledání pumpy z aplikace Timeline** – tlačítko „Načíst pumpu“ podle data a času tankování
   doplní název a adresu stanice ze záznamů polohy (viz [Napojení na Timeline](#napojení-na-timeline))
 - filtrování (vozidlo, období, palivo) a export do CSV
+- **API pro Timeline** – Timeline si načítá tankování vozidla podle SPZ do výdajů výletů
 
 ### Servis, pravidelný servis, upomínky
 - servisní záznamy (typ, místo, cena v libovolné měně)
@@ -121,6 +122,29 @@ Aplikace Timeline (běží na stejném serveru) zná podle záznamů polohy, u k
   a uloží ho ve svém **Profilu**; klíč se zobrazuje jen zkráceně
 - dotaz jde přes server aplikace (`/fuel-records/timeline-stop`), klíč se do prohlížeče
   nedostane; klíč ani poloha se nelogují, timeout 5 s, výpadek Timeline neblokuje uložení
+
+### API pro Timeline (tankování do výdajů výletů)
+
+Opačným směrem si Timeline z evidence načítá tankování vozidla podle SPZ.
+- uživatel si v **Profilu → API klíč pro Timeline** vygeneruje klíč (`fk_…`); ukáže se jen jednou,
+  v databázi je uložen jen jeho SHA-256; „Vygenerovat nový“ starý zneplatní, „Zrušit“ ho smaže
+- Timeline běží na stejném serveru, volá tedy přímo `http://127.0.0.1:8000/api/refuels`
+
+```
+GET /api/refuels?plate=1AB2345&from=2026-07-10T06:00:00&to=2026-07-15T20:00:00&context=full
+Authorization: Bearer fk_…
+```
+- `plate` – SPZ, porovnává se bez mezer (i uvnitř) a velkými písmeny; vozidlo musí uživatel
+  vlastnit nebo ho mít sdílené (pokud má stejnou SPZ víc vozidel, přednost má aktivní)
+- `from`, `to` – místní čas bez časové zóny (samotné datum v `to` = celý den)
+- `context=full` – navíc tankování od posledního tankování do plna před `from` a do prvního
+  tankování do plna po `to` (včetně částečných mezi nimi)
+- vrací všechna tankování vozidla (ať tankoval kdokoli) vzestupně podle času:
+  `id`, `time`, `odometer`, `quantity`, `unit`, `fuel_type`, `price_total` + `currency` (původní měna),
+  `price_czk`, `full`, `station_name`, `station_address`, `fueled_by` (jméno uživatele, který záznam
+  zapsal; u záznamů před touto verzí `null`)
+- chyby jako `{"error": "…"}`: 401 chybějící/neplatný klíč, 404 vozidlo nenalezeno nebo bez přístupu,
+  400 špatné parametry
 
 ## Nasazení na server
 

@@ -29,6 +29,16 @@
         </div>
         {% if avg_consumption|length > 1 %}<div class="hint">{{ avg_consumption.keys()|join(" / ") }}</div>{% endif %}
     </div>
+    <div class="kpi">
+        <div class="label">Tankuje každých</div>
+        <div class="value">{% if profile.days_between %}{{ profile.days_between|num(0 if profile.days_between >= 10 else 1) }} dní{% else %}–{% endif %}</div>
+        {% if profile.per_month %}<div class="hint">≈ {{ profile.per_month|num(1) }}× měsíčně{% if profile.km_between %} · {{ profile.km_between|num(0) }} km mezi tankováními{% endif %}</div>{% endif %}
+    </div>
+    <div class="kpi">
+        <div class="label">Průměrně za rok</div>
+        <div class="value">{{ profile.km_per_year|km if profile.km_per_year else "–" }}</div>
+        <div class="hint">{{ "z celé historie záznamů" if profile.km_per_year else "potřeba záznamy alespoň za 30 dní" }}</div>
+    </div>
     <div class="kpi"><div class="label">Náklady {{ today.year }}</div><div class="value">{{ year_cost|czk(0) if year_cost else "–" }}</div></div>
     <div class="kpi"><div class="label">Upozornění</div><div class="value">{{ alerts|length }}</div></div>
 </div>

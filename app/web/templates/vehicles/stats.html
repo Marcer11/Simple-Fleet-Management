@@ -91,15 +91,21 @@
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=2"></script>
+<script src="/static/charts.js?v=3"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
     SfmCharts.monthlyCosts("chart-monthly", data);
     const units = [...new Set(Object.keys(data.consumption).map(SfmCharts.unitOf))];
-    SfmCharts.lineChart("chart-consumption", data.consumption, 2, units.map((u) => u + "/100 km").join(", "));
-    SfmCharts.lineChart("chart-price", data.unit_price, 2, "Kč");
+    SfmCharts.timeChart("chart-consumption", data.consumption, {
+        decimals: 2, unit: units.map((u) => u + "/100 km").join(", "),
+        valueSuffix: (pt) => SfmCharts.unitOf(pt.group || "") + "/100 km",
+    });
+    SfmCharts.timeChart("chart-price", data.unit_price, {
+        decimals: 2, unit: "Kč", thin: true, withTime: true, valueSuffix: (pt) => `Kč/${pt.unit}`,
+        details: (pt) => [pt.station].filter(Boolean),
+    });
 })();
 </script>
 {% endblock %}

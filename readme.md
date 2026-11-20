@@ -44,6 +44,11 @@ a prodeje, aktivní/neaktivní.
 - **dohledání pumpy z aplikace Timeline** – tlačítko „Načíst pumpu“ podle data a času tankování
   doplní název a adresu stanice ze záznamů polohy (viz [Napojení na Timeline](#napojení-na-timeline))
 - filtrování (vozidlo, období, palivo) a export do CSV
+- **vlastní seznam paliv** (Tankování → Paliva): nově zadané palivo se uloží do nabídky; každé palivo má
+  *druh* (benzín, nafta, LPG, CNG, elektřina), podle kterého se počítá spotřeba a určuje jednotka –
+  Natural 95 i Verva 100 jsou benzín; přejmenování se promítne i do zapsaných tankování
+- **přehled čerpacích stanic** – značka (podle názvu stanice) → jednotlivé stanice podle adresy,
+  počet tankování, množství, útrata, průměrná cena za litr
 - **API pro Timeline** – Timeline si načítá tankování vozidla podle SPZ do výdajů výletů
 
 ### Servis, pravidelný servis, upomínky
@@ -62,9 +67,12 @@ a prodeje, aktivní/neaktivní.
   ukazuje, do kdy známka platí (odkaz „Obnovit“)
   - eDálnice veřejné API pro ověření platnosti nemají, platnost se proto počítá z nákupu
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
-  průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva
-- **statistiky všech vozidel** (`/stats`): souhrn a tabulka po vozidlech, měsíční náklady,
-  vývoj stavu tachometru a průměrné ceny paliva
+  průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva (každé tankování)
+- v detailu vozidla: jak často se tankuje (průměrný počet dní a km mezi tankováními)
+  a kolik se průměrně najezdí za rok
+- **statistiky všech vozidel** (`/stats`): souhrn a tabulka po vozidlech (včetně km za rok a četnosti
+  tankování), měsíční náklady, ujeté km od začátku období (porovnatelné i u aut s velmi rozdílným
+  tachometrem) a cena paliva u každého tankování
 
 ### Instalace jako aplikace (PWA)
 Na mobilu i v desktopovém Chrome/Edge lze aplikaci „nainstalovat“ (vyžaduje HTTPS).

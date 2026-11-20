@@ -54,7 +54,7 @@ class StatsService:
                     and (date_to is None or s["record"].refuel_datetime.date() <= date_to)]
         consumption_by_type = defaultdict(lambda: {"volume": ZERO, "distance": 0})
         for seg in segments:
-            key = seg["record"].fuel_type
+            key = seg["record"].fuel_group
             consumption_by_type[key]["volume"] += seg["volume"]
             consumption_by_type[key]["distance"] += seg["distance"]
         avg_consumption = {
@@ -104,19 +104,14 @@ class StatsService:
         consumption_series = defaultdict(list)
         for seg in sorted(segments, key=lambda s: s["record"].refuel_datetime):
             record = seg["record"]
-            consumption_series[record.fuel_type].append({
+            consumption_series[record.fuel_group].append({
                 "x": record.refuel_datetime.strftime("%Y-%m-%d"),
                 "y": float(seg["consumption"]),
+                "group": record.fuel_group,
             })
 
-        # Cena za jednotku v čase
-        price_series = defaultdict(list)
-        for record in sorted(fuel, key=lambda r: r.refuel_datetime):
-            if record.unit_price_local is not None:
-                price_series[record.fuel_type].append({
-                    "x": record.refuel_datetime.strftime("%Y-%m-%d"),
-                    "y": float(record.unit_price_local),
-                })
+        # Cena za jednotku u každého tankování
+        price_series = self._price_points(fuel)
 
         # Měsíční náklady podle kategorie
         dates = [f.refuel_datetime.date() for f in fuel] + [s.service_date for s in services] \
@@ -147,7 +142,7 @@ class StatsService:
 
         return {
             "consumption": dict(consumption_series),
-            "unit_price": dict(price_series),
+            "unit_price": price_series,
             "monthly_labels": list(monthly.keys()),
             "monthly_fuel": [round(v["fuel"], 2) for v in monthly.values()],
             "monthly_service": [round(v["service"], 2) for v in monthly.values()],
@@ -170,8 +165,8 @@ class StatsService:
         records = self.session.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id).all()
         totals = defaultdict(lambda: {"volume": ZERO, "distance": 0})
         for seg in compute_consumption_segments(records):
-            totals[seg["record"].fuel_type]["volume"] += seg["volume"]
-            totals[seg["record"].fuel_type]["distance"] += seg["distance"]
+            totals[seg["record"].fuel_group]["volume"] += seg["volume"]
+            totals[seg["record"].fuel_group]["distance"] += seg["distance"]
         return {
             fuel_type: {"value": v["volume"] / v["distance"] * 100, "unit": fuel_unit(fuel_type)}
             for fuel_type, v in totals.items() if v["distance"]
@@ -197,7 +192,7 @@ class StatsService:
         for vehicle in vehicles:
             summary = self.vehicle_summary(vehicle.id, date_from, date_to)
             if summary["total_cost"] or summary["distance"] or summary["fuel_count"]:
-                rows.append({"vehicle": vehicle, **summary})
+                rows.append({"vehicle": vehicle, **summary, "profile": self.usage_profile(vehicle.id)})
 
         fuel_cost = sum((r["fuel_cost"] for r in rows), ZERO)
         service_cost = sum((r["service_cost"] for r in rows), ZERO)
@@ -209,8 +204,8 @@ class StatsService:
 
         charts = self._charts(fuel, services, expenses, [], date_from, date_to)
         charts.pop("consumption", None)
-        charts["unit_price"] = self._monthly_unit_price(fuel)
-        charts["odometer"] = self._odometer_series(vehicles, fuel, services, expenses)
+        charts["unit_price"] = self._price_points(fuel, self._vehicle_names(vehicles))
+        charts["odometer"] = self._distance_series(vehicles, fuel, services, expenses)
         return {
             "rows": rows,
             "fuel_count": len(fuel),
@@ -224,37 +219,82 @@ class StatsService:
         }
 
     @staticmethod
-    def _monthly_unit_price(fuel):
-        """Průměrná cena za jednotku po měsících a druzích paliva (vážená množstvím)."""
-        sums = defaultdict(lambda: defaultdict(lambda: [ZERO, ZERO]))  # typ -> měsíc -> [cena, množství]
-        for f in fuel:
-            if f.price_local is None or not f.volume_liters:
-                continue
-            bucket = sums[f.fuel_type][_month_key(f.refuel_datetime)]
-            bucket[0] += f.price_local
-            bucket[1] += f.volume_liters
-        return {
-            fuel_type: [{"x": month, "y": round(float(price / volume), 2)}
-                        for month, (price, volume) in sorted(months.items()) if volume]
-            for fuel_type, months in sorted(sums.items())
-        }
+    def _vehicle_names(vehicles):
+        names = {}
+        for v in vehicles:
+            name = v.display_name
+            names[v.id] = f"{name} ({v.license_plate or v.id})" if name in names.values() else name
+        return names
 
     @staticmethod
-    def _odometer_series(vehicles, fuel, services, expenses):
-        """Stav tachometru v čase pro každé vozidlo (nejvyšší hodnota daného dne)."""
+    def _price_points(fuel, vehicle_names=None):
+        """Cena za jednotku (Kč) u každého tankování, řady podle paliva."""
+        series = defaultdict(list)
+        for f in sorted(fuel, key=lambda r: (r.refuel_datetime, r.id or 0)):
+            if f.unit_price_local is None:
+                continue
+            point = {"x": f.refuel_datetime.strftime("%Y-%m-%dT%H:%M"), "y": round(float(f.unit_price_local), 3),
+                     "unit": f.unit}
+            if f.station_name:
+                point["station"] = f.station_name
+            if vehicle_names:
+                point["vehicle"] = vehicle_names.get(f.vehicle_id)
+            series[(f.fuel_type or "").strip()].append(point)
+        return dict(sorted(series.items()))
+
+    @classmethod
+    def _distance_series(cls, vehicles, fuel, services, expenses):
+        """Ujeto od prvního záznamu v období pro každé vozidlo (nejvyšší stav daného dne).
+
+        Vozidla mají tachometry v úplně jiných řádech (0 vs. 400 000 km) - společný začátek
+        v nule je dělá porovnatelnými; skutečný stav je v bodu jako "odo".
+        """
         points = defaultdict(dict)  # vehicle_id -> {datum: km}
-        items = [(f.vehicle_id, f.refuel_datetime.date(), f.odometer) for f in fuel] \
-            + [(s.vehicle_id, s.service_date, s.odometer) for s in services] \
-            + [(e.vehicle_id, e.expense_date, e.odometer) for e in expenses]
+        items = [(f.vehicle_id, f.refuel_datetime.date(), f.odometer) for f in fuel]             + [(s.vehicle_id, s.service_date, s.odometer) for s in services]             + [(e.vehicle_id, e.expense_date, e.odometer) for e in expenses]
         for vehicle_id, day, km in items:
             if km is None:
                 continue
             key = day.isoformat()
             points[vehicle_id][key] = max(km, points[vehicle_id].get(key, 0))
 
-        names = {}
+        names = cls._vehicle_names(vehicles)
+        result = {}
         for v in vehicles:
-            name = v.display_name
-            names[v.id] = f"{name} ({v.license_plate or v.id})" if name in names.values() else name
-        return {names[v.id]: [{"x": day, "y": km} for day, km in sorted(points[v.id].items())]
-                for v in vehicles if points.get(v.id)}
+            days = sorted(points.get(v.id, {}).items())
+            if not days:
+                continue
+            base = days[0][1]
+            running = base
+            series = []
+            for day, km in days:
+                running = max(running, km)  # chybný starší zápis nesmí jít pod nulu
+                series.append({"x": day, "y": running - base, "odo": running})
+            result[names[v.id]] = series
+        return result
+
+    def usage_profile(self, vehicle_id):
+        """Jak často se tankuje a kolik se průměrně najezdí (z celé historie vozidla)."""
+        fuel = (self.session.query(FuelRecord.refuel_datetime, FuelRecord.odometer)
+                .filter(FuelRecord.vehicle_id == vehicle_id).order_by(FuelRecord.refuel_datetime).all())
+        readings = [(r.refuel_datetime.date(), r.odometer) for r in fuel]
+        readings += [(d, km) for d, km in self.session.query(ServiceRecord.service_date, ServiceRecord.odometer)
+                     .filter(ServiceRecord.vehicle_id == vehicle_id, ServiceRecord.odometer.isnot(None))]
+        readings += [(d, km) for d, km in self.session.query(Expense.expense_date, Expense.odometer)
+                     .filter(Expense.vehicle_id == vehicle_id, Expense.odometer.isnot(None))]
+        profile = {"refuel_count": len(fuel), "days_between": None, "per_month": None,
+                   "km_between": None, "km_per_year": None}
+        if len(fuel) >= 2:
+            span = (fuel[-1].refuel_datetime - fuel[0].refuel_datetime).total_seconds() / 86400
+            if span >= 1:
+                profile["days_between"] = span / (len(fuel) - 1)
+                profile["per_month"] = 30.44 / profile["days_between"]
+            km = fuel[-1].odometer - fuel[0].odometer
+            if km > 0:
+                profile["km_between"] = km / (len(fuel) - 1)
+        if len(readings) >= 2:
+            first, last = min(readings), max(readings)
+            days = (last[0] - first[0]).days
+            km = max(km for _, km in readings) - min(km for _, km in readings)
+            if days >= 30 and km > 0:  # z kratšího období by roční odhad byl nesmyslný
+                profile["km_per_year"] = km / days * 365.25
+        return profile

@@ -3,13 +3,14 @@ from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 
 from models import FuelRecord, Vehicle
+from models.fuel_record import FUEL_CATEGORIES, guess_fuel_category
 from services.errors import ValidationError, NotFoundError
 from services.pricing import to_decimal, normalize_currency, Q2, Q3
 
 FUEL_RECORD_FIELDS = (
     "vehicle_id", "refuel_datetime", "odometer", "fuel_type", "volume_liters", "unit_price",
     "price_paid", "currency_code", "unit_price_local", "price_local", "payment_method",
-    "station_name", "station_address", "full_tank", "skipped_refuel", "note",
+    "station_name", "station_address", "full_tank", "skipped_refuel", "note", "fuel_category",
 )
 
 
@@ -24,13 +25,14 @@ def compute_consumption_segments(records):
     Spotřeba se počítá u tankování s plnou nádrží: objem všech tankování od předchozí
     plné nádrže (včetně aktuálního) / ujetá vzdálenost * 100. Pokud je u některého
     tankování v úseku příznak "vynechané tankování", úsek se nepočítá.
-    Každý druh paliva má vlastní řadu (např. LPG a benzín u bi-fuel vozidel).
+    Každý druh paliva má vlastní řadu (např. LPG a benzín u bi-fuel vozidel); Natural 95
+    a Verva 100 jsou obojí benzín (FuelRecord.fuel_group).
 
     Vrací seznam dictů {record, volume, distance, consumption} pro spočtené úseky.
     """
     by_type = defaultdict(list)
     for record in sorted(records, key=lambda r: (r.refuel_datetime, r.odometer, r.id or 0)):
-        by_type[_fuel_key(record.fuel_type)].append(record)
+        by_type[_fuel_key(record.fuel_group)].append(record)
 
     segments = []
     for series in by_type.values():
@@ -123,7 +125,7 @@ class FuelRecordService:
     def create_fuel_record(self, vehicle_id, refuel_datetime, odometer, fuel_type, volume_liters, unit_price,
                            price_paid, currency_code, unit_price_local, price_local, payment_method=None,
                            station_name=None, full_tank=False, skipped_refuel=False, consumption=None, note=None,
-                           station_address=None, created_by_id=None):
+                           station_address=None, created_by_id=None, fuel_category=None):
         # Parametr consumption je zachován kvůli kompatibilitě - spotřeba se vždy dopočítá.
         data = self._validate({
             "vehicle_id": vehicle_id, "refuel_datetime": refuel_datetime, "odometer": odometer,
@@ -133,6 +135,7 @@ class FuelRecordService:
             "payment_method": payment_method, "station_name": station_name,
             "station_address": station_address,
             "full_tank": full_tank, "skipped_refuel": skipped_refuel, "note": note,
+            "fuel_category": fuel_category,
         })
         self._check_odometer(data["vehicle_id"], data["refuel_datetime"], data["odometer"])
 
@@ -145,6 +148,8 @@ class FuelRecordService:
 
     def update_fuel_record(self, record, data):
         current = {field: getattr(record, field) for field in FUEL_RECORD_FIELDS}
+        if "fuel_type" in data and "fuel_category" not in data:
+            current["fuel_category"] = None  # jiné palivo -> druh se odhadne znovu
         current.update(data)
         validated = self._validate(current)
         self._check_odometer(validated["vehicle_id"], validated["refuel_datetime"], validated["odometer"],
@@ -199,8 +204,15 @@ class FuelRecordService:
         data["fuel_type"] = (data.get("fuel_type") or "").strip()
         if not data["fuel_type"]:
             errors.append("Typ paliva je povinný.")
-        elif len(data["fuel_type"]) > 15:
-            errors.append("Typ paliva může mít nejvýše 15 znaků.")
+        elif len(data["fuel_type"]) > 30:
+            errors.append("Typ paliva může mít nejvýše 30 znaků.")
+        # druh: hodnota ze seznamu paliv uživatele; "" = vědomě bez druhu, None = odhad podle názvu
+        category = data.get("fuel_category")
+        if category == "":
+            category = None
+        elif category not in FUEL_CATEGORIES:
+            category = guess_fuel_category(data["fuel_type"])
+        data["fuel_category"] = category
 
         data["volume_liters"] = to_decimal(data.get("volume_liters"), Q2)
         if data["volume_liters"] is None or data["volume_liters"] <= 0:

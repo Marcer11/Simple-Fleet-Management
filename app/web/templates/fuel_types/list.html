@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Paliva{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Paliva</h1>
+        <div class="sub">Nabídka ve formuláři tankování</div>
+    </div>
+    <div class="actions"><a class="btn" href="/fuel-records/add">+ Přidat tankování</a></div>
+</div>
+
+<div class="card">
+    <p class="small muted">
+        <strong>Druh</strong> určuje jednotku a řadu pro výpočet spotřeby – např. Natural 95 i Verva 100 jsou benzín,
+        takže se spotřeba počítá mezi nimi dohromady. Přejmenování nebo změna druhu se promítne i do zapsaných
+        tankování vozidel, která můžete upravovat. Odebrané palivo jen zmizí z nabídky.
+    </p>
+    <div class="table-wrap">
+    <table class="fuel-types">
+        <thead><tr><th>Název</th><th>Druh</th><th class="num">Tankování</th><th></th></tr></thead>
+        <tbody>
+        {% for t in items %}
+        <tr>
+            <td>
+                <input type="text" form="ft-{{ t.id }}" name="name" value="{{ t.name }}" required maxlength="30"
+                       aria-label="Název paliva" autocomplete="off">
+            </td>
+            <td>
+                <select form="ft-{{ t.id }}" name="category" aria-label="Druh paliva {{ t.name }}">
+                    {% for c, unit in categories %}<option value="{{ c }}"{% if t.category == c %} selected{% endif %}>{{ c }} ({{ unit }})</option>{% endfor %}
+                    <option value=""{% if not t.category %} selected{% endif %}>Jiné – vlastní spotřeba</option>
+                </select>
+            </td>
+            <td class="num">{{ usage[t.id] or "–" }}</td>
+            <td class="actions-cell">
+                <form id="ft-{{ t.id }}" method="post" action="/fuel-types/{{ t.id }}/edit" class="inline-form">
+                    {{ m.csrf() }}<button class="btn btn-sm" type="submit">Uložit</button>
+                </form>
+                <form method="post" action="/fuel-types/{{ t.id }}/delete" class="inline-form"
+                      data-confirm="Odebrat palivo „{{ t.name }}“ z nabídky? Zapsaná tankování zůstanou beze změny.">
+                    {{ m.csrf() }}<button class="btn btn-sm btn-danger" type="submit">Odebrat</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Přidat palivo</h2>
+    <form method="post" action="/fuel-types/add">
+        {{ m.csrf() }}
+        <div class="form-grid">
+            {{ m.field("name", "Název", required=true, maxlength=30, placeholder="např. Natural 95", autocomplete="off") }}
+            <div class="field">
+                <label for="f-category">Druh</label>
+                <select id="f-category" name="category">
+                    {% for c, unit in categories %}<option value="{{ c }}"{% if values.get('category', 'Benzín') == c %} selected{% endif %}>{{ c }} ({{ unit }})</option>{% endfor %}
+                    <option value=""{% if values.get('category') == '' %} selected{% endif %}>Jiné – vlastní spotřeba</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Přidat</button></div>
+    </form>
+</div>
+{% endblock %}

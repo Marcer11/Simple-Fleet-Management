@@ -106,6 +106,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         intervals=intervals, reminders=reminders,
         validities=ExpenseService(db).current_validities(vehicle.id),
         avg_consumption=StatsService(db).avg_consumption(vehicle.id),
+        profile=StatsService(db).usage_profile(vehicle.id),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
         owner=vehicle.owner,
     )

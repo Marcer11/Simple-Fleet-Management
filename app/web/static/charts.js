@@ -76,6 +76,103 @@ window.SfmCharts = (function () {
         });
     }
 
+    // "#rrggbb" -> "rgba(r, g, b, a)" (slabší čára u grafů s body)
+    function fade(color, alpha) {
+        const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color || "");
+        return m ? `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})` : color;
+    }
+
+    function toTime(x) {
+        return new Date(x.length === 10 ? x + "T12:00:00" : x).getTime();
+    }
+
+    function dateLabel(ms, withTime) {
+        const d = new Date(ms);
+        let text = `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+        if (withTime) text += ` ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        return text;
+    }
+
+    // Popisky osy x na začátcích měsíců (krok podle délky období)
+    function monthTicks(scale) {
+        const start = new Date(scale.min), end = new Date(scale.max);
+        const months = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1;
+        const step = [1, 2, 3, 6, 12, 24].find((s) => months / s <= 8) || 36;
+        const ticks = [];
+        let d = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+        while (d.getMonth() % step !== 0 && step <= 12) d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        for (; d.getTime() <= scale.max; d = new Date(d.getFullYear(), d.getMonth() + step, 1)) {
+            ticks.push({ value: d.getTime() });
+        }
+        scale.ticks = ticks;
+    }
+
+    function monthLabel(ms) {
+        const d = new Date(ms);
+        return d.getMonth() === 0 ? String(d.getFullYear()) : `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`;
+    }
+
+    // Graf v čase se skutečnými rozestupy: {řada: [{x: "YYYY-MM-DD[THH:MM]", y, ...}]}
+    // opts: decimals, unit (popisek osy y), valueSuffix(point), thin (slabá čára, zvýrazněné body),
+    //       details(point) -> další řádky tooltipu, withTime (čas v tooltipu)
+    function timeChart(id, seriesByName, opts) {
+        const el = document.getElementById(id);
+        if (!el || !window.Chart) return;
+        const p = setup();
+        const o = Object.assign({ decimals: 0, unit: "", thin: false }, opts);
+        const names = Object.keys(seriesByName);
+        const total = names.reduce((n, name) => n + seriesByName[name].length, 0);
+        const dense = total > 150;
+        const datasets = names.map((name, i) => {
+            const color = p.series[i % p.series.length];
+            return {
+                label: name,
+                data: seriesByName[name].map((pt) => ({ x: toTime(pt.x), y: pt.y, meta: pt })),
+                borderColor: o.thin ? fade(color, 0.45) : color,
+                backgroundColor: color,
+                borderWidth: o.thin ? 1.5 : 2,
+                pointRadius: o.thin ? (dense ? 2 : 3) : (dense ? 0 : 3),
+                pointHoverRadius: 6,
+                pointBackgroundColor: color,
+                pointBorderColor: p.surface,
+                pointBorderWidth: dense ? 0 : 1,
+                tension: 0,
+            };
+        });
+        const a = axes(o.unit, o.beginAtZero === true);
+        const fmt = nf(o.decimals);
+        const xs = datasets.flatMap((d) => d.data.map((pt) => pt.x));
+        const day = 86400000;  // osa přesně podle dat (lineární osa by zaokrouhlovala až o rok)
+        const xMin = Math.min(...xs) - day, xMax = Math.max(...xs) + day;
+        return new Chart(el, {
+            type: "line",
+            data: { datasets },
+            options: {
+                maintainAspectRatio: false,
+                parsing: false,
+                interaction: { mode: "nearest", axis: "xy", intersect: false },
+                scales: {
+                    x: { type: "linear", min: xMin, max: xMax, grid: { display: false }, afterBuildTicks: monthTicks,
+                         ticks: { maxRotation: 0, autoSkip: false, callback: monthLabel } },
+                    y: { ...a.y, ticks: { callback: (v) => fmt.format(v) } },
+                },
+                plugins: {
+                    legend: { display: names.length > 1, position: "top", align: "start" },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => items.length ? dateLabel(items[0].parsed.x, o.withTime) : "",
+                            label: (c) => {
+                                const suffix = o.valueSuffix ? o.valueSuffix(c.raw.meta) : o.unit;
+                                return `${c.dataset.label}: ${fmt.format(c.parsed.y)} ${suffix}`;
+                            },
+                            afterLabel: (c) => (o.details ? o.details(c.raw.meta) : []),
+                        },
+                    },
+                },
+            },
+        });
+    }
+
     // Skládaný sloupcový graf měsíčních nákladů (palivo / servis / výdaje)
     function monthlyCosts(id, data) {
         const el = document.getElementById(id);
@@ -123,5 +220,5 @@ window.SfmCharts = (function () {
         return el ? JSON.parse(el.textContent) : null;
     }
 
-    return { lineChart, monthlyCosts, unitOf, readData };
+    return { lineChart, timeChart, monthlyCosts, unitOf, readData };
 })();

@@ -25,8 +25,9 @@
         </div>
         <div class="field">
             <label for="f-fuel_type">Palivo <span class="req">*</span></label>
-            <input id="f-fuel_type" name="fuel_type" type="text" required maxlength="15" list="fuel-types" value="{{ m.val('fuel_type') }}" autocomplete="off">
+            <input id="f-fuel_type" name="fuel_type" type="text" required maxlength="30" list="fuel-types" value="{{ m.val('fuel_type') }}" autocomplete="off">
             {{ m.datalist("fuel-types", fuel_types) }}
+            <small class="help">Nové palivo se uloží do nabídky. <a href="/fuel-types">Upravit seznam paliv</a></small>
         </div>
         {{ m.field("volume_liters", "Množství (l / kWh / kg)", required=true, inputmode="decimal", placeholder="0,00", autocomplete="off") }}
         {{ m.field("unit_price", "Cena za jednotku", inputmode="decimal", placeholder="0,000", autocomplete="off", help="Stačí vyplnit jednu z cen, druhá se dopočítá.") }}

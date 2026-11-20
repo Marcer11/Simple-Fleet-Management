@@ -313,4 +313,13 @@ def test_fleet_stats(app, db):
     assert summary["distance"] == 600
     assert set(summary["charts"]["unit_price"]) == {"Benzín", "Nafta"}
     odo = summary["charts"]["odometer"]
-    assert [p["y"] for p in odo["Škoda Octavia"]] == [10000, 10600]
+    # ujeto od začátku období, skutečný stav v "odo"
+    assert [p["y"] for p in odo["Škoda Octavia"]] == [0, 600]
+    assert [p["odo"] for p in odo["Škoda Octavia"]] == [10000, 10600]
+    # cena u každého tankování (ne měsíční průměr)
+    prices = summary["charts"]["unit_price"]["Benzín"]
+    assert len(prices) == 2 and prices[0]["y"] == 40 and prices[0]["vehicle"] == "Škoda Octavia"
+    profile = summary["rows"][0]["profile"]
+    assert profile["days_between"] == 30 and profile["km_between"] == 600
+    assert round(profile["km_per_year"]) == round(600 / 30 * 365.25)
+    assert "Tankuje každých" in page

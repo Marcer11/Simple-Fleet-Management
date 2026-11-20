@@ -36,6 +36,7 @@
         <thead><tr>
             <th>Vozidlo</th><th class="num">Ujeto</th><th class="num">Palivo</th><th class="num">Servis</th>
             <th class="num">Výdaje</th><th class="num">Celkem</th><th class="num">Kč/km</th><th class="num">Spotřeba</th>
+            <th class="num" title="Průměr z celé historie vozidla">Km za rok</th><th class="num" title="Průměr z celé historie vozidla">Tankuje každých</th>
         </tr></thead>
         <tbody>
         {% for r in summary.rows %}
@@ -52,6 +53,8 @@
                 <div>{{ info.value|num(1) }} {{ info.unit }}<span class="muted small"> · {{ ft }}</span></div>
                 {% else %}–{% endfor %}
             </td>
+            <td class="num nowrap">{{ r.profile.km_per_year|km if r.profile.km_per_year else "–" }}</td>
+            <td class="num nowrap">{{ (r.profile.days_between|num(0 if r.profile.days_between >= 10 else 1)) ~ " dní" if r.profile.days_between else "–" }}</td>
         </tr>
         {% endfor %}
         </tbody>
@@ -60,7 +63,7 @@
             <td>Celkem</td><td class="num nowrap">{{ summary.distance|km }}</td>
             <td class="num nowrap">{{ summary.fuel_cost|czk(0) }}</td><td class="num nowrap">{{ summary.service_cost|czk(0) }}</td>
             <td class="num nowrap">{{ summary.expense_cost|czk(0) }}</td><td class="num nowrap">{{ summary.total_cost|czk(0) }}</td>
-            <td class="num nowrap">{{ summary.cost_per_km|num(2) if summary.cost_per_km else "–" }}</td><td></td>
+            <td class="num nowrap">{{ summary.cost_per_km|num(2) if summary.cost_per_km else "–" }}</td><td></td><td></td><td></td>
         </tr></tfoot>
         {% endif %}
     </table>
@@ -91,17 +94,19 @@
 {% endif %}
 
 <div class="card">
-    <h2>Stav tachometru</h2>
+    <h2>Ujeté kilometry</h2>
     {% if summary.charts.odometer %}
-    <div class="chart-box tall"><canvas id="chart-odometer" role="img" aria-label="Stav tachometru jednotlivých vozidel v čase"></canvas></div>
+    <div class="chart-box tall"><canvas id="chart-odometer" role="img" aria-label="Ujeté kilometry jednotlivých vozidel od začátku období"></canvas></div>
+    <p class="help">Od prvního záznamu ve zvoleném období – vozidla s různým stavem tachometru jsou tak porovnatelná.
+        Skutečný stav tachometru je v popisku bodu.</p>
     {% else %}<div class="empty small">Žádné záznamy se stavem tachometru.</div>{% endif %}
 </div>
 
 <div class="card">
-    <h2>Průměrná cena paliva po měsících (Kč za jednotku)</h2>
+    <h2>Cena paliva (Kč za jednotku)</h2>
     {% if summary.charts.unit_price %}
     <div class="chart-box"><canvas id="chart-price" role="img" aria-label="Vývoj průměrné ceny paliva podle druhu"></canvas></div>
-    <p class="help">Průměr vážený natankovaným množstvím, ze všech vozidel.</p>
+    <p class="help">Každý bod je jedno tankování (všechna vozidla).</p>
     {% else %}<div class="empty small">Žádná tankování s cenou.</div>{% endif %}
 </div>
 </div>
@@ -113,14 +118,20 @@
 {% block scripts %}
 {% if summary.rows %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=2"></script>
+<script src="/static/charts.js?v=3"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
     SfmCharts.monthlyCosts("chart-monthly", data);
-    SfmCharts.lineChart("chart-odometer", data.odometer, 0, "km");
-    SfmCharts.lineChart("chart-price", data.unit_price, 2, "Kč");
+    const nf = new Intl.NumberFormat("cs-CZ");
+    SfmCharts.timeChart("chart-odometer", data.odometer, {
+        unit: "km", beginAtZero: true, details: (pt) => [`Tachometr: ${nf.format(pt.odo)} km`],
+    });
+    SfmCharts.timeChart("chart-price", data.unit_price, {
+        decimals: 2, unit: "Kč", thin: true, withTime: true, valueSuffix: (pt) => `Kč/${pt.unit}`,
+        details: (pt) => [pt.vehicle, pt.station].filter(Boolean),
+    });
 })();
 </script>
 {% endif %}

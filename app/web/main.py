@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from services import config
 from services.errors import NotFoundError, PermissionDeniedError
 from web.deps import LoginRequired, csrf_protect, render
-from web.routers import api, auth, dashboard, fuel, maintenance, stats, vehicles
+from web.routers import api, auth, dashboard, fuel, fuel_types, maintenance, stats, vehicles
 
 app = FastAPI(
     title="Simple Fleet Manager",
@@ -44,6 +44,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(vehicles.router)
 app.include_router(fuel.router)
+app.include_router(fuel_types.router)
 app.include_router(maintenance.router)
 app.include_router(stats.router)
 app.include_router(api.router)

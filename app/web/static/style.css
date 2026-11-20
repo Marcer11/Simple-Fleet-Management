@@ -350,3 +350,9 @@ footer.site { text-align: center; color: var(--muted); font-size: .8rem; padding
 .help.error-text { color: var(--danger); }
 @media (min-width: 720px) { .field-span-2 { grid-column: span 2; } }
 .form-after { margin-top: 10px; }
+
+/* Seznam paliv a přehled stanic */
+.inline-form { display: inline; margin: 0; }
+table.fuel-types input, table.fuel-types select { min-width: 140px; }
+tr.group-row td { font-weight: 600; background: var(--surface-2, transparent); border-top: 2px solid var(--border); }
+tr.child-row td:first-child { padding-left: 28px; }

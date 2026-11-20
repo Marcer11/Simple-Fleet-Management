@@ -3,12 +3,14 @@ from datetime import date, datetime, time
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from models.fuel_record import FUEL_TYPES, PAYMENT_METHODS
+from models.fuel_record import PAYMENT_METHODS
 from models.vehicle import ROLE_EDITOR
 from services import timeline
 from services.errors import ValidationError, NotFoundError
 from services.fuel_record_service import FuelRecordService
+from services.fuel_type_service import FuelTypeService
 from services.pricing import fuel_prices
+from services.stations import station_overview
 from services.vehicle_service import VehicleService
 from web.common import (
     editable_vehicles, visible_vehicles, check_record_access, flash_vehicle_alerts,
@@ -45,8 +47,17 @@ async def list_fuel_records(request: Request, user=Depends(get_current_user), db
         "count": len(records),
     }
     return render(request, "fuel/list.html", vehicles=vehicles, records=records, filters=filters,
-                  totals=totals, fuel_types=FUEL_TYPES,
+                  totals=totals, fuel_types=_filter_fuel_types(db, user, vehicles, filters["fuel_type"]),
                   editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)))
+
+
+def _filter_fuel_types(db, user, vehicles, selected):
+    """Paliva pro filtr: vlastní seznam + paliva zapsaná u viditelných vozidel."""
+    names = FuelTypeService(db).names(user)
+    known = {n.lower() for n in names}
+    used = FuelRecordService(db).get_used_values([v.id for v in vehicles], "fuel_type")
+    extra = [n for n in used + ([selected] if selected else []) if n.lower() not in known]
+    return names + sorted(set(extra))
 
 
 @router.get("/export.csv")
@@ -62,6 +73,17 @@ async def export_fuel_records(request: Request, user=Depends(get_current_user), 
     header = ["Vozidlo", "Datum a čas", "Tachometr", "Palivo", "Množství", "Cena/jedn.", "Cena", "Měna",
               "Cena CZK", "Platba", "Stanice", "Adresa stanice", "Plná", "Vynecháno", "Spotřeba", "Poznámka"]
     return csv_response("tankovani.csv", header, rows)
+
+
+@router.get("/stations")
+async def stations(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    """Přehled čerpacích stanic: značka -> konkrétní stanice, počet tankování a útrata."""
+    vehicles, records, filters = _filters(request, db, user)
+    overview = station_overview(records)
+    totals = {"count": len(records), "cost": sum((r.price_local or 0 for r in records), 0),
+              "brands": len(overview), "stations": sum(len(b["stations"]) for b in overview)}
+    return render(request, "fuel/stations.html", vehicles=vehicles, filters=filters,
+                  overview=overview, totals=totals)
 
 
 @router.get("/timeline-stop")
@@ -97,7 +119,7 @@ def _form_context(db, user, record=None):
     return {
         "record": record,
         "vehicles": vehicles,
-        "fuel_types": FUEL_TYPES,
+        "fuel_types": FuelTypeService(db).names(user),
         "payment_methods": PAYMENT_METHODS,
         "currencies": COMMON_CURRENCIES,
         "stations": service.get_used_values(ids, "station_name"),
@@ -114,7 +136,7 @@ def _read_form(form):
         "refuel_date": form.date("refuel_date", "Datum", required=True),
         "refuel_time": form.time("refuel_time", "Čas", required=True),
         "odometer": form.int("odometer", "Stav tachometru", required=True, min_value=0),
-        "fuel_type": form.str("fuel_type", "Palivo", required=True, max_len=15),
+        "fuel_type": form.str("fuel_type", "Palivo", required=True, max_len=30),
         "volume": form.decimal("volume_liters", "Množství", required=True, positive=True),
         "unit_price": form.decimal("unit_price", "Cena za jednotku", min_value=0),
         "total_price": form.decimal("price_paid", "Celková cena", min_value=0),
@@ -171,6 +193,7 @@ async def add_post(request: Request, user=Depends(get_current_user), db=Depends(
     vehicle_service = VehicleService(db)
     try:
         data = _read_form(form)
+        data["fuel_type"], data["fuel_category"] = FuelTypeService(db).resolve(user, data["fuel_type"])
         vehicle = vehicle_service.get_vehicle_for_user(data["vehicle_id"], user, ROLE_EDITOR)
         record = FuelRecordService(db).create_fuel_record(**data, created_by_id=user.id)
     except (ValidationError, NotFoundError) as e:
@@ -220,6 +243,7 @@ async def edit_post(request: Request, record_id: int, user=Depends(get_current_u
     form = FormReader(await request.form())
     try:
         data = _read_form(form)
+        data["fuel_type"], data["fuel_category"] = FuelTypeService(db).resolve(user, data["fuel_type"])
         # při přesunu na jiné vozidlo musí mít uživatel právo i k cílovému vozidlu
         vehicle = VehicleService(db).get_vehicle_for_user(data["vehicle_id"], user, ROLE_EDITOR)
         service.update_fuel_record(record, data)

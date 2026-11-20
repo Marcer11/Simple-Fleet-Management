@@ -222,3 +222,95 @@ def test_pwa_files(app):
     assert client.get("/manifest.webmanifest").json()["short_name"] == "Fleet"
     assert client.get("/sw.js").status_code == 200
     assert client.get("/static/icons/icon-192.png").status_code == 200
+
+
+def test_fuel_filter_dates(app, db):
+    client = register(app, "f@example.com")
+    vid = add_vehicle(client)
+    today = date.today()
+    assert add_fuel(client, vid, today, 1000, "40", refuel_time="23:59").status_code == 303
+
+    def shows(url):
+        page = client.get(url)
+        assert page.status_code == 200, url
+        return "/fuel-records/" in page.text and "/edit" in page.text
+
+    assert shows("/fuel-records")
+    assert shows(f"/fuel-records?date_from={today.isoformat()}&date_to={today.isoformat()}")
+    # nedopsaný rok z prohlížeče (0002) se ignoruje místo filtrování od roku 2
+    assert shows("/fuel-records?date_from=0002-11-20")
+    assert not shows(f"/fuel-records?date_to={(today - timedelta(days=1)).isoformat()}")
+    # nesmyslný rok ve formuláři je chyba
+    r = add_fuel(client, vid, date(2, 1, 1), 900, "10")
+    assert r.status_code == 400 and "rok musí být" in r.text
+
+
+def test_vignette_reminder(app, db):
+    from models import Expense, Reminder
+
+    client = register(app, "v@example.com")
+    vid = add_vehicle(client)
+    start = date.today()
+    data = {"vehicle_id": vid, "expense_date": start.isoformat(), "category": "Dálniční známka",
+            "price_paid": "2570", "vignette_variant": "year", "valid_from": start.isoformat(), "remind": "on"}
+    assert post(client, "/expenses/add", data).status_code == 303
+    first = db.query(Expense).one()
+    assert first.valid_until == start + timedelta(days=364)
+    reminder = db.get(Reminder, first.reminder_id)
+    assert reminder.due_date == first.valid_until and not reminder.is_done
+    assert "Dálniční známka" in client.get(f"/vehicles/{vid}").text
+    assert client.get(f"/expenses/{first.id}/edit").status_code == 200
+
+    # 10denní známka bez upomínky
+    assert post(client, "/expenses/add", {**data, "vignette_variant": "10d", "remind": ""}).status_code == 303
+    ten_day = db.query(Expense).order_by(Expense.id.desc()).first()
+    assert ten_day.valid_until == start + timedelta(days=9) and ten_day.reminder_id is None
+
+    # obnovení: nová roční známka uzavře upomínku té předchozí
+    renewal_start = first.valid_until + timedelta(days=1)
+    assert post(client, "/expenses/add", {**data, "valid_from": renewal_start.isoformat()}).status_code == 303
+    db.expire_all()
+    assert db.get(Reminder, reminder.id).is_done
+    renewal = db.query(Expense).order_by(Expense.id.desc()).first()
+    assert db.get(Reminder, renewal.reminder_id).due_date == renewal_start + timedelta(days=364)
+
+    # smazání výdaje smaže jeho otevřenou upomínku
+    renewal_reminder_id = renewal.reminder_id
+    assert post(client, f"/expenses/{renewal.id}/delete", {}).status_code == 303
+    db.expire_all()
+    assert db.get(Reminder, renewal_reminder_id) is None
+
+    # výdaj bez platnosti upomínku nevytváří, ani s výchozím zaškrtnutím
+    count = db.query(Reminder).count()
+    assert post(client, "/expenses/add", {"vehicle_id": vid, "expense_date": start.isoformat(),
+                                          "category": "Mytí", "price_paid": "200", "remind": "on",
+                                          "valid_from": start.isoformat()}).status_code == 303
+    assert db.query(Reminder).count() == count
+
+    # konec platnosti před začátkem
+    r = post(client, "/expenses/add", {**data, "vignette_variant": "", "valid_until": (start - timedelta(days=1)).isoformat()})
+    assert r.status_code == 400
+
+
+def test_fleet_stats(app, db):
+    client = register(app, "s@example.com")
+    assert "Zatím nemáte" in client.get("/stats").text
+    a = add_vehicle(client, model="Octavia")
+    b = add_vehicle(client, model="Fabia")
+    today = date.today()
+    add_fuel(client, a, today - timedelta(days=40), 10000, "40")
+    add_fuel(client, a, today - timedelta(days=10), 10600, "42")
+    add_fuel(client, b, today - timedelta(days=20), 50000, "30", fuel_type="Nafta")
+    for url in ["/stats", "/stats?period=all", f"/stats?period={today.year}", "/stats?period=nesmysl"]:
+        r = client.get(url)
+        assert r.status_code == 200, url
+    page = client.get("/stats").text
+    assert "Octavia" in page and "Fabia" in page and "chart-odometer" in page
+
+    from services.stats_service import StatsService
+    vehicles = [db.get(Vehicle, a), db.get(Vehicle, b)]
+    summary = StatsService(db).fleet_summary(vehicles)
+    assert summary["distance"] == 600
+    assert set(summary["charts"]["unit_price"]) == {"Benzín", "Nafta"}
+    odo = summary["charts"]["odometer"]
+    assert [p["y"] for p in odo["Škoda Octavia"]] == [10000, 10600]

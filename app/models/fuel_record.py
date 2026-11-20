@@ -38,6 +38,7 @@ class FuelRecord(Base):
     price_local = Column(DECIMAL(12, 3), nullable=True)
     payment_method = Column(String(20), nullable=True)
     station_name = Column(String(100), nullable=True)
+    station_address = Column(String(200), nullable=True)
     full_tank = Column(Boolean, nullable=False, default=False)
     skipped_refuel = Column(Boolean, nullable=False, default=False)
     consumption = Column(DECIMAL(5, 2), nullable=True)

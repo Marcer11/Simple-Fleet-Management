@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from services import config
+from services import timeline
 from services.errors import ValidationError
 from services.user_service import UserService, normalize_email
 from web.deps import get_db, get_optional_user, get_current_user, login_user, logout_user, flash, render
@@ -106,7 +107,8 @@ async def register_post(request: Request, db=Depends(get_db)):
 
 @router.get("/profile")
 async def profile(request: Request, user=Depends(get_current_user)):
-    return render(request, "auth/profile.html", values={"name": user.name})
+    return render(request, "auth/profile.html", values={"name": user.name},
+                  timeline_enabled=timeline.is_enabled())
 
 
 @router.post("/profile")
@@ -118,10 +120,16 @@ async def profile_post(request: Request, user=Depends(get_current_user), db=Depe
             service.change_password(user, form.raw.get("current_password", ""),
                                     form.raw.get("new_password", ""), form.raw.get("new_password_confirm", ""))
             flash(request, "Heslo bylo změněno.")
+        elif form.raw.get("action") == "timeline":
+            service.set_timeline_key(user, form.raw.get("timeline_api_key"))
+            flash(request, "API klíč Timeline byl uložen." if user.timeline_api_key else "API klíč Timeline byl odebrán.")
+        elif form.raw.get("action") == "timeline_remove":
+            service.set_timeline_key(user, None)
+            flash(request, "API klíč Timeline byl odebrán.")
         else:
             service.update_profile(user, form.raw.get("name"))
             flash(request, "Profil byl uložen.")
     except ValidationError as e:
         return render(request, "auth/profile.html", status_code=400, error=str(e),
-                      values={"name": form.raw.get("name", user.name)})
+                      values={"name": form.raw.get("name", user.name)}, timeline_enabled=timeline.is_enabled())
     return RedirectResponse("/profile", status_code=303)

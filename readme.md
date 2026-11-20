@@ -12,6 +12,7 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 - [Instalace a spuštění](#instalace-a-spuštění)
 - [Databáze a migrace](#databáze-a-migrace)
 - [Správa uživatelů](#správa-uživatelů)
+- [Napojení na Timeline](#napojení-na-timeline)
 - [Nasazení na server](#nasazení-na-server)
 - [Struktura projektu](#struktura-projektu)
 - [Testy](#testy)
@@ -40,6 +41,8 @@ a prodeje, aktivní/neaktivní.
 - **výpočet spotřeby** metodou „plná–plná“ – zvlášť pro každý druh paliva (LPG/benzín),
   příznak „vynechané tankování“ úsek vyřadí; po úpravě či smazání se vše přepočítá
 - kontrola, že stav tachometru odpovídá chronologii
+- **dohledání pumpy z aplikace Timeline** – tlačítko „Načíst pumpu“ podle data a času tankování
+  doplní název a adresu stanice ze záznamů polohy (viz [Napojení na Timeline](#napojení-na-timeline))
 - filtrování (vozidlo, období, palivo) a export do CSV
 
 ### Servis, pravidelný servis, upomínky
@@ -52,8 +55,15 @@ a prodeje, aktivní/neaktivní.
 
 ### Výdaje a statistiky
 - ostatní výdaje (dálniční známka, pojištění, mytí, mýtné, …) s převodem měny, export CSV
+- **platnost výdaje** (dálniční známka, pojištění, …) – u dálniční známky stačí zvolit typ
+  (roční / 30denní / 10denní / jednodenní) a konec platnosti se dopočítá; aplikace založí
+  upomínku konce platnosti, při zápisu nové známky tu starou uzavře a v detailu vozidla
+  ukazuje, do kdy známka platí (odkaz „Obnovit“)
+  - eDálnice veřejné API pro ověření platnosti nemají, platnost se proto počítá z nákupu
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
   průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva
+- **statistiky všech vozidel** (`/stats`): souhrn a tabulka po vozidlech, měsíční náklady,
+  vývoj stavu tachometru a průměrné ceny paliva
 
 ### Instalace jako aplikace (PWA)
 Na mobilu i v desktopovém Chrome/Edge lze aplikaci „nainstalovat“ (vyžaduje HTTPS).
@@ -103,6 +113,15 @@ Totéž platí pro vozidla založená v konzolové aplikaci.
 
 Registraci přes web lze vypnout: `ALLOW_REGISTRATION=false`.
 
+## Napojení na Timeline
+
+Aplikace Timeline (běží na stejném serveru) zná podle záznamů polohy, u které pumpy uživatel byl.
+- v `.env` nastavte `TIMELINE_URL` (např. `http://127.0.0.1:5000`); prázdné = funkce vypnutá
+- každý uživatel si v Timeline vygeneruje API klíč (Správa → Účet a zabezpečení → API klíč)
+  a uloží ho ve svém **Profilu**; klíč se zobrazuje jen zkráceně
+- dotaz jde přes server aplikace (`/fuel-records/timeline-stop`), klíč se do prohlížeče
+  nedostane; klíč ani poloha se nelogují, timeout 5 s, výpadek Timeline neblokuje uložení
+
 ## Nasazení na server
 
 GitHub Actions (`.github/workflows/deploy.yml`) po pushi do `main` spustí testy a pokud projdou,
@@ -147,6 +166,7 @@ Testy nikdy nesahají na databázi z `.env` ani na ČNB (kurz je podvržen).
 - fotografie vozidla a dokladů k výdajům
 - evidence pokut a bodového konta
 - údaje z velkého TP přes API Datové kostky (vyžaduje registraci API klíče)
+- ověření platnosti dálniční známky přímo u eDálnic (až bude veřejné API)
 - e-mailové / push notifikace upomínek
 - obnova zapomenutého hesla e-mailem
 - import tankování z CSV (např. z jiných aplikací)

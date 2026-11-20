@@ -30,6 +30,9 @@ ALLOW_REGISTRATION = _bool("ALLOW_REGISTRATION", True)
 WEB_HOST = os.getenv("WEB_HOST", "127.0.0.1")
 WEB_PORT = int(os.getenv("WEB_PORT", "8000"))
 
+# Aplikace Timeline na stejném serveru - dohledání pumpy podle polohy (prázdné = vypnuto)
+TIMELINE_URL = (os.getenv("TIMELINE_URL") or "").strip().rstrip("/")
+
 # Domácí měna - kurzy se berou z ČNB, proto CZK
 LOCAL_CURRENCY = "CZK"
 

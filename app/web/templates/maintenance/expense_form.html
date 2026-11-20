@@ -15,3 +15,20 @@
 {{ m.price_fields(currencies, "Částka", required=true) }}
 {{ m.textarea("note", "Poznámka") }}
 {% endblock %}
+
+{% block extra %}
+<fieldset class="validity" id="validity"
+          data-categories='{{ validity_categories|tojson }}' data-vignette="{{ vignette_category }}"
+          data-days='{{ vignette_days|tojson }}'>
+    <legend>Platnost</legend>
+    <p class="help">Vyplňte u dálniční známky, pojištění apod. – aplikace pak před koncem platnosti připomene obnovu.</p>
+    <div class="form-grid">
+        <div id="vignette-field">
+            {{ m.select("vignette_variant", "Typ dálniční známky", vignette_variants.items(), empty="Vlastní platnost") }}
+        </div>
+        {{ m.field("valid_from", "Platnost od", "date") }}
+        {{ m.field("valid_until", "Platnost do", "date", help="U známky se dopočítá – zkontrolujte s dokladem.") }}
+        {{ m.checkbox("remind", "Připomenout konec platnosti", help="Vytvoří upomínku; po zápisu nové známky se stará uzavře.") }}
+    </div>
+</fieldset>
+{% endblock %}

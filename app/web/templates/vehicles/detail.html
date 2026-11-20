@@ -71,6 +71,18 @@
         <div><div class="label">Barva</div><div class="value">{{ vehicle.color or "–" }}</div></div>
         <div><div class="label">Zakoupeno</div><div class="value">{{ vehicle.purchase_date|date or "–" }}</div></div>
         <div><div class="label">Prodáno</div><div class="value">{{ vehicle.sale_date|date or "–" }}</div></div>
+        {% for cat, e, days_left, renew_from in validities %}
+        <div>
+            <div class="label">{{ cat }}</div>
+            <div class="value">
+                {% if days_left < 0 %}<span class="badge badge-danger">Propadlá {{ e.valid_until|date }}</span>
+                {% else %}do {{ e.valid_until|date }}
+                    {% if days_left <= 14 %} <span class="badge badge-warning">{% if days_left == 0 %}dnes končí{% else %}zbývá {{ days_left }} {{ "den" if days_left == 1 else ("dny" if days_left < 5 else "dní") }}{% endif %}</span>{% endif %}
+                {% endif %}
+                {% if can_edit %}<a class="small" href="/expenses/add?vehicle_id={{ vehicle.id }}&amp;category={{ cat|urlencode }}&amp;valid_from={{ renew_from.isoformat() }}">Obnovit</a>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
     </div>
     {% if vehicle.note %}<p style="white-space: pre-line; margin-bottom: 0">{{ vehicle.note }}</p>{% endif %}
 </div>
@@ -100,7 +112,7 @@
             <td class="num">{{ r.volume_liters|qty }} {{ r.unit }}</td>
             <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
             <td class="num">{% if r.consumption %}{{ r.consumption|num(2) }}{% else %}<span class="muted">–</span>{% endif %}</td>
-            <td>{{ r.station_name or "" }}</td>
+            <td{% if r.station_address %} title="{{ r.station_address }}"{% endif %}>{{ r.station_name or "" }}</td>
             {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/fuel-records/{{ r.id }}/edit">Upravit</a></td>{% endif %}
         </tr>
         {% endfor %}

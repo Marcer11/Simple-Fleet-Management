@@ -67,6 +67,16 @@ class UserService:
         self.session.commit()
         return user
 
+    def set_timeline_key(self, user, key):
+        """Uloží (nebo smaže při prázdné hodnotě) osobní API klíč Timeline."""
+        from services.timeline import is_valid_key
+        key = (key or "").strip()
+        if key and not is_valid_key(key):
+            raise ValidationError("API klíč Timeline má neplatný tvar (začíná „tl_“).")
+        user.timeline_api_key = key or None
+        self.session.commit()
+        return user
+
     def change_password(self, user, current_password, new_password, new_password_confirm=None):
         if current_password is not None and not verify_password(current_password, user.password_hash):
             raise ValidationError("Současné heslo není správné.")

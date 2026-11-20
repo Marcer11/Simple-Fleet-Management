@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy import func
 
 from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle
-from models.maintenance import REPEAT_OPTIONS, REPEAT_NONE
+from models.maintenance import REPEAT_OPTIONS, REPEAT_NONE, VIGNETTE_VARIANTS
 from services.errors import ValidationError, NotFoundError
 from services.pricing import convert_price
 
@@ -193,9 +193,91 @@ class ServiceRecordService(_RecordServiceBase):
 # Výdaje
 # ----------------------------------------------------------------------
 
+def vignette_valid_until(valid_from, variant):
+    """Poslední den platnosti dálniční známky (platí včetně prvního dne)."""
+    if variant not in VIGNETTE_VARIANTS:
+        raise ValidationError("Neplatný typ dálniční známky.")
+    return valid_from + timedelta(days=VIGNETTE_VARIANTS[variant][1] - 1)
+
+
+# Upozornit na konec platnosti tolik dní předem (krátké známky dřív nedává smysl)
+def _notify_days_for(valid_from, valid_until):
+    if valid_from is None:
+        return 14
+    length = (valid_until - valid_from).days + 1
+    return 14 if length > 60 else (3 if length > 7 else 0)
+
+
 class ExpenseService(_RecordServiceBase):
+    """
+    Výdaje. U výdaje s platností (dálniční známka, pojištění…) lze nechat vytvořit upomínku
+    konce platnosti; při zápisu nové známky / pojistky se upomínka té předchozí uzavře.
+    """
     model = Expense
     date_column = "expense_date"
+
+    def create(self, **data):
+        remind = bool(data.pop("remind", False))
+        record = super().create(**data)
+        self._sync_reminder(record, remind)
+        return record
+
+    def update(self, record, data):
+        data = dict(data)
+        remind = bool(data.pop("remind", False))
+        record = super().update(record, data)
+        self._sync_reminder(record, remind)
+        return record
+
+    def delete(self, record):
+        reminder = record.reminder
+        if reminder is not None and not reminder.is_done:
+            self.session.delete(reminder)
+        super().delete(record)
+
+    def _sync_reminder(self, record, remind):
+        reminder = record.reminder
+        if remind and record.valid_until:
+            title = f"{record.category} – konec platnosti"[:100]
+            if reminder is None:
+                reminder = Reminder(vehicle_id=record.vehicle_id, repeat=REPEAT_NONE, notify_km_before=0)
+                self.session.add(reminder)
+                record.reminder = reminder
+            reminder.vehicle_id = record.vehicle_id
+            reminder.title = title
+            reminder.due_date = record.valid_until
+            reminder.due_odometer = None
+            reminder.notify_days_before = _notify_days_for(record.valid_from, record.valid_until)
+            reminder.note = f"Vytvořeno automaticky z výdaje ze dne {record.expense_date.strftime('%d.%m.%Y')}."
+            reminder.is_done = False
+            self._close_previous(record)
+        elif reminder is not None:
+            record.reminder = None
+            if not reminder.is_done:
+                self.session.delete(reminder)
+        self.session.commit()
+
+    def _close_previous(self, record):
+        """Obnovení (nová známka/pojistka) - upomínky dřívějších výdajů stejné kategorie jsou vyřízené."""
+        previous = (self.session.query(Expense)
+                    .filter(Expense.vehicle_id == record.vehicle_id, Expense.category == record.category,
+                            Expense.id != record.id, Expense.reminder_id.isnot(None),
+                            Expense.valid_until <= record.valid_until)
+                    .all())
+        for expense in previous:
+            if expense.reminder is not None:
+                expense.reminder.is_done = True
+
+    def current_validities(self, vehicle_id, today=None):
+        """Nejnovější platnost pro každou kategorii: [(kategorie, výdaj, dní do konce, začátek obnovy)]."""
+        today = today or date.today()
+        latest = {}
+        for e in (self.session.query(Expense)
+                  .filter(Expense.vehicle_id == vehicle_id, Expense.valid_until.isnot(None))
+                  .order_by(Expense.valid_until)):
+            latest[e.category] = e
+        return [(cat, e, (e.valid_until - today).days, max(today, e.valid_until + timedelta(days=1)))
+                for cat, e in sorted(latest.items())]
 
     def _validate(self, data):
         _ensure_vehicle(self.session, data.get("vehicle_id"))
@@ -204,9 +286,21 @@ class ExpenseService(_RecordServiceBase):
         if data.get("price_paid") in (None, ""):
             raise ValidationError("Částka je povinná.")
         manual_rate = data.pop("manual_rate", None)
+        variant = data.pop("vignette_variant", None)
+        valid_from = data.get("valid_from") or None
+        valid_until = data.get("valid_until") or None
+        if variant:
+            valid_from = valid_from or data["expense_date"]
+            valid_until = vignette_valid_until(valid_from, variant)
+        if valid_from and valid_until and valid_until < valid_from:
+            raise ValidationError("Konec platnosti nemůže být před jejím začátkem.")
+        if not valid_until:
+            valid_from = None  # bez konce platnosti nemá začátek význam
         currency, price_paid, price_local = convert_price(
             data.get("price_paid"), data.get("currency_code"), data["expense_date"], manual_rate)
         return {
+            "valid_from": valid_from,
+            "valid_until": valid_until,
             "vehicle_id": data["vehicle_id"],
             "expense_date": data["expense_date"],
             "category": _clean_str(data.get("category"), 30, "Kategorie", required=True),

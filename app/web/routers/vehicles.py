@@ -13,6 +13,7 @@ from services.stats_service import StatsService
 from services.vehicle_service import VehicleService
 from web.deps import get_db, get_current_user, flash, render
 from web.forms import FormReader, iso
+from web.routers.stats import parse_period
 
 router = APIRouter(prefix="/vehicles")
 
@@ -103,6 +104,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         service_records=ServiceRecordService(db).search([vehicle.id])[:10],
         expenses=ExpenseService(db).search([vehicle.id])[:10],
         intervals=intervals, reminders=reminders,
+        validities=ExpenseService(db).current_validities(vehicle.id),
         avg_consumption=StatsService(db).avg_consumption(vehicle.id),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
         owner=vehicle.owner,
@@ -222,13 +224,7 @@ async def vehicle_stats(request: Request, vehicle_id: int, period: str = "12m",
                    | {e.expense_date.year for e in vehicle.expenses}
                    | {today.year}, reverse=True)
 
-    date_from = date_to = None
-    if period == "12m":
-        date_from = date(today.year - 1, today.month, 1)
-    elif period.isdigit():
-        date_from, date_to = date(int(period), 1, 1), date(int(period), 12, 31)
-    else:
-        period = "all"
+    period, date_from, date_to = parse_period(period, today)
 
     summary = stats_service.vehicle_summary(vehicle.id, date_from, date_to)
     return render(request, "vehicles/stats.html", vehicle=vehicle, summary=summary,

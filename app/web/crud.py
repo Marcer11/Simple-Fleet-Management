@@ -23,6 +23,7 @@ class CrudConfig:
     default_values: Callable = lambda vehicle_id: {}
     extra_context: Callable = lambda db, user: {}
     messages: dict = field(default_factory=dict)
+    prefill_params: tuple = ()       # pole formuláře, která lze předvyplnit z URL (?category=...)
 
 
 def register_crud(router: APIRouter, cfg: CrudConfig):
@@ -35,6 +36,9 @@ def register_crud(router: APIRouter, cfg: CrudConfig):
         if vehicle_id is None and len(ctx["vehicles"]) == 1:
             vehicle_id = ctx["vehicles"][0].id
         values = {"vehicle_id": str(vehicle_id or ""), **cfg.default_values(vehicle_id)}
+        for name in cfg.prefill_params:
+            if request.query_params.get(name):
+                values[name] = request.query_params[name][:100]
         return render(request, cfg.template, values=values, **ctx)
 
     async def add_post(request: Request, user=Depends(get_current_user), db=Depends(get_db)):

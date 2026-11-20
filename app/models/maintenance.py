@@ -22,6 +22,18 @@ EXPENSE_CATEGORIES = [
     "Pneumatiky", "Příslušenství", "Daň", "Pokuta", "Ostatní",
 ]
 
+# Výdaje s omezenou platností - formulář u nich nabídne platnost a upomínku
+VIGNETTE_CATEGORY = "Dálniční známka"
+VALIDITY_CATEGORIES = [VIGNETTE_CATEGORY, "Pojištění", "Parkování", "Daň"]
+
+# Česká elektronická dálniční známka: (popis, počet dní platnosti včetně prvního dne)
+VIGNETTE_VARIANTS = {
+    "year": ("Roční (365 dní)", 365),
+    "30d": ("30denní", 30),
+    "10d": ("10denní", 10),
+    "1d": ("Jednodenní", 1),
+}
+
 
 class ServiceRecord(Base):
     """Záznam o provedeném servisu."""
@@ -92,5 +104,11 @@ class Expense(Base):
     currency_code = Column(CHAR(3), nullable=False, default="CZK")
     price_local = Column(DECIMAL(12, 3), nullable=True)
     note = Column(Text, nullable=True)
+    # Platnost (dálniční známka, pojištění, ...) a automaticky vytvořená upomínka konce platnosti
+    valid_from = Column(Date, nullable=True)
+    valid_until = Column(Date, nullable=True)
+    reminder_id = Column(Integer, ForeignKey("reminders.id", ondelete="SET NULL", name="fk_expenses_reminder"),
+                         nullable=True, index=True)
 
     vehicle = relationship("Vehicle", back_populates="expenses")
+    reminder = relationship("Reminder")

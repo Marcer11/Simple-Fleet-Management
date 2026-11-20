@@ -8,7 +8,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-    <link rel="stylesheet" href="/static/style.css?v=1">
+    <link rel="stylesheet" href="/static/style.css?v=2">
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -19,6 +19,7 @@
     ("/services", "Servis"),
     ("/expenses", "Výdaje"),
     ("/reminders", "Upomínky"),
+    ("/stats", "Statistiky"),
 ] %}
 <header class="topbar">
     <div class="topbar-inner">
@@ -52,7 +53,7 @@
 </main>
 
 <footer class="site">Simple Fleet Manager</footer>
-<script src="/static/app.js?v=1"></script>
+<script src="/static/app.js?v=2"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -42,5 +42,35 @@
             <div class="form-actions"><button class="btn btn-primary" type="submit">Změnit heslo</button></div>
         </form>
     </div>
+
+    {% if timeline_enabled %}
+    <div class="card">
+        <h2>Timeline</h2>
+        <p class="small muted">Formulář tankování umí podle data a času dohledat čerpací stanici z vašich záznamů
+            polohy v aplikaci Timeline. Klíč si vygenerujete v Timeline: Správa → Účet a zabezpečení → API klíč.</p>
+        {% if current_user.timeline_api_key %}
+        <p>Uložený klíč: <code>{{ current_user.timeline_key_masked }}</code></p>
+        {% endif %}
+        <form method="post" action="/profile">
+            {{ m.csrf() }}
+            <input type="hidden" name="action" value="timeline">
+            <div class="field">
+                <label for="f-timeline_api_key">{{ "Nový API klíč" if current_user.timeline_api_key else "API klíč" }}</label>
+                <input id="f-timeline_api_key" name="timeline_api_key" type="password" required maxlength="100"
+                       autocomplete="off" spellcheck="false" placeholder="tl_…">
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Uložit klíč</button>
+            </div>
+        </form>
+        {% if current_user.timeline_api_key %}
+        <form method="post" action="/profile" class="form-after" data-confirm="Odebrat API klíč Timeline?">
+            {{ m.csrf() }}
+            <input type="hidden" name="action" value="timeline_remove">
+            <button class="btn btn-danger btn-sm" type="submit">Odebrat klíč</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

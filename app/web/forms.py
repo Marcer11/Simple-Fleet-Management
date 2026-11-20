@@ -73,9 +73,12 @@ class FormReader:
         if value is None:
             return self._error(f"{label}: povinná položka.") if required else None
         try:
-            return date.fromisoformat(value)
+            parsed = date.fromisoformat(value)
         except ValueError:
             return self._error(f"{label}: neplatné datum.")
+        if not _plausible(parsed):
+            return self._error(f"{label}: rok musí být mezi {MIN_YEAR} a {MAX_YEAR}.")
+        return parsed
 
     def time(self, name, label, required=False):
         value = self._get(name)
@@ -102,9 +105,18 @@ class FormReader:
             raise ValidationError(" ".join(self.errors), self.errors)
 
 
+MIN_YEAR = 1900
+MAX_YEAR = 2100
+
+
+def _plausible(d):
+    return d if d and MIN_YEAR <= d.year <= MAX_YEAR else None
+
+
 def parse_filter_date(value):
+    """Datum z filtru; neplatné nebo nesmyslné (rok 0002 z nedopsaného pole) se ignoruje."""
     try:
-        return date.fromisoformat(value) if value else None
+        return _plausible(date.fromisoformat(value)) if value else None
     except ValueError:
         return None
 

@@ -1,3 +1,4 @@
+from datetime import datetime, time, timedelta
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -8,7 +9,7 @@ from services.pricing import to_decimal, normalize_currency, Q2, Q3
 FUEL_RECORD_FIELDS = (
     "vehicle_id", "refuel_datetime", "odometer", "fuel_type", "volume_liters", "unit_price",
     "price_paid", "currency_code", "unit_price_local", "price_local", "payment_method",
-    "station_name", "full_tank", "skipped_refuel", "note",
+    "station_name", "station_address", "full_tank", "skipped_refuel", "note",
 )
 
 
@@ -85,11 +86,13 @@ class FuelRecordService:
         if not vehicle_ids:
             return []
         query = self.session.query(FuelRecord).filter(FuelRecord.vehicle_id.in_(vehicle_ids))
+        # Rozsah [date_from 00:00, date_to + 1 den 00:00) - vždy jako datetime, aby databáze
+        # neporovnávala DATETIME s DATE (MySQL/MariaDB to dělají různě)
         if date_from:
-            query = query.filter(FuelRecord.refuel_datetime >= date_from)
+            query = query.filter(FuelRecord.refuel_datetime >= datetime.combine(date_from, time.min))
         if date_to:
-            from datetime import datetime, time
-            query = query.filter(FuelRecord.refuel_datetime <= datetime.combine(date_to, time.max))
+            query = query.filter(FuelRecord.refuel_datetime
+                                 < datetime.combine(date_to + timedelta(days=1), time.min))
         if fuel_type:
             query = query.filter(FuelRecord.fuel_type == fuel_type)
         query = query.order_by(FuelRecord.refuel_datetime.desc(), FuelRecord.id.desc())
@@ -119,7 +122,8 @@ class FuelRecordService:
 
     def create_fuel_record(self, vehicle_id, refuel_datetime, odometer, fuel_type, volume_liters, unit_price,
                            price_paid, currency_code, unit_price_local, price_local, payment_method=None,
-                           station_name=None, full_tank=False, skipped_refuel=False, consumption=None, note=None):
+                           station_name=None, full_tank=False, skipped_refuel=False, consumption=None, note=None,
+                           station_address=None):
         # Parametr consumption je zachován kvůli kompatibilitě - spotřeba se vždy dopočítá.
         data = self._validate({
             "vehicle_id": vehicle_id, "refuel_datetime": refuel_datetime, "odometer": odometer,
@@ -127,6 +131,7 @@ class FuelRecordService:
             "price_paid": price_paid, "currency_code": currency_code,
             "unit_price_local": unit_price_local, "price_local": price_local,
             "payment_method": payment_method, "station_name": station_name,
+            "station_address": station_address,
             "full_tank": full_tank, "skipped_refuel": skipped_refuel, "note": note,
         })
         self._check_odometer(data["vehicle_id"], data["refuel_datetime"], data["odometer"])
@@ -210,7 +215,7 @@ class FuelRecordService:
 
         data["currency_code"] = normalize_currency(data.get("currency_code"))
 
-        for key, max_len in (("payment_method", 20), ("station_name", 100), ("note", None)):
+        for key, max_len in (("payment_method", 20), ("station_name", 100), ("station_address", 200), ("note", None)):
             value = data.get(key)
             value = value.strip() if isinstance(value, str) else value
             data[key] = value or None

@@ -4,7 +4,9 @@ from datetime import date
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from models.maintenance import SERVICE_TYPES, EXPENSE_CATEGORIES, REPEAT_OPTIONS
+from models.maintenance import (
+    SERVICE_TYPES, EXPENSE_CATEGORIES, REPEAT_OPTIONS, VALIDITY_CATEGORIES, VIGNETTE_CATEGORY, VIGNETTE_VARIANTS,
+)
 from models.vehicle import ROLE_EDITOR
 from services.maintenance_service import (
     ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
@@ -248,7 +250,12 @@ def _read_expense(form):
         "currency_code": form.str("currency_code", "Měna") or "CZK",
         "manual_rate": form.decimal("manual_rate", "Kurz", positive=True),
         "note": form.str("note", "Poznámka"),
+        "valid_from": form.date("valid_from", "Platnost od"),
+        "valid_until": form.date("valid_until", "Platnost do"),
+        "remind": form.bool("remind"),
     }
+    if data["category"] == VIGNETTE_CATEGORY:
+        data["vignette_variant"] = form.choice("vignette_variant", "Typ známky", VIGNETTE_VARIANTS)
     form.check()
     return data
 
@@ -258,7 +265,22 @@ def _expense_values(e):
         "vehicle_id": str(e.vehicle_id), "expense_date": iso(e.expense_date), "category": e.category,
         "description": e.description or "", "odometer": iso(e.odometer), "price_paid": iso(e.price_paid),
         "currency_code": e.currency_code, "manual_rate": rate_from_record(e), "note": e.note or "",
+        "valid_from": iso(e.valid_from), "valid_until": iso(e.valid_until),
+        "remind": "on" if e.reminder_id else "", "vignette_variant": _guess_variant(e),
     }
+
+
+def _guess_variant(e):
+    """Typ známky u uloženého výdaje (podle délky platnosti), jinak vlastní platnost."""
+    if e.category != VIGNETTE_CATEGORY or not (e.valid_from and e.valid_until):
+        return ""
+    days = (e.valid_until - e.valid_from).days + 1
+    return next((key for key, (_, length) in VIGNETTE_VARIANTS.items() if length == days), "")
+
+
+def _expense_defaults(vehicle_id):
+    today = date.today().isoformat()
+    return {"expense_date": today, "currency_code": "CZK", "remind": "on", "valid_from": today}
 
 
 register_crud(router, CrudConfig(
@@ -267,9 +289,15 @@ register_crud(router, CrudConfig(
     template="maintenance/expense_form.html",
     read_form=_read_expense,
     to_values=_expense_values,
-    default_values=lambda vid: {"expense_date": date.today().isoformat(), "currency_code": "CZK"},
-    extra_context=lambda db, user: {"categories": EXPENSE_CATEGORIES},
+    default_values=_expense_defaults,
+    extra_context=lambda db, user: {
+        "categories": EXPENSE_CATEGORIES, "validity_categories": VALIDITY_CATEGORIES,
+        "vignette_category": VIGNETTE_CATEGORY,
+        "vignette_variants": {key: label for key, (label, _) in VIGNETTE_VARIANTS.items()},
+        "vignette_days": {key: days for key, (_, days) in VIGNETTE_VARIANTS.items()},
+    },
     messages={"created": "Výdaj byl uložen.", "deleted": "Výdaj byl smazán."},
+    prefill_params=("category", "valid_from"),
 ))
 
 

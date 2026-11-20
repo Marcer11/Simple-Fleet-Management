@@ -176,3 +176,85 @@ class StatsService:
             fuel_type: {"value": v["volume"] / v["distance"] * 100, "unit": fuel_unit(fuel_type)}
             for fuel_type, v in totals.items() if v["distance"]
         }
+
+    # ------------------------------------------------------------------
+    # Statistiky celého vozového parku
+    # ------------------------------------------------------------------
+
+    def fleet_summary(self, vehicles, date_from=None, date_to=None):
+        """Souhrn za všechna zadaná vozidla: řádky po vozidlech, součty a data grafů."""
+        vehicles = sorted(vehicles, key=lambda v: v.id)  # stálé pořadí = stálé barvy v grafech
+        ids = [v.id for v in vehicles]
+        empty = {"rows": [], "fuel_cost": ZERO, "service_cost": ZERO, "expense_cost": ZERO,
+                 "total_cost": ZERO, "distance": 0, "cost_per_km": None, "fuel_count": 0,
+                 "charts": {"monthly_labels": [], "monthly_fuel": [], "monthly_service": [],
+                            "monthly_expense": [], "unit_price": {}, "odometer": {}}}
+        if not ids:
+            return empty
+
+        _, fuel, services, expenses = self._load(ids, date_from, date_to)
+        rows = []
+        for vehicle in vehicles:
+            summary = self.vehicle_summary(vehicle.id, date_from, date_to)
+            if summary["total_cost"] or summary["distance"] or summary["fuel_count"]:
+                rows.append({"vehicle": vehicle, **summary})
+
+        fuel_cost = sum((r["fuel_cost"] for r in rows), ZERO)
+        service_cost = sum((r["service_cost"] for r in rows), ZERO)
+        expense_cost = sum((r["expense_cost"] for r in rows), ZERO)
+        total_cost = fuel_cost + service_cost + expense_cost
+        distance = sum(r["distance"] or 0 for r in rows)
+        # náklady na km jen z vozidel, u kterých známe ujetou vzdálenost
+        cost_with_distance = sum((r["total_cost"] for r in rows if r["distance"]), ZERO)
+
+        charts = self._charts(fuel, services, expenses, [], date_from, date_to)
+        charts.pop("consumption", None)
+        charts["unit_price"] = self._monthly_unit_price(fuel)
+        charts["odometer"] = self._odometer_series(vehicles, fuel, services, expenses)
+        return {
+            "rows": rows,
+            "fuel_count": len(fuel),
+            "fuel_cost": fuel_cost,
+            "service_cost": service_cost,
+            "expense_cost": expense_cost,
+            "total_cost": total_cost,
+            "distance": distance,
+            "cost_per_km": (cost_with_distance / distance) if distance else None,
+            "charts": charts,
+        }
+
+    @staticmethod
+    def _monthly_unit_price(fuel):
+        """Průměrná cena za jednotku po měsících a druzích paliva (vážená množstvím)."""
+        sums = defaultdict(lambda: defaultdict(lambda: [ZERO, ZERO]))  # typ -> měsíc -> [cena, množství]
+        for f in fuel:
+            if f.price_local is None or not f.volume_liters:
+                continue
+            bucket = sums[f.fuel_type][_month_key(f.refuel_datetime)]
+            bucket[0] += f.price_local
+            bucket[1] += f.volume_liters
+        return {
+            fuel_type: [{"x": month, "y": round(float(price / volume), 2)}
+                        for month, (price, volume) in sorted(months.items()) if volume]
+            for fuel_type, months in sorted(sums.items())
+        }
+
+    @staticmethod
+    def _odometer_series(vehicles, fuel, services, expenses):
+        """Stav tachometru v čase pro každé vozidlo (nejvyšší hodnota daného dne)."""
+        points = defaultdict(dict)  # vehicle_id -> {datum: km}
+        items = [(f.vehicle_id, f.refuel_datetime.date(), f.odometer) for f in fuel] \
+            + [(s.vehicle_id, s.service_date, s.odometer) for s in services] \
+            + [(e.vehicle_id, e.expense_date, e.odometer) for e in expenses]
+        for vehicle_id, day, km in items:
+            if km is None:
+                continue
+            key = day.isoformat()
+            points[vehicle_id][key] = max(km, points[vehicle_id].get(key, 0))
+
+        names = {}
+        for v in vehicles:
+            name = v.display_name
+            names[v.id] = f"{name} ({v.license_plate or v.id})" if name in names.values() else name
+        return {names[v.id]: [{"x": day, "y": km} for day, km in sorted(points[v.id].items())]
+                for v in vehicles if points.get(v.id)}

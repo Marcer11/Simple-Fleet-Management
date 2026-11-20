@@ -1,10 +1,11 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from models.fuel_record import FUEL_TYPES, PAYMENT_METHODS
 from models.vehicle import ROLE_EDITOR
+from services import timeline
 from services.errors import ValidationError, NotFoundError
 from services.fuel_record_service import FuelRecordService
 from services.pricing import fuel_prices
@@ -54,13 +55,38 @@ async def export_fuel_records(request: Request, user=Depends(get_current_user), 
     rows = [
         (r.vehicle.display_name, r.refuel_datetime.strftime("%d.%m.%Y %H:%M"), r.odometer, r.fuel_type,
          decimal_csv(r.volume_liters), decimal_csv(r.unit_price), decimal_csv(r.price_paid), r.currency_code,
-         decimal_csv(r.price_local), r.payment_method, r.station_name, "ano" if r.full_tank else "",
+         decimal_csv(r.price_local), r.payment_method, r.station_name, r.station_address, "ano" if r.full_tank else "",
          "ano" if r.skipped_refuel else "", decimal_csv(r.consumption), r.note)
         for r in records
     ]
     header = ["Vozidlo", "Datum a čas", "Tachometr", "Palivo", "Množství", "Cena/jedn.", "Cena", "Měna",
-              "Cena CZK", "Platba", "Stanice", "Plná", "Vynecháno", "Spotřeba", "Poznámka"]
+              "Cena CZK", "Platba", "Stanice", "Adresa stanice", "Plná", "Vynecháno", "Spotřeba", "Poznámka"]
     return csv_response("tankovani.csv", header, rows)
+
+
+@router.get("/timeline-stop")
+async def timeline_stop(request: Request, user=Depends(get_current_user)):
+    """Dohledá v Timeline pumpu podle data a času tankování (klíč přihlášeného uživatele)."""
+    def reply(status, **data):
+        # osobní údaje (poloha) - nic necachovat
+        return JSONResponse({"status": status, **data}, headers={"Cache-Control": "no-store"})
+
+    if not timeline.is_enabled():
+        return reply("error", message="Napojení na Timeline není nastaveno.")
+    if not user.timeline_api_key:
+        return reply("no_key", message="Nejdřív si v profilu uložte API klíč Timeline.")
+    try:
+        at = datetime.combine(date.fromisoformat(request.query_params.get("date", "")),
+                              time.fromisoformat(request.query_params.get("time", "")))
+    except ValueError:
+        return reply("error", message="Vyplňte datum a čas tankování.")
+    try:
+        stop = timeline.find_fuel_stop(user.timeline_api_key, at)
+    except timeline.TimelineError as e:
+        return reply("no_key" if e.kind == "auth" else "error", message=str(e))
+    if stop is None:
+        return reply("not_found", message="V Timeline jste v tu dobu u čerpací stanice nebyl/a.")
+    return reply("found", **stop)
 
 
 def _form_context(db, user, record=None):
@@ -77,6 +103,8 @@ def _form_context(db, user, record=None):
         "stations": service.get_used_values(ids, "station_name"),
         "last_odometers": {v.id: VehicleService(db).get_current_odometer(v.id) for v in vehicles},
         "last_fuel_types": {vid: (r.fuel_type if r else "") for vid, r in last_records.items()},
+        "timeline_enabled": timeline.is_enabled(),
+        "timeline_ready": timeline.is_enabled() and bool(user.timeline_api_key),
     }
 
 
@@ -94,6 +122,7 @@ def _read_form(form):
         "manual_rate": form.decimal("manual_rate", "Kurz", positive=True),
         "payment_method": form.str("payment_method", "Platba", max_len=20),
         "station_name": form.str("station_name", "Čerpací stanice", max_len=100),
+        "station_address": form.str("station_address", "Adresa stanice", max_len=200),
         "full_tank": form.bool("full_tank"),
         "skipped_refuel": form.bool("skipped_refuel"),
         "note": form.str("note", "Poznámka"),
@@ -112,6 +141,7 @@ def _read_form(form):
         **prices,
         "payment_method": data["payment_method"],
         "station_name": data["station_name"],
+        "station_address": data["station_address"],
         "full_tank": data["full_tank"],
         "skipped_refuel": data["skipped_refuel"],
         "note": data["note"],
@@ -174,6 +204,7 @@ async def edit_form(request: Request, record_id: int, user=Depends(get_current_u
         "manual_rate": rate_from_record(record),
         "payment_method": record.payment_method or "",
         "station_name": record.station_name or "",
+        "station_address": record.station_address or "",
         "full_tank": "on" if record.full_tank else "",
         "skipped_refuel": "on" if record.skipped_refuel else "",
         "note": record.note or "",

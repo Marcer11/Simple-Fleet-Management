@@ -44,11 +44,22 @@
     <fieldset>
         <legend>Doplňující údaje</legend>
         <div class="form-grid">
-            <div class="field">
+            <div class="field{% if timeline_ready %} field-span-2{% endif %}">
                 <label for="f-station_name">Čerpací stanice</label>
-                <input id="f-station_name" name="station_name" type="text" maxlength="100" list="stations" value="{{ m.val('station_name') }}">
+                <div class="input-with-button">
+                    <input id="f-station_name" name="station_name" type="text" maxlength="100" list="stations" value="{{ m.val('station_name') }}">
+                    {% if timeline_ready %}
+                    <button type="button" class="btn" id="timeline-lookup" title="Dohledat pumpu podle data a času v aplikaci Timeline">Načíst pumpu</button>
+                    {% endif %}
+                </div>
                 {{ m.datalist("stations", stations) }}
+                {% if timeline_ready %}
+                <small class="help" id="timeline-status" aria-live="polite"></small>
+                {% elif timeline_enabled %}
+                <small class="help">Pumpu lze dohledat z Timeline – <a href="/profile">nastavte API klíč v profilu</a>.</small>
+                {% endif %}
             </div>
+            {{ m.field("station_address", "Adresa stanice", maxlength=200) }}
             <div class="field">
                 <label for="f-payment_method">Způsob platby</label>
                 <input id="f-payment_method" name="payment_method" type="text" maxlength="20" list="payment-methods" value="{{ m.val('payment_method') }}">

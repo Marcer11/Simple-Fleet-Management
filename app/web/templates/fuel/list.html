@@ -39,7 +39,7 @@
             <td class="num">{{ r.unit_price_local|num(2) }}</td>
             <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
             <td class="num">{% if r.consumption %}{{ r.consumption|num(2) }}{% else %}<span class="muted">–</span>{% endif %}</td>
-            <td>{{ r.station_name or "" }}</td>
+            <td{% if r.station_address %} title="{{ r.station_address }}"{% endif %}>{{ r.station_name or "" }}</td>
             <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/fuel-records/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
         </tr>
         {% endfor %}

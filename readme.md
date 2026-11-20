@@ -68,6 +68,10 @@ a prodeje, aktivní/neaktivní.
   - eDálnice veřejné API pro ověření platnosti nemají, platnost se proto počítá z nákupu
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
   průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva (každé tankování)
+- **spotřeba podle druhu paliva** – v detailu i statistikách vozidla: hlavní a alternativní palivo
+  (např. benzín a LPG) zvlášť, v rámci druhu rozpad na konkrétní paliva (Natural 95 / 98) a natankované
+  množství; benzín i LPG lze zapsat ve stejný čas a při stejném stavu tachometru, AdBlue apod.
+  (palivo bez druhu) spotřebu neovlivní
 - v detailu vozidla: jak často se tankuje (průměrný počet dní a km mezi tankováními)
   a kolik se průměrně najezdí za rok
 - **statistiky všech vozidel** (`/stats`): souhrn a tabulka po vozidlech (včetně km za rok a četnosti
@@ -114,6 +118,7 @@ python app/manage.py list-users
 python app/manage.py set-password <email>
 python app/manage.py assign-orphans <email>      # vozidla bez vlastníka -> uživatel
 python app/manage.py deactivate-user <email>
+python app/manage.py recalculate-consumption     # přepočet spotřeby (spouští se při každém deployi)
 ```
 
 **Po migraci existující databáze** nemají stará vozidla vlastníka a na webu nejsou vidět.

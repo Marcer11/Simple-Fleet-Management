@@ -107,6 +107,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         validities=ExpenseService(db).current_validities(vehicle.id),
         avg_consumption=StatsService(db).avg_consumption(vehicle.id),
         profile=StatsService(db).usage_profile(vehicle.id),
+        breakdown=StatsService(db).fuel_breakdown(vehicle.id),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
         owner=vehicle.owner,
     )
@@ -229,4 +230,4 @@ async def vehicle_stats(request: Request, vehicle_id: int, period: str = "12m",
 
     summary = stats_service.vehicle_summary(vehicle.id, date_from, date_to)
     return render(request, "vehicles/stats.html", vehicle=vehicle, summary=summary,
-                  period=period, years=years, role=service.get_role(vehicle, user))
+                  breakdown=stats_service.fuel_breakdown(vehicle.id, date_from, date_to), period=period, years=years, role=service.get_role(vehicle, user))

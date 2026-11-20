@@ -1,0 +1,32 @@
+{# Spotřeba a natankované palivo podle druhu a konkrétního paliva. Vstup: breakdown, title #}
+{% if breakdown %}
+<div class="card">
+    <h2>{{ title }}</h2>
+    <div class="table-wrap">
+    <table class="breakdown">
+        <thead><tr><th>Palivo</th><th class="num">Spotřeba</th><th class="num">Natankováno</th><th class="num">Tankování</th></tr></thead>
+        {% for g in breakdown %}
+        <tbody>
+        <tr class="group-row">
+            <td>{{ g.name }}{% if g.role %} <span class="muted small">{{ g.role }}</span>{% endif %}</td>
+            <td class="num">{% if g.consumption %}{{ g.consumption|num(1) }} {{ g.unit }}/100 km{% else %}–{% endif %}</td>
+            <td class="num">{{ g.volume|num(0 if g.volume >= 100 else 1) }} {{ g.unit }}</td>
+            <td class="num">{{ g.count }}</td>
+        </tr>
+        {% if g.show_fuels %}{% for f in g.fuels %}
+        <tr class="child-row">
+            <td>{{ f.name }}</td>
+            <td class="num">{% if f.consumption %}{{ f.consumption|num(1) }} {{ g.unit }}/100 km{% else %}–{% endif %}</td>
+            <td class="num">{{ f.volume|num(0 if f.volume >= 100 else 1) }} {{ g.unit }}</td>
+            <td class="num">{{ f.count }}</td>
+        </tr>
+        {% endfor %}{% endif %}
+        </tbody>
+        {% endfor %}
+    </table>
+    </div>
+    <p class="help">Spotřeba se počítá metodou „plná–plná“ zvlášť pro každý druh paliva (Natural 95 i 98 jsou benzín,
+        LPG nebo AdBlue mají vlastní řadu). U konkrétního paliva jde o úseky, které jím byly dotankovány do plna.
+        Druh paliva nastavíte v <a href="/fuel-types">seznamu paliv</a>.</p>
+</div>
+{% endif %}

@@ -7,6 +7,7 @@ Správcovské příkazy.
     python app/manage.py set-password <email>
     python app/manage.py assign-orphans <email>      # vozidla bez vlastníka přiřadí uživateli
     python app/manage.py deactivate-user <email>
+    python app/manage.py recalculate-consumption     # přepočet spotřeby všech vozidel (spouští deploy)
 """
 import argparse
 import getpass
@@ -48,6 +49,7 @@ def main(argv=None):
     orphans.add_argument("email")
     deact = sub.add_parser("deactivate-user", help="zablokuje přihlášení uživatele")
     deact.add_argument("email")
+    sub.add_parser("recalculate-consumption", help="přepočítá uloženou spotřebu u všech vozidel")
 
     args = parser.parse_args(argv)
     session = SessionLocal()
@@ -85,6 +87,20 @@ def main(argv=None):
             user.is_active = False
             session.commit()
             print(f"Uživatel {user.email} zablokován.")
+        elif args.command == "recalculate-consumption":
+            from models import FuelRecord
+            from services.fuel_record_service import FuelRecordService
+            fuel = FuelRecordService(session)
+            ids = [vid for (vid,) in session.query(FuelRecord.vehicle_id).distinct()]
+            changed = 0
+            for vehicle_id in ids:
+                before = {r.id: r.consumption for r in fuel.get_fuel_records_for_vehicle(vehicle_id)}
+                fuel.recalculate_consumption(vehicle_id)
+                session.flush()
+                changed += sum(1 for r in fuel.get_fuel_records_for_vehicle(vehicle_id)
+                               if before.get(r.id) != r.consumption)
+            session.commit()
+            print(f"Spotřeba přepočítána u {len(ids)} vozidel, změněno tankování: {changed}.")
     except ValidationError as e:
         sys.exit(f"Chyba: {e}")
     finally:

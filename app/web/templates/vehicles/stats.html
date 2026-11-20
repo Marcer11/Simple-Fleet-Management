@@ -31,6 +31,8 @@
     {% endfor %}
 </div>
 
+{% with title="Spotřeba a palivo" %}{% include "vehicles/_fuel_breakdown.html" %}{% endwith %}
+
 <div class="viz-root">
 {% if summary.charts.monthly_labels %}
 <div class="card">

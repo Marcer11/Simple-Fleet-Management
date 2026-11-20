@@ -93,6 +93,7 @@ jobs:
 
             echo "[7/8] Migrace databáze (alembic upgrade head)..."
             alembic upgrade head
+            python app/manage.py recalculate-consumption
 
             echo "[8/8] Restart služby: $SERVICE_NAME"
             sudo /usr/bin/systemctl restart "$SERVICE_NAME"

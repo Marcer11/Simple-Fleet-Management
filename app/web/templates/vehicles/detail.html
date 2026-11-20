@@ -43,6 +43,8 @@
     <div class="kpi"><div class="label">Upozornění</div><div class="value">{{ alerts|length }}</div></div>
 </div>
 
+{% with title="Spotřeba a palivo (celá historie)" %}{% include "vehicles/_fuel_breakdown.html" %}{% endwith %}
+
 {% if alerts %}
 <div class="card">
     <h2>Upozornění</h2>

@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal
 
 from models import FuelRecord, ServiceRecord, Expense
-from models.fuel_record import fuel_unit
+from models.fuel_record import FUEL_CATEGORIES, fuel_unit
 from services.fuel_record_service import compute_consumption_segments
 from services.maintenance_service import add_months
 
@@ -171,6 +171,58 @@ class StatsService:
             fuel_type: {"value": v["volume"] / v["distance"] * 100, "unit": fuel_unit(fuel_type)}
             for fuel_type, v in totals.items() if v["distance"]
         }
+
+    def fuel_breakdown(self, vehicle_id, date_from=None, date_to=None):
+        """Spotřeba a natankované množství podle druhu paliva a v něm podle konkrétního paliva.
+
+        Druh (Benzín, LPG…) je řada "plná–plná" - Natural 95 a 98 se počítají dohromady, benzín
+        a LPG (nebo nafta a AdBlue) zvlášť. Spotřeba konkrétního paliva = úseky, které jím byly
+        uzavřeny (natankováno do plna). Seřazeno podle množství - hlavní palivo první.
+        """
+        records = self.session.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id).all()
+
+        def in_range(record):
+            d = record.refuel_datetime.date()
+            return (date_from is None or d >= date_from) and (date_to is None or d <= date_to)
+
+        def bucket():
+            return {"volume": ZERO, "count": 0, "seg_volume": ZERO, "seg_distance": 0}
+
+        groups = defaultdict(lambda: {**bucket(), "fuels": defaultdict(bucket)})
+        for r in records:
+            if not in_range(r):
+                continue
+            group = groups[r.fuel_group]
+            fuel = group["fuels"][(r.fuel_type or "").strip()]
+            for b in (group, fuel):
+                b["volume"] += r.volume_liters or ZERO
+                b["count"] += 1
+        for seg in compute_consumption_segments(records):
+            r = seg["record"]
+            if not in_range(r):
+                continue
+            group = groups[r.fuel_group]
+            for b in (group, group["fuels"][(r.fuel_type or "").strip()]):
+                b["seg_volume"] += seg["volume"]
+                b["seg_distance"] += seg["distance"]
+
+        def finish(name, b):
+            return {"name": name, "volume": b["volume"], "count": b["count"],
+                    "consumption": (b["seg_volume"] / b["seg_distance"] * 100) if b["seg_distance"] else None}
+
+        result = []
+        for name, g in groups.items():
+            fuels = sorted((finish(n, f) for n, f in g["fuels"].items()), key=lambda f: (-f["volume"], f["name"]))
+            result.append({**finish(name, g), "unit": fuel_unit(name), "fuels": fuels,
+                           "is_fuel": name in FUEL_CATEGORIES,  # AdBlue apod. není pohonná hmota
+                           "show_fuels": len(fuels) > 1 or fuels[0]["name"].lower() != name.lower()})
+        result.sort(key=lambda g: (not g["is_fuel"], -g["volume"], g["name"]))
+        fuels = [g for g in result if g["is_fuel"]]
+        for g in result:
+            g["role"] = None
+            if g["is_fuel"] and len(fuels) > 1:
+                g["role"] = "hlavní" if g is fuels[0] else "alternativní"
+        return result
 
     # ------------------------------------------------------------------
     # Statistiky celého vozového parku

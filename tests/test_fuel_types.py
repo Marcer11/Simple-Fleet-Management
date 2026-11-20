@@ -92,3 +92,62 @@ def test_station_overview(app):
     assert [s["count"] for s in mol["stations"]] == [2, 1]
     assert float(mol["stations"][0]["avg_price"]) == 40
     assert overview[1]["brand"] == "Shell"
+
+
+def test_consumption_by_category_and_breakdown(app, db):
+    client = register(app, "b@example.com")
+    vid = add_vehicle(client)
+    d0 = date.today() - timedelta(days=60)
+    # Natural 95 -> Natural 98: spotřeba se počítá (obojí benzín)
+    add_fuel(client, vid, d0, 10000, "40", fuel_type="Natural 95")
+    add_fuel(client, vid, d0 + timedelta(days=10), 10500, "38", fuel_type="Natural 98")
+    add_fuel(client, vid, d0 + timedelta(days=20), 11000, "37", fuel_type="Natural 95")
+    # LPG ve stejnou dobu a při stejném stavu tachometru jako benzín - vlastní řada
+    lpg_day = d0 + timedelta(days=20)
+    r = add_fuel(client, vid, lpg_day, 11000, "40", fuel_type="LPG", unit_price="18")
+    assert r.status_code == 303, r.text
+    add_fuel(client, vid, d0 + timedelta(days=30), 12000, "50", fuel_type="LPG", unit_price="18")
+    # AdBlue nesmí rozbít ani tvořit spotřebu benzínu
+    add_fuel(client, vid, d0 + timedelta(days=31), 12000, "10", fuel_type="AdBlue", unit_price="20")
+    add_fuel(client, vid, d0 + timedelta(days=40), 12500, "36", fuel_type="Natural 98")
+
+    by_odo = {(r.odometer, r.fuel_type): r for r in db.query(FuelRecord).all()}
+    assert float(by_odo[(10500, "Natural 98")].consumption) == 7.6
+    assert float(by_odo[(11000, "Natural 95")].consumption) == 7.4
+    assert float(by_odo[(12000, "LPG")].consumption) == 5.0
+    assert by_odo[(12000, "AdBlue")].consumption is None
+    assert float(by_odo[(12500, "Natural 98")].consumption) == 2.4  # 36 l / 1500 km
+
+    from services.stats_service import StatsService
+    groups = StatsService(db).fuel_breakdown(vid)
+    assert [g["name"] for g in groups] == ["Benzín", "LPG", "AdBlue"]
+    assert [g["role"] for g in groups] == ["hlavní", "alternativní", None]
+    benzin = groups[0]
+    assert float(benzin["volume"]) == 40 + 38 + 37 + 36 and benzin["count"] == 4
+    assert round(float(benzin["consumption"]), 2) == round((38 + 37 + 36) / 2500 * 100, 2)
+    names = {f["name"]: f for f in benzin["fuels"]}
+    assert round(float(names["Natural 98"]["consumption"]), 2) == round((38 + 36) / 2000 * 100, 2)
+    assert float(names["Natural 95"]["consumption"]) == 7.4
+
+    page = client.get(f"/vehicles/{vid}").text
+    assert "Spotřeba a palivo" in page and "alternativní" in page and "Natural 98" in page
+    assert "Spotřeba a palivo" in client.get(f"/vehicles/{vid}/stats?period=all").text
+
+
+def test_recalculate_command(app, db, monkeypatch, capsys):
+    client = register(app, "r@example.com")
+    vid = add_vehicle(client)
+    d0 = date.today() - timedelta(days=20)
+    add_fuel(client, vid, d0, 10000, "40")
+    add_fuel(client, vid, d0 + timedelta(days=10), 10500, "35")
+    record = db.query(FuelRecord).filter_by(odometer=10500).one()
+    record.consumption = None  # zastaralá hodnota
+    db.commit()
+
+    import manage
+    from sqlalchemy.orm import sessionmaker
+    monkeypatch.setattr(manage, "SessionLocal", sessionmaker(bind=db.get_bind()))
+    manage.main(["recalculate-consumption"])
+    assert "změněno tankování: 1" in capsys.readouterr().out
+    db.expire_all()
+    assert float(db.query(FuelRecord).filter_by(odometer=10500).one().consumption) == 7.0

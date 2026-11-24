@@ -5,7 +5,8 @@
 {% set detail = (e.detail or "").strip().replace("\n", " · ") %}
 <li class="tl-item tl-{{ e.kind }}">
     <div class="tl-when">
-        <span class="tl-date">{{ e.when.day }}. {{ e.when.month }}.{% if with_year and e.when.year != today.year %} {{ e.when.year }}{% endif %}</span>
+        <span class="tl-date">{{ e.when.day }}. {{ e.when.month }}.</span>
+        {% if with_year and e.when.year != today.year %}<span class="tl-time tl-year">{{ e.when.year }}</span>{% endif %}
         {% if e.has_time %}<span class="tl-time">{{ e.when.strftime("%H:%M") }}</span>{% endif %}
     </div>
     <div class="tl-icon" title="{{ e.kind_label }}">{{ m.icon(e.icon, e.kind_label) }}</div>

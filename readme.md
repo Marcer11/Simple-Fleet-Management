@@ -131,7 +131,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
   průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva (každé tankování)
 - **vývoj najetých kilometrů** ve statistice vozidla: stav tachometru v čase (ze všech záznamů se stavem
-  tachometru) a najeto po měsících (lineárně mezi zápisy)
+  tachometru) a najeto po měsících (lineárně mezi zápisy); graf kilometrů (u vozidla i u všech vozidel)
+  lze přepnout mezi „od nuly“ (najeto od začátku období) a skutečným stavem tachometru
 - **spotřeba podle druhu paliva** – v detailu i statistikách vozidla: hlavní a alternativní palivo
   (např. benzín a LPG) zvlášť, v rámci druhu rozpad na konkrétní paliva (Natural 95 / 98) a natankované
   množství; benzín i LPG lze zapsat ve stejný čas a při stejném stavu tachometru, AdBlue apod.

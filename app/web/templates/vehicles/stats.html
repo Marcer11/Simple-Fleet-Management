@@ -59,7 +59,14 @@
 {% if summary.charts.odometer|length > 1 %}
 <div class="grid grid-2">
     <div class="card">
-        <h2>Stav tachometru</h2>
+        <div class="card-head">
+            <h2>Kilometry</h2>
+            {% set mode = "actual" %}
+            <div class="seg" role="group" aria-label="Zobrazení kilometrů">
+            <button type="button" class="btn btn-sm" data-chart-mode="chart-odometer" data-mode="zero" aria-pressed="{{ 'true' if mode == 'zero' else 'false' }}">Od nuly</button>
+            <button type="button" class="btn btn-sm" data-chart-mode="chart-odometer" data-mode="actual" aria-pressed="{{ 'true' if mode == 'actual' else 'false' }}">Stav tachometru</button>
+        </div>
+        </div>
         <div class="chart-box"><canvas id="chart-odometer" role="img" aria-label="Stav tachometru v čase"></canvas></div>
     </div>
     <div class="card">
@@ -121,13 +128,13 @@
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=4"></script>
+<script src="/static/charts.js?v=5"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
     SfmCharts.monthlyCosts("chart-monthly", data);
-    SfmCharts.timeChart("chart-odometer", { "Tachometr": data.odometer }, { unit: "km" });
+    SfmCharts.odometerChart("chart-odometer", { "Tachometr": data.odometer }, "actual");
     SfmCharts.monthlyBars("chart-monthly-km", data.monthly_km_labels, data.monthly_km, "Najeto", "km");
     const units = [...new Set(Object.keys(data.consumption).map(SfmCharts.unitOf))];
     SfmCharts.timeChart("chart-consumption", data.consumption, {

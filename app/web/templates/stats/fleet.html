@@ -94,7 +94,14 @@
 {% endif %}
 
 <div class="card">
-    <h2>Ujeté kilometry</h2>
+    <div class="card-head">
+        <h2>Ujeté kilometry</h2>
+        {% set mode = "zero" %}
+        {% if summary.charts.odometer %}<div class="seg" role="group" aria-label="Zobrazení kilometrů">
+            <button type="button" class="btn btn-sm" data-chart-mode="chart-odometer" data-mode="zero" aria-pressed="{{ 'true' if mode == 'zero' else 'false' }}">Od nuly</button>
+            <button type="button" class="btn btn-sm" data-chart-mode="chart-odometer" data-mode="actual" aria-pressed="{{ 'true' if mode == 'actual' else 'false' }}">Stav tachometru</button>
+        </div>{% endif %}
+    </div>
     {% if summary.charts.odometer %}
     <div class="chart-box tall"><canvas id="chart-odometer" role="img" aria-label="Ujeté kilometry jednotlivých vozidel od začátku období"></canvas></div>
     {% else %}<div class="empty small">Žádné záznamy se stavem tachometru.</div>{% endif %}
@@ -115,16 +122,13 @@
 {% block scripts %}
 {% if summary.rows %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=4"></script>
+<script src="/static/charts.js?v=5"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
     SfmCharts.monthlyCosts("chart-monthly", data);
-    const nf = new Intl.NumberFormat("cs-CZ");
-    SfmCharts.timeChart("chart-odometer", data.odometer, {
-        unit: "km", beginAtZero: true, details: (pt) => [`Tachometr: ${nf.format(pt.odo)} km`],
-    });
+    SfmCharts.odometerChart("chart-odometer", data.odometer, "zero");
     SfmCharts.timeChart("chart-price", data.unit_price, {
         decimals: 2, unit: "Kč", thin: true, withTime: true, valueSuffix: (pt) => `Kč/${pt.unit}`,
         details: (pt) => [pt.vehicle, pt.station].filter(Boolean),

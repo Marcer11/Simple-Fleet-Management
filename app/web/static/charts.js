@@ -235,6 +235,35 @@ window.SfmCharts = (function () {
         });
     }
 
+    // Vývoj kilometrů s přepínačem: "zero" = najeto od prvního bodu řady, "actual" = stav tachometru.
+    // Body: {x, y, odo?} - odo je skutečný stav (když chybí, bere se y). Tlačítka: data-chart-mode="<id>" data-mode="…"
+    function odometerChart(id, seriesByName, startMode) {
+        const el = document.getElementById(id);
+        if (!el || !window.Chart) return;
+        const fmt = nf(0);
+        const buttons = document.querySelectorAll('[data-chart-mode="' + id + '"]');
+        let chart = null;
+        function draw(mode) {
+            if (chart) chart.destroy();
+            const series = {};
+            Object.keys(seriesByName).forEach((name) => {
+                const pts = seriesByName[name];
+                const base = pts.length ? (pts[0].odo != null ? pts[0].odo : pts[0].y) : 0;
+                series[name] = pts.map((pt) => {
+                    const odo = pt.odo != null ? pt.odo : pt.y;
+                    return Object.assign({}, pt, { odo, y: mode === "zero" ? odo - base : odo });
+                });
+            });
+            chart = timeChart(id, series, {
+                unit: "km", beginAtZero: mode === "zero",
+                details: (pt) => (mode === "zero" ? [`Tachometr: ${fmt.format(pt.odo)} km`] : []),
+            });
+            buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+        }
+        buttons.forEach((b) => b.addEventListener("click", () => draw(b.dataset.mode)));
+        draw(startMode || "zero");
+    }
+
     function unitOf(fuelName) {
         return /elekt/i.test(fuelName) ? "kWh" : (/cng/i.test(fuelName) ? "kg" : "l");
     }
@@ -244,5 +273,5 @@ window.SfmCharts = (function () {
         return el ? JSON.parse(el.textContent) : null;
     }
 
-    return { lineChart, timeChart, monthlyCosts, monthlyBars, unitOf, readData };
+    return { lineChart, timeChart, monthlyCosts, monthlyBars, odometerChart, unitOf, readData };
 })();

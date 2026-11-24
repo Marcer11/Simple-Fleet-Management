@@ -413,6 +413,13 @@ tr.child-row td:first-child { padding-left: 28px; }
     .tl-line { flex-wrap: wrap; }
     .tl-meta { flex-basis: 100%; order: 3; }
 }
+/* Přepínač zobrazení grafu */
+.seg { display: inline-flex; }
+.seg .btn { border-radius: 0; margin-left: -1px; }
+.seg .btn:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.seg .btn:last-child { border-radius: 0 8px 8px 0; }
+.seg .btn[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; position: relative; }
+@media (prefers-color-scheme: dark) { .seg .btn[aria-pressed="true"] { color: #0b1016; } }
 /* Skrytý filtr (zobrazí se po kliknutí) */
 .filter-toggle[aria-expanded="true"] { background: var(--surface-2); }
 .filter-panel { margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }

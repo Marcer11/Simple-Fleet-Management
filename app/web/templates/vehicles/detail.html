@@ -69,8 +69,8 @@
             {% for r in rentals %}
             <tr>
                 <td>{{ r.provider }}{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
-                <td class="nowrap">{{ r.date_from|date }}</td>
-                <td class="nowrap">{{ r.date_to|date or "–" }}</td>
+                <td class="nowrap">{{ r.date_from|date }}{% if r.time_from %} {{ r.time_from.strftime("%H:%M") }}{% endif %}</td>
+                <td class="nowrap">{{ r.date_to|date or "–" }}{% if r.date_to and r.time_to %} {{ r.time_to.strftime("%H:%M") }}{% endif %}</td>
                 <td class="num nowrap">{% if r.odometer_from is not none or r.odometer_to is not none %}{{ r.odometer_from|km }} → {{ r.odometer_to|km }}{% else %}–{% endif %}</td>
                 <td class="num nowrap">{{ r.distance|km if r.distance is not none else "–" }}</td>
                 <td class="num nowrap">{{ r.price_local|czk(0) }}{% if r.currency_code != "CZK" and r.price_paid is not none %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>

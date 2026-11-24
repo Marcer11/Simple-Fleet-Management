@@ -58,6 +58,7 @@ Smazání vozidla je schované dole ve formuláři úprav.
   nabídne zápis půjčení)
 - **půjčení** (opakovaně u stejného vozidla): půjčovna / od koho, půjčeno od – do, kilometry při půjčení
   a vrácení (najeto), půjčovné v libovolné měně (převod kurzem ČNB), poznámka; 0 km je platný stav
+- u půjčení lze zadat i čas půjčení a vrácení; bez času se vrácení řadí na konec dne (po tankování téhož dne)
 - půjčení a vrácení jsou na časové ose jako dvě události (vrácení s počtem dní a najetými km); v detailu
   vozidla je sekce „Půjčení“ a tlačítko „Půjčení“
 - **vrácené vozidlo je neaktivní** (poslední půjčení skončilo); novým půjčením je znovu aktivní

@@ -378,6 +378,11 @@ class RentalService(_RecordServiceBase):
         date_to = data.get("date_to") or None
         if date_to and date_to < data["date_from"]:
             raise ValidationError("Konec půjčení nemůže být před jeho začátkem.")
+        time_from, time_to = data.get("time_from") or None, data.get("time_to") or None
+        if time_to and not date_to:
+            raise ValidationError("K času vrácení vyplňte i datum vrácení.")
+        if date_to == data["date_from"] and time_from and time_to and time_to < time_from:
+            raise ValidationError("Čas vrácení nemůže být před časem půjčení.")
         km_from = _positive_int(data.get("odometer_from"), "Kilometry při půjčení")
         km_to = _positive_int(data.get("odometer_to"), "Kilometry při vrácení")
         if km_from is not None and km_to is not None and km_to < km_from:
@@ -389,7 +394,9 @@ class RentalService(_RecordServiceBase):
             "vehicle_id": data["vehicle_id"],
             "provider": _clean_str(data.get("provider"), 100, "Půjčovna / od koho", required=True),
             "date_from": data["date_from"],
+            "time_from": time_from,
             "date_to": date_to,
+            "time_to": time_to,
             "odometer_from": km_from,
             "odometer_to": km_to,
             "price_paid": price_paid,

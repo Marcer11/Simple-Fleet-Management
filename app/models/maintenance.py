@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DECIMAL, Text, CHAR
+from sqlalchemy import Column, Integer, String, Boolean, Date, Time, ForeignKey, DECIMAL, Text, CHAR
 from sqlalchemy.orm import relationship
 from .base import Base
 
@@ -120,7 +120,9 @@ class VehicleRental(Base):
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
     provider = Column(String(100), nullable=False)
     date_from = Column(Date, nullable=False)
+    time_from = Column(Time, nullable=True)
     date_to = Column(Date, nullable=True)
+    time_to = Column(Time, nullable=True)
     odometer_from = Column(Integer, nullable=True)
     odometer_to = Column(Integer, nullable=True)
     price_paid = Column(DECIMAL(12, 3), nullable=True)

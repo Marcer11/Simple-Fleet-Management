@@ -157,3 +157,40 @@ def test_insurance_claim_on_service_and_expense(app, db):
     assert "pojišťovna uhradila 15 000 Kč (Kooperativa)" in client.get("/?all=1").text
     edit_form = client.get(f"/services/{record.id}/edit").text
     assert 'name="insurance_claim" value="on" checked' in edit_form and 'value="PU-7"' in edit_form
+
+
+def test_rental_times_order_timeline(app, db):
+    from datetime import datetime, time
+    from services.events import collect_events
+    client = register(app, "times@example.com")
+    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on"})
+    vid = int(r.headers["location"].rsplit("=", 1)[1])
+    day = date(2026, 5, 4)
+    # vrácení bez času je až po tankování téhož dne
+    assert rental(client, vid, odometer_to="15420").status_code == 303
+    assert add_fuel(client, vid, day, "15400", "30").status_code == 303
+    events = collect_events(db, [db.get(Vehicle, vid)])
+    assert [e.title for e in events[:2]] == ["Vrácení – Půjčovna AutoPraha", "Benzín"]
+
+    # s časem vrácení před tankováním je pořadí podle času
+    item = db.query(VehicleRental).one()
+    r = post(client, f"/rentals/{item.id}/edit", {"vehicle_id": vid, "provider": "Půjčovna AutoPraha",
+                                                  "date_from": "2026-05-01", "time_from": "08:30",
+                                                  "date_to": "2026-05-04", "time_to": "10:15",
+                                                  "odometer_from": "15000", "odometer_to": "15420",
+                                                  "price_paid": "3600", "currency_code": "CZK"})
+    assert r.status_code == 303
+    db.expire_all()
+    item = db.query(VehicleRental).one()
+    assert (item.time_from, item.time_to) == (time(8, 30), time(10, 15))
+    events = collect_events(db, [db.get(Vehicle, vid)])
+    assert [e.title for e in events[:2]] == ["Benzín", "Vrácení – Půjčovna AutoPraha"]
+    assert events[1].when == datetime(2026, 5, 4, 10, 15) and events[1].has_time
+    start = events[-1]
+    assert start.title.startswith("Půjčení") and start.when == datetime(2026, 5, 1, 8, 30)
+    assert 'value="10:15"' in client.get(f"/rentals/{item.id}/edit").text
+    assert "4. 5. 2026 10:15" in client.get(f"/vehicles/{vid}").text.replace("\u00a0", " ")
+
+    # vrácení téhož dne nemůže být dřív než půjčení
+    r = rental(client, vid, date_from="2026-06-01", time_from="12:00", date_to="2026-06-01", time_to="09:00")
+    assert r.status_code == 400 and "Čas vrácení" in r.text

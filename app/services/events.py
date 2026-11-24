@@ -37,6 +37,16 @@ class Event:
     amount: Decimal = None       # Kč
     url: str = None              # úprava záznamu (jen pro editory)
     icon: str = None             # ikona v časové ose (viz _macros.event_icon)
+    end_of_day: bool = False     # bez času řadit na konec dne (vrácení vozidla), jinak na začátek
+
+    @property
+    def order(self):
+        """Řazení v rámci dne: záznamy bez času na začátku (vrácení na konci), mezi nimi podle času."""
+        if self.has_time:
+            rank = 1
+        else:
+            rank = 2 if self.end_of_day else 0
+        return self.when.date(), rank, self.when.time(), self.odometer or 0
 
     def __post_init__(self):
         if self.icon is None:
@@ -199,10 +209,12 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         for r in query.all():
             url = f"/rentals/{r.id}/edit"
             if in_range(_day(r.date_from)):
-                parts = [f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}" if r.date_to else "zatím nevráceno"]
+                parts = [f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}"
+                         + (f" {r.time_to:%H:%M}" if r.time_to else "") if r.date_to else "zatím nevráceno"]
                 if r.note:
                     parts.append(r.note.strip())
-                events.append(Event(KIND_RENTAL, _day(r.date_from), False, by_id[r.vehicle_id],
+                events.append(Event(KIND_RENTAL, datetime.combine(r.date_from, r.time_from or time(0, 0)),
+                                    r.time_from is not None, by_id[r.vehicle_id],
                                     f"Půjčení – {r.provider}", " · ".join(parts), r.odometer_from, r.price_local, url))
             if r.date_to and in_range(_day(r.date_to)):
                 parts = []
@@ -210,9 +222,11 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                     parts.append(f"{r.days} {'den' if r.days == 1 else ('dny' if r.days < 5 else 'dní')}")
                 if r.distance is not None:
                     parts.append(f"najeto {r.distance:,} km".replace(",", " "))
-                events.append(Event(KIND_RENTAL, _day(r.date_to), False, by_id[r.vehicle_id],
+                # vrácení bez času patří na konec dne (po tankování a dalších záznamech toho dne)
+                events.append(Event(KIND_RENTAL, datetime.combine(r.date_to, r.time_to or time(0, 0)),
+                                    r.time_to is not None, by_id[r.vehicle_id],
                                     f"Vrácení – {r.provider}", " · ".join(parts), r.odometer_to, None, url,
-                                    icon="return"))
+                                    icon="return", end_of_day=True))
 
     if KIND_NOTE in kinds:
         query = (session.query(VehicleNote).options(joinedload(VehicleNote.created_by))
@@ -240,7 +254,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                                     odometer=v.sale_odometer, amount=v.sale_price, url=f"/vehicles/{v.id}/edit"))
 
     # nejnovější nahoře; ve stejný den události s časem před celodenními
-    events.sort(key=lambda e: (e.when.date(), e.has_time, e.when.time(), e.odometer or 0), reverse=True)
+    events.sort(key=lambda e: e.order, reverse=True)
     return events[:limit] if limit else events
 
 

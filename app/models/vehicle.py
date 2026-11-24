@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Date, DateTime, Text, CHAR, DECIMAL, ForeignKey, UniqueConstraint, func
@@ -74,7 +74,12 @@ class Vehicle(Base):
     def is_returned(self):
         """Půjčené vozidlo, jehož poslední půjčení už skončilo (vráceno)."""
         last = self.last_rental if self.is_rental else None
-        return last is not None and last.date_to is not None and last.date_to <= date.today()
+        if last is None or last.date_to is None:
+            return False
+        today = date.today()
+        if last.date_to != today or last.time_to is None:
+            return last.date_to <= today
+        return last.time_to <= datetime.now().time()
 
     @property
     def in_use(self):

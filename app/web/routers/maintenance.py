@@ -201,7 +201,9 @@ def _read_rental(form):
         "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
         "provider": form.str("provider", "Půjčovna / od koho", required=True, max_len=100),
         "date_from": form.date("date_from", "Půjčeno od", required=True),
+        "time_from": form.time("time_from", "Čas půjčení"),
         "date_to": form.date("date_to", "Půjčeno do"),
+        "time_to": form.time("time_to", "Čas vrácení"),
         "odometer_from": form.int("odometer_from", "Km při půjčení", min_value=0),
         "odometer_to": form.int("odometer_to", "Km při vrácení", min_value=0),
         "price_paid": form.decimal("price_paid", "Půjčovné", min_value=0),
@@ -216,7 +218,9 @@ def _read_rental(form):
 def _rental_values(r):
     return {
         "vehicle_id": str(r.vehicle_id), "provider": r.provider, "date_from": iso(r.date_from),
-        "date_to": iso(r.date_to), "odometer_from": iso(r.odometer_from), "odometer_to": iso(r.odometer_to),
+        "time_from": r.time_from.strftime("%H:%M") if r.time_from else "",
+        "date_to": iso(r.date_to), "time_to": r.time_to.strftime("%H:%M") if r.time_to else "",
+        "odometer_from": iso(r.odometer_from), "odometer_to": iso(r.odometer_to),
         "price_paid": iso(r.price_paid), "currency_code": r.currency_code, "manual_rate": rate_from_record(r),
         "note": r.note or "",
     }

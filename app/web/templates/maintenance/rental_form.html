@@ -10,7 +10,9 @@
     {{ m.datalist("providers", providers) }}
 </div>
 {{ m.field("date_from", "Půjčeno od", "date", required=true) }}
+{{ m.field("time_from", "Čas půjčení", "time") }}
 {{ m.field("date_to", "Půjčeno do", "date") }}
+{{ m.field("time_to", "Čas vrácení", "time") }}
 {{ m.field("odometer_from", "Km při půjčení", "number", min=0, step=1, inputmode="numeric") }}
 {{ m.field("odometer_to", "Km při vrácení", "number", min=0, step=1, inputmode="numeric") }}
 {{ m.price_fields(currencies, "Půjčovné") }}

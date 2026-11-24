@@ -5,6 +5,7 @@
 <div class="page-head">
     <h1>Servis</h1>
     <div class="actions">
+        <a class="btn" href="/tires{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Pneumatiky</a>
         <a class="btn" href="/intervals/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Pravidelný servis</a>
         <a class="btn btn-primary" href="/services/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Zapsat servis</a>
     </div>

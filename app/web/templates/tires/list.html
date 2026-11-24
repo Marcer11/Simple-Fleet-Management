@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Pneumatiky{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Pneumatiky</h1>
+        <div class="sub">Sady, přezutí, poškození a jak dlouho vydržely</div>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/tire-changes/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Přezutí</a>
+        <a class="btn btn-primary" href="/tires/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Sada pneumatik</a>
+    </div>
+</div>
+
+<div class="card">
+    <form class="filters" method="get" action="/tires" data-autosubmit>
+        <div class="field">
+            <label for="flt-vehicle">Vozidlo</label>
+            <select id="flt-vehicle" name="vehicle_id">
+                <option value="">Všechna vozidla</option>
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if filters.vehicle_id == v.id %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+            </select>
+        </div>
+        <noscript><button class="btn" type="submit">Filtrovat</button></noscript>
+    </form>
+    {% if not sections %}
+    <div class="empty">Zatím žádné pneumatiky. Přidejte sadu (např. letní a zimní) a pak zapisujte přezutí –
+        aplikace spočítá, kolik na které sadě najezdíte.</div>
+    {% endif %}
+</div>
+
+{% for sec in sections %}
+{% set v = sec.vehicle %}
+{% set can_edit = v.id in editable_ids %}
+<div class="card">
+    <div class="card-head">
+        <h2>{{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.display_name }}</a></h2>
+        {% if can_edit %}
+        <div class="actions">
+            <a class="btn btn-sm" href="/tire-damages/add?vehicle_id={{ v.id }}">Poškození</a>
+            <a class="btn btn-sm" href="/tire-changes/add?vehicle_id={{ v.id }}">Přezutí</a>
+            <a class="btn btn-sm btn-primary" href="/tires/add?vehicle_id={{ v.id }}">+ Sada</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if sec.overview %}
+    <div class="table-wrap">
+    <table class="tires">
+        <thead><tr>
+            <th>Sada</th><th>Stav</th><th class="num">Stáří</th><th class="num">Najeto</th>
+            <th class="num" title="Počet období na voze a celková doba">Na voze</th>
+            <th class="num">Dezén</th><th class="num" title="Úbytek dezénu na 1000 km a odhad km do zákonného minima">Opotřebení</th>
+            <th class="num">Náklady</th>{% if can_edit %}<th></th>{% endif %}
+        </tr></thead>
+        <tbody>
+        {% for r in sec.overview %}
+        {% set t = r.set %}
+        <tr{% if r.status == "retired" %} class="muted-row"{% endif %}>
+            <td>
+                <strong>{{ t.label }}</strong>
+                <div class="small muted">{{ [t.size, t.rim_label, (t.quantity ~ " ks"), ("DOT " ~ t.dot) if t.dot]|select|join(" · ") }}</div>
+                {% for level, text in r.warnings %}<span class="badge badge-{{ level }}">{{ text }}</span> {% endfor %}
+            </td>
+            <td>
+                {% if r.status == "mounted" %}<span class="badge badge-ok">Nasazeno</span>
+                {% elif r.status == "stored" %}<span class="badge badge-muted">Uskladněno</span>{% if t.storage_location %}<div class="small muted">{{ t.storage_location }}</div>{% endif %}
+                {% else %}<span class="badge badge-muted">Vyřazeno {{ t.retired_date|date }}</span>{% if t.retired_reason %}<div class="small muted">{{ t.retired_reason }}</div>{% endif %}
+                {% endif %}
+            </td>
+            <td class="num">{{ (t.age_years ~ " let") if t.age_years is not none else "–" }}</td>
+            <td class="num">{{ r.km|km if r.km else "–" }}</td>
+            <td class="num">{% if r.seasons %}{{ r.seasons }}× <div class="small muted">{{ r.used_years|num(1) }} roku</div>{% else %}–{% endif %}</td>
+            <td class="num">{{ (r.tread|num(1) ~ " mm") if r.tread is not none else "–" }}</td>
+            <td class="num">
+                {% if r.wear %}{{ r.wear|num(2) }} mm/1000 km
+                <div class="small muted">{% if r.remaining_km %}zbývá ≈ {{ r.remaining_km|km }}{% else %}na minimu{% endif %}</div>
+                {% else %}–{% endif %}
+            </td>
+            <td class="num">{{ r.cost|czk(0) if r.cost else "–" }}{% if r.cost_per_1000 %}<div class="small muted">{{ r.cost_per_1000|czk(0) }}/1000 km</div>{% endif %}</td>
+            {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/tires/{{ t.id }}/edit">Upravit</a></td>{% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty small">Zatím žádná sada pneumatik.</div>
+    {% endif %}
+
+    {% if sec.changes %}
+    <details class="form-after">
+        <summary>Přezutí ({{ sec.changes|length }})</summary>
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Datum</th><th class="num">Tachometr</th><th>Nasazeno</th><th>Kde</th><th class="num" title="Naměřeno na sundané sadě">Dezén sundané</th><th class="num">Cena</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for c in sec.changes %}
+            <tr>
+                <td class="nowrap">{{ c.change_date|date }}</td>
+                <td class="num">{{ c.odometer|km }}</td>
+                <td>{{ c.tire_set.label }}</td>
+                <td>{{ c.place_label }}{% if c.service_record and c.service_record.place %} <span class="small muted">· {{ c.service_record.place }}</span>{% endif %}</td>
+                <td class="num">{{ (c.removed_tread_mm|num(1) ~ " mm") if c.removed_tread_mm is not none else "–" }}</td>
+                <td class="num">{{ c.service_record.price_local|czk(0) if c.service_record and c.service_record.price_local is not none else "–" }}</td>
+                {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/tire-changes/{{ c.id }}/edit">Upravit</a></td>{% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </details>
+    {% endif %}
+
+    {% if sec.damages %}
+    <details class="form-after">
+        <summary>Poškození ({{ sec.damages|length }})</summary>
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Datum</th><th>Sada</th><th>Pozice</th><th>Co se stalo</th><th class="num">Oprava</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for d in sec.damages %}
+            <tr>
+                <td class="nowrap">{{ d.damage_date|date }}{% if d.odometer %}<div class="small muted">{{ d.odometer|km }}</div>{% endif %}</td>
+                <td>{{ d.tire_set.label }}</td>
+                <td>{{ d.position or "–" }}</td>
+                <td>{{ d.description }}</td>
+                <td class="num">{{ d.expense.price_local|czk(0) if d.expense else "–" }}</td>
+                {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/tire-damages/{{ d.id }}/edit">Upravit</a></td>{% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </details>
+    {% endif %}
+</div>
+{% endfor %}
+
+<p class="help">Najeto = součet km mezi přezutími, u nasazené sady do aktuálního stavu tachometru. Opotřebení se počítá
+    z dezénu při nákupu a dezénu naměřeného při sundání. Zákonné minimum: letní 1,6 mm, zimní a univerzální
+    v zimním období 4 mm. Pneumatiky starší {{ max_age }} let aplikace označí k výměně.</p>
+{% endblock %}

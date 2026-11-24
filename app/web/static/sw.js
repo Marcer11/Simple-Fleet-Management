@@ -1,10 +1,10 @@
 // Service worker - umožní instalaci aplikace a zobrazí offline stránku bez připojení.
 // Stránky se vždy načítají ze sítě (data musí být aktuální), z cache jen statické soubory.
-const CACHE = "sfm-static-v5";
+const CACHE = "sfm-static-v6";
 const PRECACHE = [
     "/offline",
-    "/static/style.css?v=4",
-    "/static/app.js?v=4",
+    "/static/style.css?v=5",
+    "/static/app.js?v=5",
     "/static/charts.js?v=3",
     "/static/icons/icon.svg",
     "/static/icons/icon-192.png",

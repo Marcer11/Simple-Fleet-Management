@@ -255,6 +255,39 @@
         window.sfmRefreshFuels = refreshFuels;  // po načtení pumpy z Timeline
     }
 
+    // Výběr sady pneumatik jen pro zvolené vozidlo: <select data-by-vehicle> s <option data-vehicle>
+    const bySelect = document.querySelector("select[data-by-vehicle]");
+    const ownerSelect = document.getElementById("f-vehicle_id");
+    if (bySelect && ownerSelect) {
+        const all = Array.from(bySelect.options).filter(function (o) { return o.dataset.vehicle; });
+        function filterSets() {
+            const vid = ownerSelect.value;
+            const current = bySelect.value;
+            bySelect.replaceChildren(bySelect.options[0] || new Option("– vyberte –", ""),
+                ...all.filter(function (o) { return !vid || o.dataset.vehicle === vid; }));
+            const still = all.some(function (o) { return o.value === current && (!vid || o.dataset.vehicle === vid); });
+            bySelect.value = still ? current : "";
+        }
+        ownerSelect.addEventListener("change", filterSets);
+        filterSets();
+    }
+
+    // Přezutí: pole servisu a ceny jen při přezutí v servisu
+    const placeSelect = document.querySelector("select[data-toggle-service]");
+    if (placeSelect) {
+        const serviceOnly = [document.querySelector("[data-service-only]"),
+            (document.getElementById("f-price_paid") || {}).parentElement,
+            (document.getElementById("f-currency_code") || {}).parentElement].filter(Boolean);
+        function toggleService() {
+            const show = placeSelect.value === "service";
+            serviceOnly.forEach(function (el) { el.hidden = !show; });
+            const rate = document.getElementById("rate-field");
+            if (rate && !show) rate.hidden = true;
+        }
+        placeSelect.addEventListener("change", toggleService);
+        toggleService();
+    }
+
     // Kopírování do schránky: <button data-copy="id-pole">
     document.querySelectorAll("[data-copy]").forEach(function (button) {
         button.addEventListener("click", function () {

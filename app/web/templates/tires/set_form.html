@@ -1,0 +1,41 @@
+{% extends "maintenance/_record_form.html" %}
+{% import "_macros.html" as m with context %}
+{% set heading = "Upravit sadu pneumatik" if record else "Nová sada pneumatik" %}
+{% set back_url = "/tires" %}
+{% set delete_url = "/tires/%d/delete"|format(record.id) if record else "" %}
+{% block fields %}
+<div class="field">
+    <label for="f-season">Typ <span class="req">*</span></label>
+    <select id="f-season" name="season" required>
+        {% for s in seasons %}<option value="{{ s }}"{% if m.val('season') == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+</div>
+{{ m.field("manufacturer", "Výrobce", required=true, maxlength=50, placeholder="např. Michelin", autocomplete="off") }}
+{{ m.field("model", "Model", maxlength=50, placeholder="např. Alpin 6", autocomplete="off") }}
+{{ m.field("size", "Rozměr", maxlength=30, placeholder="např. 205/55 R16 91H", autocomplete="off") }}
+{{ m.field("production_year", "Rok výroby", "number", min=1990, max=today.year + 1, help="Z kódu DOT na boku pneumatiky") }}
+{{ m.field("dot", "DOT (týden a rok)", maxlength=10, placeholder="např. 2322", autocomplete="off") }}
+{{ m.field("quantity", "Počet kusů", "number", min=1, max=20) }}
+<div class="field">
+    <label for="f-rim">Disky</label>
+    <select id="f-rim" name="rim">
+        {% for value, label in rims.items() %}<option value="{{ value }}"{% if m.val('rim') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+</div>
+{{ m.field("new_tread_mm", "Dezén při nákupu (mm)", inputmode="decimal", placeholder="např. 8,0", autocomplete="off", help="Z něj se počítá opotřebení") }}
+{{ m.field("purchase_date", "Datum nákupu", "date") }}
+{{ m.price_fields(currencies, "Cena nákupu") }}
+{{ m.field("storage_location", "Místo uložení", maxlength=100, placeholder="např. sklep, pneuservis Novák", autocomplete="off") }}
+{{ m.textarea("note", "Poznámka") }}
+{% endblock %}
+{% block extra %}
+<p class="help">Vyplněná cena nákupu se zapíše jako výdaj v kategorii Pneumatiky (úpravou ceny se výdaj upraví,
+    smazáním ceny se smaže).</p>
+<details class="form-after"{% if m.val('retired_date') %} open{% endif %}>
+    <summary>Vyřazení sady</summary>
+    <div class="form-grid" style="margin-top: 10px">
+        {{ m.field("retired_date", "Vyřazeno dne", "date") }}
+        {{ m.field("retired_reason", "Důvod", maxlength=200, placeholder="např. sjeté, stáří, prodáno", autocomplete="off") }}
+    </div>
+</details>
+{% endblock %}

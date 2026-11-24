@@ -25,9 +25,13 @@ class CrudConfig:
     messages: dict = field(default_factory=dict)
     prefill_params: tuple = ()       # pole formuláře, která lze předvyplnit z URL (?category=...)
     track_author: bool = False       # uložit created_by_id (kdo záznam zapsal)
+    redirect: Callable = None        # (vehicle) -> URL po uložení / smazání; výchozí detail vozidla
 
 
 def register_crud(router: APIRouter, cfg: CrudConfig):
+    def done_url(vehicle):
+        return cfg.redirect(vehicle) if cfg.redirect else f"/vehicles/{vehicle.id}"
+
     def context(db, user, record=None):
         return {"record": record, "vehicles": editable_vehicles(db, user), "currencies": COMMON_CURRENCIES,
                 **cfg.extra_context(db, user)}
@@ -56,7 +60,7 @@ def register_crud(router: APIRouter, cfg: CrudConfig):
                           **context(db, user))
         flash(request, cfg.messages.get("created", "Záznam byl uložen."))
         flash_vehicle_alerts(request, db, vehicle)
-        return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
+        return RedirectResponse(done_url(vehicle), status_code=303)
 
     async def edit_form(request: Request, record_id: int, user=Depends(get_current_user), db=Depends(get_db)):
         record = cfg.service_cls(db).get(record_id)
@@ -78,7 +82,7 @@ def register_crud(router: APIRouter, cfg: CrudConfig):
                           **context(db, user, record))
         flash(request, cfg.messages.get("updated", "Změny byly uloženy."))
         flash_vehicle_alerts(request, db, vehicle)
-        return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
+        return RedirectResponse(done_url(vehicle), status_code=303)
 
     async def delete_post(request: Request, record_id: int, user=Depends(get_current_user), db=Depends(get_db)):
         service = cfg.service_cls(db)
@@ -86,7 +90,7 @@ def register_crud(router: APIRouter, cfg: CrudConfig):
         vehicle = check_record_access(db, user, record, ROLE_EDITOR)
         service.delete(record)
         flash(request, cfg.messages.get("deleted", "Záznam byl smazán."))
-        return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
+        return RedirectResponse(done_url(vehicle), status_code=303)
 
     router.add_api_route(f"{cfg.prefix}/add", add_form, methods=["GET"])
     router.add_api_route(f"{cfg.prefix}/add", add_post, methods=["POST"])

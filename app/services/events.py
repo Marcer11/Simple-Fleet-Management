@@ -5,17 +5,19 @@ from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
 
-from models import Expense, FuelRecord, ServiceRecord, Vehicle, VehicleNote
+from models import Expense, FuelRecord, ServiceRecord, TireChange, TireDamage, Vehicle, VehicleNote
 
 KIND_FUEL = "fuel"
 KIND_SERVICE = "service"
 KIND_EXPENSE = "expense"
 KIND_NOTE = "note"
 KIND_VEHICLE = "vehicle"
+KIND_TIRES = "tires"
 KINDS = {
     KIND_FUEL: "Tankování",
     KIND_SERVICE: "Servis",
     KIND_EXPENSE: "Výdaje",
+    KIND_TIRES: "Pneumatiky",
     KIND_NOTE: "Poznámky",
     KIND_VEHICLE: "Nákup a prodej",
 }
@@ -36,7 +38,7 @@ class Event:
     @property
     def kind_label(self):
         return {KIND_FUEL: "Tankování", KIND_SERVICE: "Servis", KIND_EXPENSE: "Výdaj",
-                KIND_NOTE: "Poznámka", KIND_VEHICLE: "Vozidlo"}[self.kind]
+                KIND_NOTE: "Poznámka", KIND_VEHICLE: "Vozidlo", KIND_TIRES: "Pneumatiky"}[self.kind]
 
 
 def _qty(value):
@@ -81,8 +83,37 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             events.append(Event(KIND_FUEL, r.refuel_datetime, True, by_id[r.vehicle_id], r.fuel_type, detail,
                                 r.odometer, r.price_local, f"/fuel-records/{r.id}/edit"))
 
+    # servis / výdaj založený přezutím nebo poškozením pneu se ukáže jen jako událost pneumatik
+    tire_service_ids = {i for (i,) in session.query(TireChange.service_record_id)
+                        .filter(TireChange.vehicle_id.in_(ids), TireChange.service_record_id.isnot(None))}
+    tire_expense_ids = {i for (i,) in session.query(TireDamage.expense_id)
+                        .filter(TireDamage.vehicle_id.in_(ids), TireDamage.expense_id.isnot(None))}
+
+    if KIND_TIRES in kinds:
+        query = (session.query(TireChange).options(joinedload(TireChange.tire_set), joinedload(TireChange.service_record))
+                 .filter(TireChange.vehicle_id.in_(ids)))
+        for c in dated(query, TireChange.change_date, False):
+            parts = [c.place_label + (f" – {c.service_record.place}" if c.service_record and c.service_record.place else "")]
+            if c.removed_tread_mm is not None:
+                parts.append(f"dezén sundané sady {_qty(c.removed_tread_mm)} mm")
+            if c.note:
+                parts.append(c.note.strip())
+            amount = c.service_record.price_local if c.service_record else None
+            events.append(Event(KIND_TIRES, _day(c.change_date), False, by_id[c.vehicle_id],
+                                f"Přezutí: {c.tire_set.label}", " · ".join(parts), c.odometer, amount,
+                                f"/tire-changes/{c.id}/edit"))
+        query = (session.query(TireDamage).options(joinedload(TireDamage.tire_set), joinedload(TireDamage.expense))
+                 .filter(TireDamage.vehicle_id.in_(ids)))
+        for d in dated(query, TireDamage.damage_date, False):
+            detail = " · ".join(x for x in (d.tire_set.label, d.position) if x)
+            events.append(Event(KIND_TIRES, _day(d.damage_date), False, by_id[d.vehicle_id],
+                                f"Poškození pneu: {d.description}", detail, d.odometer,
+                                d.expense.price_local if d.expense else None, f"/tire-damages/{d.id}/edit"))
+
     if KIND_SERVICE in kinds:
         query = session.query(ServiceRecord).filter(ServiceRecord.vehicle_id.in_(ids))
+        if tire_service_ids:
+            query = query.filter(ServiceRecord.id.notin_(tire_service_ids))
         for r in dated(query, ServiceRecord.service_date, False):
             detail = " · ".join(x for x in (r.place, (r.note or "").strip()) if x)
             events.append(Event(KIND_SERVICE, _day(r.service_date), False, by_id[r.vehicle_id], r.service_type,
@@ -90,6 +121,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
 
     if KIND_EXPENSE in kinds:
         query = session.query(Expense).filter(Expense.vehicle_id.in_(ids))
+        if tire_expense_ids:
+            query = query.filter(Expense.id.notin_(tire_expense_ids))
         for r in dated(query, Expense.expense_date, False):
             parts = [r.description] if getattr(r, "description", None) else []
             if r.valid_until:

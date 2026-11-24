@@ -6,13 +6,18 @@
         {{ m.status_badge(a.status) }}
         <span class="what">
             <strong>{{ a.title }}</strong>
-            <span class="muted small">· {{ "Pravidelný servis" if a.kind == "interval" else "Upomínka" }}</span>
+            <span class="muted small">· {{ {"interval": "Pravidelný servis", "tires": "Pneumatiky"}.get(a.kind, "Upomínka") }}</span>
             {% if show_vehicle %}<br><a class="small" href="/vehicles/{{ a.vehicle.id }}">{{ m.color_dot(a.vehicle) }} {{ a.vehicle.display_name }}</a>{% endif %}
         </span>
         <span class="small">
+            {% if a.kind == "tires" %}
+            nasazené letní: {{ a.item.label }}
+            <span class="muted">({{ "povinné od " ~ (a.status.due_date|date) if a.status.days_left > 0 else "zimní období od " ~ (a.status.due_date|date) }})</span>
+            {% else %}
             {{ a.status.summary }}
             {% if a.status.due_date %}<span class="muted">({{ a.status.due_date|date }}{% if a.status.due_km %}, {{ a.status.due_km|km }}{% endif %})</span>
             {% elif a.status.due_km %}<span class="muted">({{ a.status.due_km|km }})</span>{% endif %}
+            {% endif %}
         </span>
         <span class="actions">
             {% if a.kind == "reminder" %}
@@ -21,6 +26,8 @@
                 <input type="hidden" name="next" value="{{ path }}">
                 <button class="btn btn-sm" type="submit">Vyřízeno</button>
             </form>
+            {% elif a.kind == "tires" %}
+            <a class="btn btn-sm" href="/tire-changes/add?vehicle_id={{ a.vehicle.id }}">Zapsat přezutí</a>
             {% else %}
             <a class="btn btn-sm" href="/services/add?vehicle_id={{ a.vehicle.id }}">Zapsat servis</a>
             {% endif %}

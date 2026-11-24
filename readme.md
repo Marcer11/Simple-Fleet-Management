@@ -67,6 +67,20 @@ a prodeje (ztráta hodnoty), aktivní/neaktivní. Smazání vozidla je schované
   nastavitelný předstih upozornění
 - upozornění se zobrazují na přehledu a v detailu vozidla a po uložení každého záznamu
 
+### Pneumatiky (`/tires`)
+- **sady pneumatik**: typ (letní / zimní / univerzální), výrobce a model, rozměr, rok výroby a DOT,
+  počet kusů, alu / plechové disky / bez disků, dezén při nákupu, místo uložení, vyřazení s důvodem;
+  cena nákupu se zapíše jako výdaj „Pneumatiky“
+- **přezutí** doma nebo v servisu (v servisu = servisní záznam „Přezutí pneumatik“ s cenou),
+  naměřený dezén sundané sady; stav tachometru se kontroluje proti ostatním záznamům
+- **poškození** (pozice, popis, cena opravy jako výdaj)
+- **životnost**: najeto na každé sadě, počet období a doba na voze, stáří, dezén, opotřebení
+  na 1000 km a odhad km do zákonného minima (letní 1,6 mm, zimní a univerzální 4 mm),
+  náklady na 1000 km; upozornění na stáří ≥ 6 let a dezén u minima
+- **upozornění na zimní pneumatiky**: od 15. 10. a v období 1. 11. – 31. 3. u aktivních vozidel,
+  která mají podle posledního přezutí nasazené letní pneu
+- přezutí a poškození jsou i na časové ose
+
 ### Výdaje a statistiky
 - ostatní výdaje (dálniční známka, pojištění, mytí, mýtné, …) s převodem měny, export CSV
 - **platnost výdaje** (dálniční známka, pojištění, …) – u dálniční známky stačí zvolit typ

@@ -68,7 +68,7 @@
             <div><div class="label">Pořizovací cena</div><div class="value">{{ vehicle.purchase_price|czk(0) }}</div></div>
             <div><div class="label">Prodáno</div><div class="value">{{ vehicle.sale_date|date or "–" }}{% if vehicle.sale_odometer is not none %} <span class="small muted">· {{ vehicle.sale_odometer|km }}</span>{% endif %}</div></div>
             {% if vehicle.owned_km is not none %}<div><div class="label">Najeto za vlastnictví</div><div class="value">{{ vehicle.owned_km|km }}</div></div>
-            {% elif vehicle.purchase_odometer is not none and odometer and odometer >= vehicle.purchase_odometer %}<div><div class="label">Najeto od nákupu</div><div class="value">{{ (odometer - vehicle.purchase_odometer)|km }}</div></div>{% endif %}
+            {% elif vehicle.purchase_odometer is not none and odometer is not none and odometer >= vehicle.purchase_odometer %}<div><div class="label">Najeto od nákupu</div><div class="value">{{ (odometer - vehicle.purchase_odometer)|km }}</div></div>{% endif %}
             {% if vehicle.sale_price is not none %}<div><div class="label">Prodejní cena</div><div class="value">{{ vehicle.sale_price|czk(0) }}</div></div>{% endif %}
             {% if vehicle.value_loss is not none %}<div><div class="label">Ztráta hodnoty</div><div class="value">{{ vehicle.value_loss|czk(0) }}</div></div>{% endif %}
             {% if vehicle.tire_size_list %}<div><div class="label">Pneumatiky dle TP</div><div class="value">{{ vehicle.tire_size_list|join(", ") }}</div></div>{% endif %}
@@ -119,7 +119,7 @@
                 <span class="what">{{ m.season_icon(mnt.tire.season) }} <a href="/tires/{{ mnt.tire.id }}/edit"><strong>{{ mnt.tire.label }}</strong></a>
                     <span class="small muted">{{ [mnt.tire.quantity_label, mnt.tire.size, mnt.tire.rim_label]|select|join(" · ") }}</span>
                 </span>
-                <span class="small">od {{ mnt.mounted_date|date }}{% if odometer and odometer >= mnt.mounted_km %} · {{ (odometer - mnt.mounted_km)|km }}{% endif %}{% if mnt.tire.age_years is not none %} · {{ mnt.tire.age_years }} let{% endif %}</span>
+                <span class="small">od {{ mnt.mounted_date|date }}{% if odometer is not none and odometer >= mnt.mounted_km %} · {{ (odometer - mnt.mounted_km)|km }}{% endif %}{% if mnt.tire.age_years is not none %} · {{ mnt.tire.age_years }} let{% endif %}</span>
             </li>
             {% endfor %}
         </ul>

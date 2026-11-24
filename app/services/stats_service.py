@@ -114,7 +114,7 @@ class StatsService:
             items += list(q(column, km_column).filter(model.vehicle_id == vehicle_id))
         vehicle = self.session.get(Vehicle, vehicle_id)
         if vehicle is not None:
-            items += [(vehicle.purchase_date, vehicle.purchase_odometer), (vehicle.sale_date, vehicle.sale_odometer)]
+            items += [(day, km) for day, (km, _) in self.odometer_marks(vehicle).items()]
         by_day = {}
         for day, km in items:
             if day is not None and km is not None:
@@ -125,11 +125,37 @@ class StatsService:
             result.append((day, running))
         return result
 
+    @staticmethod
+    def odometer_marks(vehicle):
+        """Nákup a prodej jako body grafu: {datum: (km, popis)}.
+
+        Bod vznikne jen při vyplněném datu i stavu tachometru - 0 km je platný stav (nové vozidlo),
+        prázdné pole (None) znamená, že stav neznáme.
+        """
+        marks = {}
+        for day, km, label in ((vehicle.purchase_date, vehicle.purchase_odometer, "Nákup vozidla"),
+                               (vehicle.sale_date, vehicle.sale_odometer, "Prodej vozidla")):
+            if day is not None and km is not None:
+                marks[day] = (km, label)
+        return marks
+
+    def _odometer_points(self, vehicle_id, date_from=None, date_to=None):
+        """Body grafu kilometrů ve zvoleném období (s popiskem u nákupu a prodeje)."""
+        vehicle = self.session.get(Vehicle, vehicle_id)
+        marks = self.odometer_marks(vehicle) if vehicle is not None else {}
+        points = []
+        for d, km in self.odometer_readings(vehicle_id):
+            if (date_from is None or d >= date_from) and (date_to is None or d <= date_to):
+                point = {"x": d.isoformat(), "y": km}
+                if d in marks:
+                    point["label"] = marks[d][1]
+                points.append(point)
+        return points
+
     def odometer_charts(self, vehicle_id, date_from=None, date_to=None):
         """Stav tachometru v čase a najeto po měsících (lineárně mezi zápisy)."""
         readings = self.odometer_readings(vehicle_id)
-        points = [{"x": d.isoformat(), "y": km} for d, km in readings
-                  if (date_from is None or d >= date_from) and (date_to is None or d <= date_to)]
+        points = self._odometer_points(vehicle_id, date_from, date_to)
         labels, values = [], []
         if len(readings) >= 2:
             first, last = readings[0][0], readings[-1][0]
@@ -315,7 +341,7 @@ class StatsService:
         charts = self._charts(fuel, services, expenses, [], date_from, date_to)
         charts.pop("consumption", None)
         charts["unit_price"] = self._price_points(fuel, self._vehicle_names(vehicles))
-        charts["odometer"] = self._distance_series(vehicles, fuel, services, expenses)
+        charts["odometer"] = self._distance_series(vehicles, date_from, date_to)
         return {
             "rows": rows,
             "fuel_count": len(fuel),
@@ -352,34 +378,21 @@ class StatsService:
             series[(f.fuel_type or "").strip()].append(point)
         return dict(sorted(series.items()))
 
-    @classmethod
-    def _distance_series(cls, vehicles, fuel, services, expenses):
-        """Ujeto od prvního záznamu v období pro každé vozidlo (nejvyšší stav daného dne).
+    def _distance_series(self, vehicles, date_from=None, date_to=None):
+        """Kilometry každého vozidla v období: y = ujeto od prvního bodu, odo = skutečný stav.
 
         Vozidla mají tachometry v úplně jiných řádech (0 vs. 400 000 km) - společný začátek
-        v nule je dělá porovnatelnými; skutečný stav je v bodu jako "odo".
+        v nule je dělá porovnatelnými; graf lze přepnout i na skutečný stav tachometru.
+        Body jsou ze všech záznamů se stavem tachometru včetně nákupu a prodeje vozidla.
         """
-        points = defaultdict(dict)  # vehicle_id -> {datum: km}
-        items = [(f.vehicle_id, f.refuel_datetime.date(), f.odometer) for f in fuel]             + [(s.vehicle_id, s.service_date, s.odometer) for s in services]             + [(e.vehicle_id, e.expense_date, e.odometer) for e in expenses]
-        for vehicle_id, day, km in items:
-            if km is None:
-                continue
-            key = day.isoformat()
-            points[vehicle_id][key] = max(km, points[vehicle_id].get(key, 0))
-
-        names = cls._vehicle_names(vehicles)
+        names = self._vehicle_names(vehicles)
         result = {}
         for v in vehicles:
-            days = sorted(points.get(v.id, {}).items())
-            if not days:
+            points = self._odometer_points(v.id, date_from, date_to)
+            if not points:
                 continue
-            base = days[0][1]
-            running = base
-            series = []
-            for day, km in days:
-                running = max(running, km)  # chybný starší zápis nesmí jít pod nulu
-                series.append({"x": day, "y": running - base, "odo": running})
-            result[names[v.id]] = series
+            base = points[0]["y"]
+            result[names[v.id]] = [{**p, "y": p["y"] - base, "odo": p["y"]} for p in points]
         return result
 
     def usage_profile(self, vehicle_id):

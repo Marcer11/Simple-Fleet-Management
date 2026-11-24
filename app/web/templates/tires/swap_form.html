@@ -5,7 +5,7 @@
 <div class="page-head">
     <div>
         <h1>{{ "Upravit přezutí" if swap else "Přezutí pneumatik" }}</h1>
-        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
+        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer is not none %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
     </div>
 </div>
 
@@ -29,7 +29,7 @@
         </div>
         {% if vehicle %}
         {{ m.field("swap_date", "Datum", "date", required=true, max=today.isoformat()) }}
-        {{ m.field("odometer", "Stav tachometru (km)", "number", required=true, min=0, step=1, inputmode="numeric", placeholder=(odometer or "")) }}
+        {{ m.field("odometer", "Stav tachometru (km)", "number", required=true, min=0, step=1, inputmode="numeric", placeholder=(odometer if odometer is not none else "")) }}
         <div class="field">
             <label for="f-place">Kde</label>
             <select id="f-place" name="place" data-toggle-service>

@@ -114,3 +114,32 @@ def test_forms_without_examples(app):
     for url in ("/vehicles/add", f"/fuel-records/add?vehicle_id={car}", "/tires/add", "/notes/add"):
         html = client.get(url).text
         assert "např." not in html and 'class="help">' not in html.replace('class="help" id', "")
+
+
+def test_odometer_chart_purchase_and_sale_points(app, db):
+    """Nákup a prodej jsou body grafu; 0 km je platný stav, prázdné pole bod nevytvoří."""
+    from services.stats_service import StatsService
+    client = register(app, "buy@example.com")
+    new_car = add_vehicle(client, model="Nová", purchase_date="2026-01-05", purchase_odometer="0",
+                          sale_date="2026-06-01", sale_odometer="12000")
+    add_fuel(client, new_car, date(2026, 3, 10), 5000, "40")
+    stats = StatsService(db)
+    points = stats.odometer_charts(new_car)["odometer"]
+    assert [(p["x"], p["y"], p.get("label")) for p in points] == [
+        ("2026-01-05", 0, "Nákup vozidla"), ("2026-03-10", 5000, None), ("2026-06-01", 12000, "Prodej vozidla")]
+
+    blank = add_vehicle(client, model="Bez km", purchase_date="2026-01-05", purchase_odometer="")
+    add_fuel(client, blank, date(2026, 3, 10), 80000, "40")
+    assert db.get(Vehicle, blank).purchase_odometer is None
+    assert [p["x"] for p in stats.odometer_charts(blank)["odometer"]] == ["2026-03-10"]
+    import re
+    def form_value(vid):
+        html = client.get(f"/vehicles/{vid}/edit").text
+        return re.search(r'name="purchase_odometer"[^>]*value="([^"]*)"', html).group(1)
+    assert form_value(blank) == "" and form_value(new_car) == "0"
+
+    # graf všech vozidel: od nuly i skutečný stav, nákup s popiskem
+    series = stats._distance_series([db.get(Vehicle, new_car)])
+    first = list(series.values())[0][0]
+    assert first == {"x": "2026-01-05", "y": 0, "odo": 0, "label": "Nákup vozidla"}
+    assert list(series.values())[0][-1]["odo"] == 12000

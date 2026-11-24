@@ -256,7 +256,8 @@ window.SfmCharts = (function () {
             });
             chart = timeChart(id, series, {
                 unit: "km", beginAtZero: mode === "zero",
-                details: (pt) => (mode === "zero" ? [`Tachometr: ${fmt.format(pt.odo)} km`] : []),
+                details: (pt) => [pt.label, mode === "zero" ? `Tachometr: ${fmt.format(pt.odo)} km` : null]
+                    .filter(Boolean),
             });
             buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
         }

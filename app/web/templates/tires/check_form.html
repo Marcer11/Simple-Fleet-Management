@@ -35,7 +35,7 @@
 <div class="page-head">
     <div>
         <h1>{{ "Upravit kontrolu dezénu" if check else "Kontrola dezénu" }}</h1>
-        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
+        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer is not none %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
     </div>
 </div>
 
@@ -59,7 +59,7 @@
         </div>
         {% if vehicle %}
         {{ m.field("check_date", "Datum", "date", required=true, max=today.isoformat()) }}
-        {{ m.field("odometer", "Stav tachometru (km)", "number", required=true, min=0, step=1, inputmode="numeric", placeholder=(odometer or "")) }}
+        {{ m.field("odometer", "Stav tachometru (km)", "number", required=true, min=0, step=1, inputmode="numeric", placeholder=(odometer if odometer is not none else "")) }}
         {% endif %}
     </div>
     {% if not vehicle %}

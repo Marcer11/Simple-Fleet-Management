@@ -132,7 +132,9 @@ Smazání vozidla je schované dole ve formuláři úprav.
   průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva (každé tankování)
 - **vývoj najetých kilometrů** ve statistice vozidla: stav tachometru v čase (ze všech záznamů se stavem
   tachometru) a najeto po měsících (lineárně mezi zápisy); graf kilometrů (u vozidla i u všech vozidel)
-  lze přepnout mezi „od nuly“ (najeto od začátku období) a skutečným stavem tachometru
+  lze přepnout mezi „od nuly“ (najeto od začátku období) a skutečným stavem tachometru; body grafu jsou i nákup
+  a prodej vozidla (datum + km, v popisku bodu „Nákup / Prodej vozidla“) – 0 km je platný stav (nové vozidlo),
+  prázdné pole znamená neznámý stav a bod se nevytvoří
 - **spotřeba podle druhu paliva** – v detailu i statistikách vozidla: hlavní a alternativní palivo
   (např. benzín a LPG) zvlášť, v rámci druhu rozpad na konkrétní paliva (Natural 95 / 98) a natankované
   množství; benzín i LPG lze zapsat ve stejný čas a při stejném stavu tachometru, AdBlue apod.

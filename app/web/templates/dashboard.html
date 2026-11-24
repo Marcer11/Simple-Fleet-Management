@@ -5,65 +5,73 @@
 <div class="page-head">
     <div>
         <h1>Přehled</h1>
-        <div class="sub">Aktivní vozidla: {{ cards|length }} · Náklady {{ year }}: {{ total_year_cost|czk(0) }}</div>
+        <div class="sub">Aktivní vozidla: {{ active|length }} · Náklady {{ year }}: {{ total_year_cost|czk(0) }}</div>
     </div>
-    <div class="actions">
-        <a class="btn btn-primary" href="/fuel-records/add">+ Tankování</a>
-        <a class="btn" href="/services/add">+ Servis</a>
-        <a class="btn" href="/expenses/add">+ Výdaj</a>
+    {% if editable %}
+    <div class="actions quick-actions">
+        <a class="btn btn-primary" href="/fuel-records/add">{{ m.icon("fuel") }} Tankování</a>
+        <a class="btn" href="/services/add">{{ m.icon("service") }} Servis</a>
+        <a class="btn" href="/expenses/add">{{ m.icon("expense") }} Výdaj</a>
+        <a class="btn" href="/notes/add">{{ m.icon("note") }} Poznámka</a>
     </div>
+    {% endif %}
 </div>
 
-{% if alerts %}
-<div class="card">
-    <div class="card-head"><h2>Upozornění</h2><a class="small" href="/reminders">Všechny upomínky</a></div>
-    {% with show_vehicle=true %}{% include "_alerts.html" %}{% endwith %}
-</div>
-{% endif %}
-
-{% if cards %}
-<div class="grid grid-cards">
-    {% for c in cards %}
-    {% set v = c.vehicle %}
-    <div class="card vehicle-card">
-        <div class="title">
-            {{ m.color_dot(v, "lg") }}
-            <div>
-                <h3>{{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a></h3>
-                <div class="muted small plate-line">{{ v.license_plate or "bez SPZ" }} {{ m.tire_icons(tires.get(v.id)) }} {{ m.role_badge(roles.get(v.id)) }}</div>
-            </div>
-        </div>
-        <div class="facts">
-            <div><span class="label">Tachometr</span>{{ c.odometer|km }}</div>
-            <div><span class="label">Náklady {{ year }}</span>{{ c.year_cost|czk(0) if c.year_cost else "–" }}</div>
-            <div class="field-wide" style="grid-column: 1 / -1">
-                <span class="label">Průměrná spotřeba</span>
-                {% for fuel_type, info in c.consumption.items() %}
-                    {{ info.value|num(1) }} {{ info.unit }}/100 km <span class="muted small">({{ fuel_type }})</span>{% if not loop.last %} · {% endif %}
-                {% else %}<span class="muted">zatím nelze spočítat</span>{% endfor %}
-            </div>
-        </div>
-        {% if c.alerts %}
-        <div>
-            {% for a in c.alerts[:3] %}
-            <div class="small">{{ m.status_badge(a.status) }} {{ a.title }} – {{ a.status.summary }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        <div class="actions">
-            {% if roles.get(v.id) in ("owner", "editor") %}
-            <a class="btn btn-sm btn-primary" href="/fuel-records/add?vehicle_id={{ v.id }}">Tankovat</a>
-            <a class="btn btn-sm" href="/services/add?vehicle_id={{ v.id }}">Servis</a>
-            {% endif %}
-            <a class="btn btn-sm" href="/vehicles/{{ v.id }}/stats">Statistiky</a>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
+{% if not vehicles %}
 <div class="card empty">
     <p>Zatím nemáte žádné vozidlo.</p>
     <a class="btn btn-primary" href="/vehicles/add">Přidat první vozidlo</a>
+</div>
+{% else %}
+
+<div class="card">
+    <div class="card-head">
+        <h2>Upozornění</h2>
+        <div class="actions">
+            <a class="small" href="/reminders">Upomínky</a>
+            <a class="small" href="/service-intervals">Servisní intervaly</a>
+        </div>
+    </div>
+    {% if alerts %}
+    {% with show_vehicle=true %}{% include "_alerts.html" %}{% endwith %}
+    {% else %}
+    <div class="empty small">Žádná upozornění.</div>
+    {% endif %}
+</div>
+
+<div class="card" id="timeline">
+    <div class="card-head">
+        <div>
+            <h2>Časová osa</h2>
+            <div class="small muted">{{ filter_summary }}</div>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn btn-sm filter-toggle" data-toggle="timeline-filter"
+                    aria-controls="timeline-filter" aria-expanded="false">{{ m.icon("filter") }} Filtr{% if filter_active %} •{% endif %}</button>
+            {% if filter_active %}<a class="btn btn-sm" href="/">Zrušit filtr</a>{% endif %}
+        </div>
+    </div>
+    <div class="filter-panel" id="timeline-filter" hidden>
+        {% call m.period_filter("/", vehicles, filters) %}
+        <fieldset class="field kind-filter">
+            <legend>Zobrazit</legend>
+            <div class="check-row">
+            {% for key, label in kinds.items() %}
+            <label class="check"><input type="checkbox" name="kind" value="{{ key }}"{% if key in filters.kinds %} checked{% endif %}> {{ label }}</label>
+            {% endfor %}
+            </div>
+        </fieldset>
+        {% endcall %}
+    </div>
+
+    {% if groups %}
+    {% for month, events in groups %}
+    <h3 class="tl-month">{{ months[month.month - 1]|capitalize }} {{ month.year }}</h3>
+    {% include "_timeline_items.html" %}
+    {% endfor %}
+    {% else %}
+    <div class="empty">Ve zvoleném období nejsou žádné události.</div>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

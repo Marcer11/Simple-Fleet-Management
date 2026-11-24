@@ -640,7 +640,7 @@ def tire_alerts(session, vehicles, today=None):
         return []
     result = []
     for vehicle in vehicles:
-        if not vehicle.is_active or vehicle.kind == "moto":
+        if not vehicle.in_use or vehicle.kind == "moto":
             continue
         summer = [m for m in open_mounts(session, vehicle.id) if m.tire.season == "Letní" and m.position != "spare"]
         if summer:

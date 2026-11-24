@@ -4,7 +4,7 @@
 {% set back_url = "/reminders" %}
 {% set delete_url = "/reminders/%d/delete"|format(record.id) if record else "" %}
 {% block fields %}
-{{ m.field("title", "Název", required=true, maxlength=100, placeholder="např. Pojištění, dálniční známka, přezutí") }}
+{{ m.field("title", "Název", required=true, maxlength=100) }}
 {{ m.field("due_date", "Termín (datum)", "date") }}
 {{ m.field("due_odometer", "Termín (stav tachometru km)", "number", min=0, step=1) }}
 {% endblock %}
@@ -13,12 +13,11 @@
     <legend>Opakování a upozornění</legend>
     <div class="form-grid">
         {{ m.select("repeat", "Opakovat podle data", repeat_options.items()) }}
-        {{ m.field("repeat_km", "Opakovat po km", "number", min=1, step=1, help="Volitelné – např. 10000.") }}
+        {{ m.field("repeat_km", "Opakovat po km", "number", min=1, step=1) }}
         {{ m.field("notify_days_before", "Upozornit dní předem", "number", min=0, max=365) }}
         {{ m.field("notify_km_before", "Upozornit km předem", "number", min=0, step=1) }}
         {% if record %}{{ m.checkbox("is_done", "Vyřízeno") }}{% endif %}
         {{ m.textarea("note", "Poznámka") }}
     </div>
-    <p class="muted small" style="margin-bottom: 0">Po kliknutí na „Vyřízeno“ se opakovaná upomínka posune na další termín, jednorázová se uzavře.</p>
 </fieldset>
 {% endblock %}

@@ -21,8 +21,7 @@
     {% set prev = last.get((w.mount.id, w.key)) %}
     <div class="small">{{ m.season_icon(w.mount.tire.season) }} {{ w.mount.tire.label }}</div>
     <label class="tread-input">
-        <input type="text" name="{{ name }}" value="{{ m.val(name) }}" inputmode="decimal" autocomplete="off"
-               placeholder="0,0" aria-label="Dezén {{ w.label }} (mm)">
+        <input type="text" name="{{ name }}" value="{{ m.val(name) }}" inputmode="decimal" autocomplete="off" aria-label="Dezén {{ w.label }} (mm)">
         <span>mm</span>
     </label>
     <div class="small muted">{% if prev %}naposledy {{ prev[0]|num(1) }} mm ({{ prev[1]|date }}){% elif w.mount.tire.new_tread_mm is not none %}nová {{ w.mount.tire.new_tread_mm|num(1) }} mm{% endif %}</div>
@@ -106,8 +105,6 @@
         {% if by_key["spare"].mount %}{{ wheel_input(by_key["spare"]) }}{% endif %}
     </div>
     {% endif %}
-    <p class="help">Hloubku měřte v hlavních drážkách, zapisujte v mm (např. 5,5). Prázdná kola se neukládají.
-        Zákonné minimum: letní 1,6 mm, zimní a univerzální v zimním období 4 mm.</p>
 
     {{ m.textarea("note", "Poznámka") }}
     <div class="form-actions">

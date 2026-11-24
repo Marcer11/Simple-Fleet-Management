@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import (
     Column, Integer, String, Boolean, Date, DateTime, Text, CHAR, DECIMAL, ForeignKey, UniqueConstraint, func
 )
@@ -55,6 +57,15 @@ class Vehicle(Base):
     def display_name(self):
         name = f"{self.brand} {self.model}"
         return f"{name} ({self.license_plate})" if self.license_plate else name
+
+    @property
+    def is_sold(self):
+        return self.sale_date is not None and self.sale_date <= date.today()
+
+    @property
+    def in_use(self):
+        """Aktivní a neprodané vozidlo."""
+        return bool(self.is_active) and not self.is_sold
 
     @property
     def is_moto(self):

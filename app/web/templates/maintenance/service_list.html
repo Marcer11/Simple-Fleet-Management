@@ -6,13 +6,19 @@
     <h1>Servis</h1>
     <div class="actions">
         <a class="btn" href="/tires{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Pneumatiky</a>
-        <a class="btn" href="/intervals/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Pravidelný servis</a>
+        <a class="btn" href="/service-intervals">Servisní intervaly</a>
         <a class="btn btn-primary" href="/services/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Zapsat servis</a>
     </div>
 </div>
 
 <div class="card">
-    <h2>Pravidelný servis</h2>
+    <div class="card-head">
+        <h2>Pravidelný servis</h2>
+        <div class="actions">
+            <a class="small" href="/service-intervals">Univerzální intervaly</a>
+            <a class="btn btn-sm" href="/intervals/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Interval vozidla</a>
+        </div>
+    </div>
     {% if intervals %}
     <div class="table-wrap">
     <table>
@@ -22,18 +28,18 @@
         <tr>
             <td>{% if i.is_active %}{{ m.status_badge(s) }}{% else %}<span class="badge">Vypnuto</span>{% endif %}</td>
             <td>{{ m.color_dot(i.vehicle) }} <a href="/vehicles/{{ i.vehicle.id }}">{{ i.vehicle.display_name }}</a></td>
-            <td>{{ i.service_type }}</td>
+            <td>{{ i.service_type }}{% if i.is_default %} <span class="badge badge-muted" title="Univerzální interval">univerzální</span>{% endif %}</td>
             <td class="nowrap">{% if i.interval_months %}{{ i.interval_months }} měs.{% endif %}{% if i.interval_months and i.interval_km %} / {% endif %}{% if i.interval_km %}{{ i.interval_km|km }}{% endif %}</td>
             <td class="nowrap">{{ s.last_date|date or "–" }}{% if s.last_km is not none %}<br><span class="muted small">{{ s.last_km|km }}</span>{% endif %}</td>
             <td class="nowrap">{% if s.due_date %}{{ s.due_date|date }}{% endif %}{% if s.due_km %}<br><span class="small">{{ s.due_km|km }}</span>{% endif %}
                 {% if s.days_left is not none or s.km_left is not none %}<br><span class="muted small">{{ s.summary }}</span>{% endif %}</td>
-            <td class="actions-cell">{% if i.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/intervals/{{ i.id }}/edit">Upravit</a>{% endif %}</td>
+            <td class="actions-cell">{% if i.vehicle_id in editable_ids %}{{ m.interval_edit_link(i) }}{% endif %}</td>
         </tr>
         {% endfor %}
         </tbody>
     </table>
     </div>
-    {% else %}<div class="empty small">Nastavte pravidelný servis (olej, STK, rozvody…) a aplikace vás upozorní, když bude zbývat méně než 10 % intervalu.</div>{% endif %}
+    {% else %}<div class="empty small">Žádný pravidelný servis. <a href="/service-intervals">Nastavit univerzální intervaly</a></div>{% endif %}
 </div>
 
 <div class="card">

@@ -2,7 +2,7 @@ from collections import defaultdict, OrderedDict
 from datetime import date
 from decimal import Decimal
 
-from models import FuelRecord, ServiceRecord, Expense
+from models import FuelRecord, ServiceRecord, Expense, Vehicle, VehicleNote, TireSwap, TireTreadCheck
 from models.fuel_record import FUEL_CATEGORIES, fuel_unit
 from services.fuel_record_service import compute_consumption_segments
 from services.maintenance_service import add_months
@@ -96,8 +96,66 @@ class StatsService:
             "avg_consumption": avg_consumption,
             "volume_by_type": dict(volume_by_type),
             "expense_by_category": dict(sorted(expense_by_category.items(), key=lambda kv: -kv[1])),
-            "charts": self._charts(fuel, services, expenses, segments, date_from, date_to),
+            "charts": {**self._charts(fuel, services, expenses, segments, date_from, date_to),
+                       **self.odometer_charts(vehicle_id, date_from, date_to)},
         }
+
+    def odometer_readings(self, vehicle_id):
+        """Všechny známé stavy tachometru vozidla: [(datum, km)] seřazené, nejvyšší stav za den."""
+        q = self.session.query
+        items = [(at.date(), km) for at, km in q(FuelRecord.refuel_datetime, FuelRecord.odometer)
+                 .filter(FuelRecord.vehicle_id == vehicle_id)]
+        items += [(at.date(), km) for at, km in q(VehicleNote.note_datetime, VehicleNote.odometer)
+                  .filter(VehicleNote.vehicle_id == vehicle_id)]
+        for column, km_column, model in ((ServiceRecord.service_date, ServiceRecord.odometer, ServiceRecord),
+                                         (Expense.expense_date, Expense.odometer, Expense),
+                                         (TireSwap.swap_date, TireSwap.odometer, TireSwap),
+                                         (TireTreadCheck.check_date, TireTreadCheck.odometer, TireTreadCheck)):
+            items += list(q(column, km_column).filter(model.vehicle_id == vehicle_id))
+        vehicle = self.session.get(Vehicle, vehicle_id)
+        if vehicle is not None:
+            items += [(vehicle.purchase_date, vehicle.purchase_odometer), (vehicle.sale_date, vehicle.sale_odometer)]
+        by_day = {}
+        for day, km in items:
+            if day is not None and km is not None:
+                by_day[day] = max(km, by_day.get(day, 0))
+        result, running = [], None
+        for day, km in sorted(by_day.items()):
+            running = km if running is None else max(running, km)  # chybný starší zápis nesmí jít dolů
+            result.append((day, running))
+        return result
+
+    def odometer_charts(self, vehicle_id, date_from=None, date_to=None):
+        """Stav tachometru v čase a najeto po měsících (lineárně mezi zápisy)."""
+        readings = self.odometer_readings(vehicle_id)
+        points = [{"x": d.isoformat(), "y": km} for d, km in readings
+                  if (date_from is None or d >= date_from) and (date_to is None or d <= date_to)]
+        labels, values = [], []
+        if len(readings) >= 2:
+            first, last = readings[0][0], readings[-1][0]
+            start = max(first, date_from) if date_from else first
+            end = min(last, date_to) if date_to else last
+            if (end.year - start.year) * 12 + end.month - start.month > 35:
+                start = add_months(date(end.year, end.month, 1), -35)
+            for key in _months_range(start, end) if start <= end else []:
+                month_start = date(int(key[:4]), int(key[5:]), 1)
+                month_end = add_months(month_start, 1)
+                km = self._odometer_at(readings, min(month_end, last)) - self._odometer_at(readings, max(month_start, first))
+                labels.append(key)
+                values.append(max(round(km), 0))
+        return {"odometer": points, "monthly_km_labels": labels, "monthly_km": values}
+
+    @staticmethod
+    def _odometer_at(readings, day):
+        """Stav tachometru k danému dni - lineární interpolace mezi zápisy."""
+        prev = readings[0]
+        for d, km in readings:
+            if d >= day:
+                if d == prev[0]:
+                    return km
+                return prev[1] + (km - prev[1]) * (day - prev[0]).days / (d - prev[0]).days
+            prev = (d, km)
+        return readings[-1][1]
 
     def _charts(self, fuel, services, expenses, segments, date_from, date_to):
         # Spotřeba v čase (body podle data tankování)

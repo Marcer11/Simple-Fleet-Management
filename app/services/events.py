@@ -34,11 +34,35 @@ class Event:
     odometer: int = None
     amount: Decimal = None       # Kč
     url: str = None              # úprava záznamu (jen pro editory)
+    icon: str = None             # ikona v časové ose (viz _macros.event_icon)
+
+    def __post_init__(self):
+        if self.icon is None:
+            self.icon = {KIND_FUEL: "fuel", KIND_SERVICE: "service", KIND_EXPENSE: "expense", KIND_NOTE: "note",
+                         KIND_VEHICLE: "car", KIND_TIRES: "tire"}[self.kind]
 
     @property
     def kind_label(self):
         return {KIND_FUEL: "Tankování", KIND_SERVICE: "Servis", KIND_EXPENSE: "Výdaj",
                 KIND_NOTE: "Poznámka", KIND_VEHICLE: "Vozidlo", KIND_TIRES: "Pneumatiky"}[self.kind]
+
+
+# Ikona podle typu poznámky / kategorie výdaje / položky servisu (porovnává se malými písmeny)
+NOTE_ICONS = {"nehoda": "crash", "poškození": "warning", "garáž": "garage", "parkování": "parking",
+              "půjčeno": "key", "vráceno": "key", "pneumatiky": "tire"}
+EXPENSE_ICONS = {"pojištění": "shield", "parkování": "parking", "dálniční známka": "road", "mýtné": "road",
+                 "pokuta": "warning", "pneumatiky": "tire", "mytí": "wash"}
+
+
+def _note_icon(category):
+    return NOTE_ICONS.get((category or "").strip().lower(), "note")
+
+
+def _service_icon(types):
+    lowered = [t.lower() for t in types]
+    if lowered and all(t in ("stk", "emise") for t in lowered):
+        return "stk"
+    return "service"
 
 
 def _qty(value):
@@ -118,7 +142,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             detail = " · ".join(x for x in (d.tire.label, d.position) if x)
             events.append(Event(KIND_TIRES, _day(d.defect_date), False, by_id[d.vehicle_id],
                                 f"Poškození pneu: {d.description}", detail, d.odometer,
-                                d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}/edit"))
+                                d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}/edit",
+                                icon="warning"))
         query = (session.query(TireTreadCheck).options(joinedload(TireTreadCheck.readings))
                  .filter(TireTreadCheck.vehicle_id.in_(ids)))
         for c in dated(query, TireTreadCheck.check_date, False):
@@ -128,7 +153,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                 lines.append(c.note.strip())
             detail = "\n".join(lines)
             events.append(Event(KIND_TIRES, _day(c.check_date), False, by_id[c.vehicle_id], "Kontrola dezénu",
-                                detail, c.odometer, None, f"/tire-checks/{c.id}/edit"))
+                                detail, c.odometer, None, f"/tire-checks/{c.id}/edit", icon="gauge"))
 
     if KIND_SERVICE in kinds:
         query = session.query(ServiceRecord).filter(ServiceRecord.vehicle_id.in_(ids))
@@ -137,7 +162,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         for r in dated(query, ServiceRecord.service_date, False):
             detail = " · ".join(x for x in (r.place, (r.note or "").strip()) if x)
             events.append(Event(KIND_SERVICE, _day(r.service_date), False, by_id[r.vehicle_id], r.service_type,
-                                detail, r.odometer, r.price_local, f"/services/{r.id}/edit"))
+                                detail, r.odometer, r.price_local, f"/services/{r.id}/edit",
+                                icon=_service_icon(r.types)))
 
     if KIND_EXPENSE in kinds:
         query = session.query(Expense).filter(Expense.vehicle_id.in_(ids))
@@ -150,7 +176,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             if r.note:
                 parts.append(r.note.strip())
             events.append(Event(KIND_EXPENSE, _day(r.expense_date), False, by_id[r.vehicle_id], r.category,
-                                " · ".join(parts), r.odometer, r.price_local, f"/expenses/{r.id}/edit"))
+                                " · ".join(parts), r.odometer, r.price_local, f"/expenses/{r.id}/edit",
+                                icon=EXPENSE_ICONS.get(r.category.lower(), "expense")))
 
     if KIND_NOTE in kinds:
         query = (session.query(VehicleNote).options(joinedload(VehicleNote.created_by))
@@ -160,14 +187,14 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             if n.created_by:
                 detail = f"{detail} ({n.created_by.name})" if detail else n.created_by.name
             events.append(Event(KIND_NOTE, n.note_datetime, True, by_id[n.vehicle_id], n.title, detail,
-                                n.odometer, None, f"/notes/{n.id}/edit"))
+                                n.odometer, None, f"/notes/{n.id}/edit", icon=_note_icon(n.category)))
 
     if KIND_VEHICLE in kinds:
         for v in vehicles:
             if v.purchase_date and in_range(_day(v.purchase_date)):
                 events.append(Event(KIND_VEHICLE, _day(v.purchase_date), False, v, "Nákup vozidla",
                                     odometer=v.purchase_odometer, amount=v.purchase_price,
-                                    url=f"/vehicles/{v.id}/edit"))
+                                    url=f"/vehicles/{v.id}/edit", icon="key"))
             if v.sale_date and in_range(_day(v.sale_date)):
                 parts = []
                 if v.value_loss is not None:

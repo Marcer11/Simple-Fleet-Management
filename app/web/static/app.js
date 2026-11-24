@@ -526,23 +526,12 @@
             const sel = h("select", { "aria-label": "Pneumatika k nasazení" });
             sel.appendChild(h("option", { value: "" }, "– vyberte pneumatiku –"));
             ids.forEach(function (id) {
-                const o = h("option", { value: id }, data.tires[id].full +
-                    (data.tires[id].fits === false ? " – jiný rozměr než v TP" : ""));
+                const o = h("option", { value: id }, data.tires[id].full);
                 if (state.next && state.next.tire === id) o.selected = true;
                 sel.appendChild(o);
             });
             pick.appendChild(h("label", { class: "small" }, "Nasadit:"));
             pick.appendChild(sel);
-            const sizeNote = h("p", { class: "small text-warning", role: "status" });
-            function checkSize() {
-                const t = data.tires[sel.value];
-                sizeNote.textContent = t && t.fits === false
-                    ? "Rozměr " + t.size + " není v technickém průkazu (" + data.sizes.join(", ") + ")." : "";
-                sizeNote.hidden = !sizeNote.textContent;
-            }
-            sel.addEventListener("change", checkSize);
-            checkSize();
-            pick.appendChild(sizeNote);
             const scopes = h("div", { class: "swap-scopes" });
             scopesFor(wheel).forEach(function (sc) {
                 const b = h("button", { type: "button", class: "btn btn-sm" + (state.next && state.next.position === sc[0] ? " btn-primary" : "") }, sc[1]);
@@ -576,7 +565,6 @@
                 const t = data.tires[p.tire] || {};
                 li.appendChild(h("strong", {}, t.label || "?"));
                 li.appendChild(document.createTextNode(" → " + (data.positions[p.position] || p.position).toLowerCase() + " "));
-                if (t.fits === false) li.appendChild(h("span", { class: "small text-warning" }, "(jiný rozměr než v TP) "));
                 const x = h("button", { type: "button", class: "btn-link small", "aria-label": "Zrušit" }, "zrušit");
                 x.addEventListener("click", function () { clearRow(p.row); render(); });
                 li.appendChild(x);
@@ -657,6 +645,80 @@
             } else if (document.execCommand && document.execCommand("copy")) {
                 done();
             }
+        });
+    });
+
+    // Rozbalovací panel: <button data-toggle="id-panelu" aria-expanded="false">
+    document.querySelectorAll("[data-toggle]").forEach(function (button) {
+        const panel = document.getElementById(button.getAttribute("data-toggle"));
+        if (!panel) return;
+        button.addEventListener("click", function () {
+            panel.hidden = !panel.hidden;
+            button.setAttribute("aria-expanded", String(!panel.hidden));
+            if (!panel.hidden) {
+                const first = panel.querySelector("select, input");
+                if (first) first.focus();
+            }
+        });
+    });
+
+    // Detail události na časové ose: klik zobrazí celý text
+    document.addEventListener("click", function (event) {
+        const detail = event.target.closest(".tl-detail");
+        if (detail) detail.classList.toggle("open");
+    });
+
+    // Řazení tabulek kliknutím na záhlaví sloupce (všechny tabulky s <thead>, kromě data-nosort)
+    const DATE_RE = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/;
+    const NUM_RE = /^[-−]?\d[\d\s ]*(?:,\d+)?/;
+    function cellValue(cell) {
+        if (!cell) return { empty: true };
+        const raw = cell.hasAttribute("data-sort") ? cell.getAttribute("data-sort") : cell.textContent;
+        const text = raw.trim().replace(/\s+/g, " ");
+        if (!text || text === "–" || text === "-") return { empty: true, text: "" };
+        const d = DATE_RE.exec(text);
+        const n = NUM_RE.exec(text);
+        return {
+            text: text,
+            date: d ? new Date(+d[3], +d[2] - 1, +d[1], +(d[4] || 0), +(d[5] || 0)).getTime() : null,
+            num: n ? parseFloat(n[0].replace(/[\s ]/g, "").replace("−", "-").replace(",", ".")) : null,
+        };
+    }
+    function sortTable(table, index, th) {
+        const body = table.tBodies[0];
+        const rows = Array.from(body.rows);
+        const values = new Map(rows.map(function (r) { return [r, cellValue(r.cells[index])]; }));
+        const filled = Array.from(values.values()).filter(function (v) { return !v.empty; });
+        const type = filled.length && filled.every(function (v) { return v.date !== null; }) ? "date"
+            : (filled.length && filled.every(function (v) { return v.num !== null; }) ? "num" : "text");
+        const asc = th.getAttribute("aria-sort") !== "ascending";
+        table.querySelectorAll("thead th[aria-sort]").forEach(function (o) { o.removeAttribute("aria-sort"); });
+        th.setAttribute("aria-sort", asc ? "ascending" : "descending");
+        rows.sort(function (a, b) {
+            const va = values.get(a), vb = values.get(b);
+            if (va.empty || vb.empty) return va.empty === vb.empty ? 0 : (va.empty ? 1 : -1);  // prázdné vždy na konec
+            let c;
+            if (type === "date") c = va.date - vb.date;
+            else if (type === "num") c = va.num - vb.num;
+            else c = va.text.localeCompare(vb.text, "cs", { sensitivity: "base", numeric: true });
+            return asc ? c : -c;
+        });
+        rows.forEach(function (r) { body.appendChild(r); });
+    }
+    document.querySelectorAll("table").forEach(function (table) {
+        if (table.hasAttribute("data-nosort") || !table.tHead || table.tBodies.length !== 1) return;
+        const body = table.tBodies[0];
+        if (body.rows.length < 2 || body.querySelector("[colspan], [rowspan], tr.group-row")) return;
+        const head = table.tHead.rows[table.tHead.rows.length - 1];
+        Array.from(head.cells).forEach(function (th, index) {
+            if (!th.textContent.trim() || th.colSpan > 1) return;
+            th.classList.add("sortable");
+            th.tabIndex = 0;
+            th.title = "Seřadit";
+            th.addEventListener("click", function () { sortTable(table, index, th); });
+            th.addEventListener("keydown", function (e) {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sortTable(table, index, th); }
+            });
         });
     });
 

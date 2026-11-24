@@ -7,9 +7,8 @@ from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SH
 from services.errors import ValidationError
 from services.events import collect_events
 from services.tire_service import mounted_seasons, open_mounts
-from services.fuel_record_service import FuelRecordService
 from services.maintenance_service import (
-    ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
+    ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
 )
 from services.stats_service import StatsService
 from services.vehicle_service import VehicleService
@@ -68,8 +67,12 @@ async def list_vehicles(request: Request, show: str = "active", user=Depends(get
     vehicles = service.get_vehicles_for_user(user, only_active=(show != "all"))
     roles = service.get_roles_for_user(user)
     odometers = {v.id: service.get_current_odometer(v.id) for v in vehicles}
+    stats = StatsService(db)
+    consumption = {v.id: stats.avg_consumption(v.id) for v in vehicles}
+    year_costs = stats.year_costs([v.id for v in vehicles], date.today().year)
     inactive_count = len(service.get_vehicles_for_user(user)) - len(service.get_vehicles_for_user(user, True))
     return render(request, "vehicles/list.html", vehicles=vehicles, roles=roles, odometers=odometers,
+                  consumption=consumption, year_costs=year_costs,
                   show=show, inactive_count=inactive_count, tires=mounted_seasons(db, [v.id for v in vehicles]))
 
 
@@ -104,7 +107,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
     interval_service = ServiceIntervalService(db)
     reminder_service = ReminderService(db)
     intervals = [(i, interval_service.get_status(i, odometer))
-                 for i in interval_service.list_for_vehicles([vehicle.id], only_active=False)]
+                 for i in interval_service.effective_for_vehicles([vehicle], only_active=False)]
     reminders = [(r, reminder_service.get_status(r, odometer))
                  for r in reminder_service.list_for_vehicles([vehicle.id])]
 
@@ -112,15 +115,12 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         request, "vehicles/detail.html",
         vehicle=vehicle, role=role, odometer=odometer,
         alerts=collect_alerts(db, [vehicle]),
-        fuel_records=FuelRecordService(db).search([vehicle.id], limit=10),
-        service_records=ServiceRecordService(db).search([vehicle.id])[:10],
-        expenses=ExpenseService(db).search([vehicle.id])[:10],
         intervals=intervals, reminders=reminders,
         validities=ExpenseService(db).current_validities(vehicle.id),
         avg_consumption=StatsService(db).avg_consumption(vehicle.id),
         profile=StatsService(db).usage_profile(vehicle.id),
         breakdown=StatsService(db).fuel_breakdown(vehicle.id),
-        events=collect_events(db, [vehicle], limit=8),
+        events=collect_events(db, [vehicle], limit=15),
         mounted_tires=open_mounts(db, vehicle.id),
         tire_seasons=mounted_seasons(db, [vehicle.id]).get(vehicle.id),
         editable_ids={vehicle.id} if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set(),

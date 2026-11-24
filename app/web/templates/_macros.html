@@ -12,7 +12,6 @@
 <div class="field{% if wide %} field-wide{% endif %}">
     <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req">*</span>{% endif %}</label>
     <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ val(name) }}"{% if required %} required{% endif %}{{ kwargs|xmlattr }}>
-    {% if help %}<small class="help" id="{{ name }}-help">{{ help }}</small>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -33,7 +32,6 @@
         <option value="{{ value }}"{% if val(name) == value|string %} selected{% endif %}>{{ text }}</option>
         {% endfor %}
     </select>
-    {% if help %}<small class="help">{{ help }}</small>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -44,7 +42,6 @@
 {% macro checkbox(name, label, help=none) -%}
 <div class="field">
     <label class="check"><input type="checkbox" id="f-{{ name }}" name="{{ name }}" value="on"{% if values.get(name) %} checked{% endif %}> {{ label }}</label>
-    {% if help %}<small class="help">{{ help }}</small>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -63,7 +60,7 @@
 {%- endmacro %}
 
 {% macro price_fields(currencies, label="Cena", required=false) -%}
-{{ field("price_paid", label, "text", required=required, inputmode="decimal", placeholder="0,00", autocomplete="off") }}
+{{ field("price_paid", label, "text", required=required, inputmode="decimal", autocomplete="off") }}
 <div class="field">
     <label for="f-currency_code">Měna</label>
     <input id="f-currency_code" name="currency_code" type="text" value="{{ val('currency_code') or 'CZK' }}" maxlength="3" list="currencies" autocomplete="off" style="text-transform: uppercase">
@@ -71,8 +68,7 @@
 </div>
 <div class="field" id="rate-field">
     <label for="f-manual_rate">Kurz (Kč za 1 jednotku)</label>
-    <input id="f-manual_rate" name="manual_rate" type="text" value="{{ val('manual_rate') }}" inputmode="decimal" autocomplete="off" placeholder="automaticky z ČNB">
-    <small class="help">Nechte prázdné pro kurz ČNB ke dni platby.</small>
+    <input id="f-manual_rate" name="manual_rate" type="text" value="{{ val('manual_rate') }}" inputmode="decimal" autocomplete="off">
 </div>
 {%- endmacro %}
 
@@ -109,6 +105,34 @@
 {% if entries %}<span class="tire-icons">{% for season, labels in entries %}{{ season_icon(season, season ~ " pneumatiky: " ~ labels|join(", ")) }}{% endfor %}</span>{% endif %}
 {%- endmacro %}
 
+{# Ikony časové osy a rychlých akcí (24×24, tah) #}
+{% set ICON_PATHS = {
+    "fuel": '<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10"/><path d="M14 8h2a2 2 0 0 1 2 2v5.5a1.5 1.5 0 0 0 3 0V8.5L18 5.5"/>',
+    "service": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>',
+    "stk": '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+    "expense": '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    "shield": '<path d="M12 21.5s8-3.8 8-9.8V5.2L12 2.5 4 5.2v6.5c0 6 8 9.8 8 9.8z"/>',
+    "parking": '<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M9.5 17V7h3.5a3 3 0 0 1 0 6H9.5"/>',
+    "road": '<path d="M5 21 9 3M19 21 15 3M12 5v2.5M12 11v2.5M12 17v2.5"/>',
+    "wash": '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+    "tire": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21"/>',
+    "gauge": '<path d="M3.5 18.5a9.5 9.5 0 1 1 17 0"/><path d="m12 14 4.5-4.5"/><circle cx="12" cy="14" r="1.2"/>',
+    "warning": '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+    "crash": '<path d="m12 2 2.1 5.4 5.6-1.6-3 5 4.3 3.8-5.7.6L14 21l-2.7-5.1L6 18.8l1.4-5.6L2.5 10.4 8.1 9 7.4 3.3z"/>',
+    "garage": '<path d="M3 21V9.5L12 3l9 6.5V21"/><path d="M7 21v-8h10v8M7 17h10"/>',
+    "key": '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9-9M16 6l3 3M18.5 3.5l2 2"/>',
+    "note": '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+    "car": '<path d="M5 16H3v-3.5L5 8a2 2 0 0 1 1.8-1.2h10.4A2 2 0 0 1 19 8l2 4.5V16h-2M9 16h6M4 12h16"/><circle cx="7" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/>',
+    "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+    "chart": '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>',
+    "edit": '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    "filter": '<path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>',
+    "plus": '<path d="M12 5v14M5 12h14"/>',
+} %}
+{% macro icon(name, label=none, cls="") -%}
+<svg class="icon {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"{% if label %} role="img" aria-label="{{ label }}"><title>{{ label }}</title>{% else %} aria-hidden="true">{% endif %}{{ ICON_PATHS.get(name, ICON_PATHS["note"])|safe }}</svg>
+{%- endmacro %}
+
 {% macro role_badge(role) -%}
 {% if role and role != 'owner' %}<span class="badge badge-info" title="Sdílené vozidlo">Sdíleno · {{ role_labels[role] }}</span>{% endif %}
 {%- endmacro %}
@@ -138,6 +162,15 @@
     </div>
     <noscript><button class="btn" type="submit">Filtrovat</button></noscript>
 </form>
+{%- endmacro %}
+
+{# Úprava intervalu; univerzální se upraví založením vlastního intervalu vozidla #}
+{% macro interval_edit_link(i) -%}
+{% if i.is_default -%}
+<a class="btn btn-sm" href="/intervals/add?vehicle_id={{ i.vehicle_id }}&amp;service_type={{ i.service_type|urlencode }}{% if i.interval_months %}&amp;interval_months={{ i.interval_months }}{% endif %}{% if i.interval_km %}&amp;interval_km={{ i.interval_km }}{% endif %}" title="Nastavit jinak pro toto vozidlo">Upravit</a>
+{%- else -%}
+<a class="btn btn-sm" href="/intervals/{{ i.id }}/edit">Upravit</a>
+{%- endif %}
 {%- endmacro %}
 
 {% macro delete_button(action, confirm="Opravdu smazat?", label="Smazat", small=true) -%}

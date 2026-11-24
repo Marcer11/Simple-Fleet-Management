@@ -5,9 +5,10 @@ from fastapi.responses import FileResponse, Response
 
 from services.maintenance_service import collect_alerts
 from services.stats_service import StatsService
-from services.tire_service import mounted_seasons
 from services.vehicle_service import VehicleService
+from models.vehicle import ROLE_EDITOR
 from web.deps import get_db, get_current_user, render, TEMPLATES_DIR
+from web.routers.events import timeline_context
 
 router = APIRouter()
 STATIC_DIR = TEMPLATES_DIR.parent / "static"
@@ -15,25 +16,15 @@ STATIC_DIR = TEMPLATES_DIR.parent / "static"
 
 @router.get("/")
 async def dashboard(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    """Výchozí obrazovka: upozornění a pod nimi časová osa (filtr je skrytý)."""
     vehicle_service = VehicleService(db)
-    stats = StatsService(db)
-    vehicles = vehicle_service.get_vehicles_for_user(user, only_active=True)
-    ids = [v.id for v in vehicles]
+    active = vehicle_service.get_vehicles_for_user(user, only_active=True)
     year = date.today().year
-    year_costs = stats.year_costs(ids, year)
-    alerts = collect_alerts(db, vehicles)
-
-    cards = [{
-        "vehicle": v,
-        "odometer": vehicle_service.get_current_odometer(v.id),
-        "consumption": stats.avg_consumption(v.id),
-        "year_cost": year_costs.get(v.id),
-        "alerts": [a for a in alerts if a.vehicle.id == v.id],
-    } for v in vehicles]
-
-    return render(request, "dashboard.html", cards=cards, alerts=alerts, year=year,
-                  roles=vehicle_service.get_roles_for_user(user), tires=mounted_seasons(db, ids),
-                  total_year_cost=sum(year_costs.values(), 0))
+    year_costs = StatsService(db).year_costs([v.id for v in active], year)
+    timeline = timeline_context(request, db, user)
+    return render(request, "dashboard.html", alerts=collect_alerts(db, active), active=active, year=year,
+                  total_year_cost=sum(year_costs.values(), 0),
+                  editable=vehicle_service.get_accessible_ids(user, ROLE_EDITOR), **timeline)
 
 
 # ----------------------------------------------------------------------

@@ -9,7 +9,7 @@ from models.maintenance import (
 )
 from models.vehicle import ROLE_EDITOR
 from services.maintenance_service import (
-    ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
+    DefaultIntervalService, ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
     collect_alerts,
 )
 from services.vehicle_service import VehicleService
@@ -18,7 +18,8 @@ from web.common import (
 )
 from web.crud import CrudConfig, register_crud
 from web.deps import get_db, get_current_user, flash, render
-from web.forms import iso, parse_filter_date, parse_filter_int, rate_from_record
+from services.errors import ValidationError
+from web.forms import FormReader, iso, parse_filter_date, parse_filter_int, rate_from_record
 
 router = APIRouter()
 
@@ -116,8 +117,9 @@ async def list_services(request: Request, user=Depends(get_current_user), db=Dep
     vehicle_service = VehicleService(db)
     interval_service = ServiceIntervalService(db)
     odometers = {vid: vehicle_service.get_current_odometer(vid) for vid in ids}
+    selected = [v for v in vehicles if v.id in ids and v.in_use]
     intervals = [(i, interval_service.get_status(i, odometers[i.vehicle_id]))
-                 for i in interval_service.list_for_vehicles(ids, only_active=False)]
+                 for i in interval_service.effective_for_vehicles(selected, only_active=False)]
 
     return render(request, "maintenance/service_list.html", vehicles=vehicles, records=records,
                   intervals=intervals, filters=filters,
@@ -172,8 +174,91 @@ register_crud(router, CrudConfig(
     to_values=_interval_values,
     default_values=lambda vid: {"is_active": "on", "start_date": date.today().isoformat()},
     extra_context=lambda db, user: {"service_types": SERVICE_TYPES},
+    prefill_params=("service_type", "interval_months", "interval_km"),
     messages={"created": "Pravidelný servis byl nastaven.", "deleted": "Pravidelný servis byl odstraněn."},
 ))
+
+
+# ----------------------------------------------------------------------
+# Univerzální intervaly (platí pro všechna vozidla uživatele, pokud vozidlo nemá vlastní)
+# ----------------------------------------------------------------------
+
+KIND_OPTIONS = [("", "Všechna vozidla"), ("car", "Auta"), ("moto", "Motorky")]
+
+
+def _read_default_interval(form):
+    data = {
+        "service_type": form.str("service_type", "Typ servisu", required=True, max_len=50),
+        "vehicle_kind": form.str("vehicle_kind", "Pro vozidla"),
+        "interval_months": form.int("interval_months", "Interval (měsíce)", min_value=1, max_value=240),
+        "interval_km": form.int("interval_km", "Interval (km)", min_value=1),
+    }
+    form.check()
+    return data
+
+
+def _defaults_page(request, db, user, values=None, interval=None, error=None, status_code=200):
+    service = DefaultIntervalService(db)
+    return render(request, "maintenance/default_intervals.html", status_code=status_code,
+                  intervals=service.list_for_user(user.id), interval=interval, values=values or {},
+                  kind_options=KIND_OPTIONS, service_types=SERVICE_TYPES, error=error)
+
+
+@router.get("/service-intervals")
+async def default_intervals(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    return _defaults_page(request, db, user)
+
+
+@router.post("/service-intervals")
+async def default_interval_add(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    form = FormReader(await request.form())
+    try:
+        DefaultIntervalService(db).create(user.id, _read_default_interval(form))
+    except ValidationError as e:
+        db.rollback()
+        return _defaults_page(request, db, user, form.values, error=str(e), status_code=400)
+    flash(request, "Univerzální interval byl přidán.")
+    return RedirectResponse("/service-intervals", status_code=303)
+
+
+@router.post("/service-intervals/suggested")
+async def default_interval_suggested(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    DefaultIntervalService(db).add_suggested(user.id)
+    flash(request, "Doporučené intervaly byly přidány – upravte si je podle vozidel.")
+    return RedirectResponse("/service-intervals", status_code=303)
+
+
+@router.get("/service-intervals/{interval_id}/edit")
+async def default_interval_edit(request: Request, interval_id: int, user=Depends(get_current_user),
+                                db=Depends(get_db)):
+    interval = DefaultIntervalService(db).get(interval_id, user.id)
+    values = {"service_type": interval.service_type, "vehicle_kind": interval.vehicle_kind or "",
+              "interval_months": iso(interval.interval_months), "interval_km": iso(interval.interval_km)}
+    return _defaults_page(request, db, user, values, interval)
+
+
+@router.post("/service-intervals/{interval_id}/edit")
+async def default_interval_edit_post(request: Request, interval_id: int, user=Depends(get_current_user),
+                                     db=Depends(get_db)):
+    service = DefaultIntervalService(db)
+    interval = service.get(interval_id, user.id)
+    form = FormReader(await request.form())
+    try:
+        service.update(interval, _read_default_interval(form))
+    except ValidationError as e:
+        db.rollback()
+        return _defaults_page(request, db, user, form.values, interval, str(e), 400)
+    flash(request, "Změny byly uloženy.")
+    return RedirectResponse("/service-intervals", status_code=303)
+
+
+@router.post("/service-intervals/{interval_id}/delete")
+async def default_interval_delete(request: Request, interval_id: int, user=Depends(get_current_user),
+                                  db=Depends(get_db)):
+    service = DefaultIntervalService(db)
+    service.delete(service.get(interval_id, user.id))
+    flash(request, "Univerzální interval byl odstraněn.")
+    return RedirectResponse("/service-intervals", status_code=303)
 
 
 # ======================================================================

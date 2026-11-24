@@ -2,25 +2,24 @@
 {% import "_macros.html" as m with context %}
 <ol class="timeline viz-root">
 {% for e in events %}
+{% set detail = (e.detail or "").strip().replace("\n", " · ") %}
 <li class="tl-item tl-{{ e.kind }}">
     <div class="tl-when">
-        <div class="tl-date">{{ e.when.day }}. {{ e.when.month }}.</div>
-        {% if with_year and e.when.year != today.year %}<div class="tl-time">{{ e.when.year }}</div>{% endif %}
-        {% if e.has_time %}<div class="tl-time">{{ e.when.strftime("%H:%M") }}</div>{% endif %}
+        <span class="tl-date">{{ e.when.day }}. {{ e.when.month }}.{% if with_year and e.when.year != today.year %} {{ e.when.year }}{% endif %}</span>
+        {% if e.has_time %}<span class="tl-time">{{ e.when.strftime("%H:%M") }}</span>{% endif %}
     </div>
-    <div class="tl-dot" aria-hidden="true"></div>
+    <div class="tl-icon" title="{{ e.kind_label }}">{{ m.icon(e.icon, e.kind_label) }}</div>
     <div class="tl-body">
-        <div class="tl-head">
-            <span class="tl-kind">{{ e.kind_label }}</span>
+        <div class="tl-line">
             {% if e.url and e.vehicle.id in editable_ids %}<a class="tl-title" href="{{ e.url }}">{{ e.title }}</a>
             {% else %}<span class="tl-title">{{ e.title }}</span>{% endif %}
+            <span class="tl-meta">
+                {%- if show_vehicle %}{{ m.color_dot(e.vehicle) }} {{ e.vehicle.brand }} {{ e.vehicle.model }}{% endif -%}
+                {%- if e.odometer is not none %}{% if show_vehicle %} · {% endif %}{{ e.odometer|km }}{% endif -%}
+            </span>
             {% if e.amount is not none %}<span class="tl-amount">{{ e.amount|czk(0) }}</span>{% endif %}
         </div>
-        <div class="tl-meta small muted">
-            {% if show_vehicle %}{{ m.color_dot(e.vehicle) }} {{ e.vehicle.display_name }}{% endif %}
-            {% if e.odometer is not none %}{% if show_vehicle %} · {% endif %}{{ e.odometer|km }}{% endif %}
-        </div>
-        {% if e.detail %}<div class="tl-detail small">{{ e.detail }}</div>{% endif %}
+        {% if detail %}<div class="tl-detail" title="{{ e.detail }}">{{ detail }}</div>{% endif %}
     </div>
 </li>
 {% endfor %}

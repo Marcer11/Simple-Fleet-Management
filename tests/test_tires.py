@@ -227,8 +227,7 @@ def test_per_wheel_treads_and_moto(app, db):
     alerts = [a for a in collect_alerts(db, [db.get(Vehicle, moto)], today=date(2026, 12, 1)) if a.kind == "tires"]
     assert not alerts
     # ikony typu pneumatik na přehledu a v seznamu vozidel
-    assert "Letní pneumatiky: Letní Michelin Primacy 4 (všechna kola)" in client.get("/").text
-    assert "Letní pneumatiky" in client.get("/vehicles").text
+    assert "Letní pneumatiky: Letní Michelin Primacy 4 (všechna kola)" in client.get("/vehicles").text
 
 
 def test_vehicle_tire_sizes(app, db):
@@ -240,19 +239,20 @@ def test_vehicle_tire_sizes(app, db):
     car = add_vehicle(client, model="Astra", tire_sizes="205/55 R16 91V\r\n  225/45   R17 91W \r\n205/55 r16 91v")
     vehicle = db.get(Vehicle, car)
     assert vehicle.tire_size_list == ["205/55 R16 91V", "225/45 R17 91W"]
+    # rozměry dle TP jsou jen údaj u vozidla - nikam se nepropisují
     form = client.get("/tires/add").text
-    assert 'list="vehicle-sizes"' in form and '<option value="225/45 R17 91W" label="Škoda Astra">' in form
-    assert "Rozměry dle TP: 205/55 R16 91V · 225/45 R17 91W" in client.get(f"/vehicles/{car}").text
+    assert "vehicle-sizes" not in form and "225/45 R17 91W" not in form
+    assert "205/55 R16 91V" in client.get(f"/vehicles/{car}").text
     wrong = add_tire(client, db, size="195/65 R15 91H")
     page = client.get(f"/tire-swaps/add?vehicle_id={car}").text
-    assert '"fits": false' in page and "dle TP 205/55 R16 91V, 225/45 R17 91W" in page
+    assert '"fits"' not in page and "dle TP" not in page
     r = swap(client, car, date.today(), 1000, [(wrong, "all")])
     assert r.status_code == 303
-    assert "v technickém průkazu je 205/55 R16 91V, 225/45 R17 91W" in client.get(f"/vehicles/{car}").text
+    assert "technickém průkazu" not in client.get(f"/vehicles/{car}").text
     # univerzální pneumatiky: svisle rozdělená ikona (půl vločky, půl slunce)
     allseason = add_tire(client, db, season="Univerzální")
     swap(client, car, date.today(), 1000, [(allseason, "all")])
-    dash = client.get("/").text
+    dash = client.get("/vehicles").text
     assert "Univerzální pneumatiky:" in dash and 'class="season-winter"' in dash and 'class="season-summer"' in dash
 
 

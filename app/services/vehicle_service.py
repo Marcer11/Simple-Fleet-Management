@@ -54,6 +54,8 @@ class VehicleService:
             vehicle.color_hex = "#FFFFFF"
         if vehicle.is_active is None:
             vehicle.is_active = True
+        if vehicle.is_sold:
+            vehicle.is_active = False
         self.session.add(vehicle)
         self._commit()
         return vehicle
@@ -94,8 +96,11 @@ class VehicleService:
         current = {field: getattr(vehicle, field) for field in VEHICLE_FIELDS}
         current.update(data)
         validated = self._validate(current)
+        sold_before = vehicle.sale_date
         for key in data:
             setattr(vehicle, key, validated[key])
+        if vehicle.is_sold and vehicle.sale_date != sold_before:
+            vehicle.is_active = False  # zapsaný prodej vozidlo vyřadí z aktivních
         self._commit()
         return vehicle
 
@@ -217,7 +222,8 @@ class VehicleService:
     def get_vehicles_for_user(self, user, only_active=False):
         query = self._accessible_query(user)
         if only_active:
-            query = query.filter(Vehicle.is_active.is_(True))
+            query = query.filter(Vehicle.is_active.is_(True),
+                                 or_(Vehicle.sale_date.is_(None), Vehicle.sale_date > date.today()))
         return query.order_by(Vehicle.is_active.desc(), Vehicle.brand, Vehicle.model).all()
 
     def get_roles_for_user(self, user):

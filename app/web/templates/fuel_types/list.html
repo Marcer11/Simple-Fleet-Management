@@ -11,13 +11,6 @@
 </div>
 
 <div class="card">
-    <p class="small muted">
-        <strong>Druh</strong> určuje jednotku a řadu pro výpočet spotřeby – např. Natural 95 i Verva 100 jsou benzín,
-        takže se spotřeba počítá mezi nimi dohromady. <strong>Pumpy</strong> omezí nabídku paliva jen na dané značky
-        (Verva 100 → ORLEN, V-Power → Shell); víc značek oddělte čárkou, prázdné = nabízet všude.
-        Přejmenování nebo změna druhu se promítne i do zapsaných tankování vozidel, která můžete upravovat.
-        Odebrané palivo jen zmizí z nabídky.
-    </p>
     {{ m.datalist("brand-list", brands) }}
     <div class="table-wrap">
     <table class="fuel-types">
@@ -37,7 +30,7 @@
             </td>
             <td>
                 <input type="text" form="ft-{{ t.id }}" name="station_brands" value="{{ t.brands|join(', ') }}"
-                       maxlength="255" list="brand-list" placeholder="všechny pumpy" autocomplete="off"
+                       maxlength="255" list="brand-list" autocomplete="off"
                        aria-label="Pumpy pro {{ t.name }}">
             </td>
             <td class="num">{{ usage[t.id] or "–" }}</td>
@@ -62,7 +55,7 @@
     <form method="post" action="/fuel-types/add">
         {{ m.csrf() }}
         <div class="form-grid">
-            {{ m.field("name", "Název", required=true, maxlength=30, placeholder="např. Verva 100", autocomplete="off") }}
+            {{ m.field("name", "Název", required=true, maxlength=30, autocomplete="off") }}
             <div class="field">
                 <label for="f-category">Druh</label>
                 <select id="f-category" name="category">
@@ -70,7 +63,7 @@
                     <option value=""{% if values.get('category') == '' %} selected{% endif %}>Jiné – vlastní spotřeba</option>
                 </select>
             </div>
-            {{ m.field("station_brands", "Pumpy", maxlength=255, list="brand-list", placeholder="např. ORLEN (prázdné = všude)", autocomplete="off") }}
+            {{ m.field("station_brands", "Pumpy", maxlength=255, list="brand-list", autocomplete="off") }}
         </div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Přidat</button></div>
     </form>

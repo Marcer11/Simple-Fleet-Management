@@ -91,6 +91,34 @@ class ServiceInterval(Base):
 
     vehicle = relationship("Vehicle", back_populates="service_intervals")
 
+    is_default = False  # univerzální interval je services.maintenance_service.EffectiveInterval
+
+
+class DefaultServiceInterval(Base):
+    """Univerzální interval uživatele - platí pro jeho vozidla, pokud u vozidla není nastaven jinak."""
+    __tablename__ = "default_service_intervals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    service_type = Column(String(50), nullable=False)
+    vehicle_kind = Column(String(10), nullable=True)  # None = všechna vozidla, jinak "car" / "moto"
+    interval_months = Column(Integer, nullable=True)
+    interval_km = Column(Integer, nullable=True)
+
+    def applies_to(self, vehicle):
+        return self.vehicle_kind in (None, "", vehicle.kind or "car")
+
+
+# Doporučené univerzální intervaly (nabídnou se, dokud uživatel žádné nemá)
+SUGGESTED_INTERVALS = [
+    ("Výměna oleje", None, 12, 15000),
+    ("Filtry", None, 24, 30000),
+    ("Brzdová kapalina", None, 24, None),
+    ("Rozvody", "car", 60, 120000),
+    ("STK", None, 24, None),
+    ("Klimatizace", "car", 24, None),
+]
+
 
 class Reminder(Base):
     """Jednorázová nebo opakovaná upomínka (datum a/nebo stav tachometru)."""

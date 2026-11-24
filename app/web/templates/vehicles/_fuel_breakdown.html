@@ -1,7 +1,7 @@
-{# Spotřeba a natankované palivo podle druhu a konkrétního paliva. Vstup: breakdown, title #}
+{# Spotřeba a natankované palivo podle druhu a konkrétního paliva. Vstup: breakdown, title, bare (bez karty) #}
 {% if breakdown %}
-<div class="card">
-    <h2>{{ title }}</h2>
+{% if not bare %}<div class="card">
+    <h2>{{ title }}</h2>{% endif %}
     <div class="table-wrap">
     <table class="breakdown">
         <thead><tr><th>Palivo</th><th class="num">Spotřeba</th><th class="num">Natankováno</th><th class="num">Tankování</th></tr></thead>
@@ -25,8 +25,5 @@
         {% endfor %}
     </table>
     </div>
-    <p class="help">Spotřeba se počítá metodou „plná–plná“ zvlášť pro každý druh paliva (Natural 95 i 98 jsou benzín,
-        LPG nebo AdBlue mají vlastní řadu). U konkrétního paliva jde o úseky, které jím byly dotankovány do plna.
-        Druh paliva nastavíte v <a href="/fuel-types">seznamu paliv</a>.</p>
-</div>
+{% if not bare %}</div>{% endif %}
 {% endif %}

@@ -97,8 +97,6 @@
     <h2>Ujeté kilometry</h2>
     {% if summary.charts.odometer %}
     <div class="chart-box tall"><canvas id="chart-odometer" role="img" aria-label="Ujeté kilometry jednotlivých vozidel od začátku období"></canvas></div>
-    <p class="help">Od prvního záznamu ve zvoleném období – vozidla s různým stavem tachometru jsou tak porovnatelná.
-        Skutečný stav tachometru je v popisku bodu.</p>
     {% else %}<div class="empty small">Žádné záznamy se stavem tachometru.</div>{% endif %}
 </div>
 
@@ -106,7 +104,6 @@
     <h2>Cena paliva (Kč za jednotku)</h2>
     {% if summary.charts.unit_price %}
     <div class="chart-box"><canvas id="chart-price" role="img" aria-label="Vývoj průměrné ceny paliva podle druhu"></canvas></div>
-    <p class="help">Každý bod je jedno tankování (všechna vozidla).</p>
     {% else %}<div class="empty small">Žádná tankování s cenou.</div>{% endif %}
 </div>
 </div>
@@ -118,7 +115,7 @@
 {% block scripts %}
 {% if summary.rows %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=3"></script>
+<script src="/static/charts.js?v=4"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();

@@ -1,7 +1,7 @@
 {% extends "maintenance/_record_form.html" %}
 {% import "_macros.html" as m with context %}
 {% set heading = "Upravit poznámku" if record else "Nová poznámka" %}
-{% set back_url = "/timeline" %}
+{% set back_url = "/" %}
 {% set delete_url = "/notes/%d/delete"|format(record.id) if record else "" %}
 {% block fields %}
 {{ m.field("note_date", "Datum", "date", required=true) }}
@@ -10,8 +10,8 @@
 <div class="field">
     <label for="f-category">Typ</label>
     <input id="f-category" name="category" type="text" maxlength="40" list="note-categories" value="{{ m.val('category') }}"
-           autocomplete="off" placeholder="např. Garáž, Půjčeno, Nehoda">
+           autocomplete="off">
     {{ m.datalist("note-categories", note_categories) }}
 </div>
-{{ m.textarea("text", "Poznámka", rows=4, maxlength=5000, placeholder="např. uloženo do garáže u rodičů, půjčeno Petrovi do neděle…") }}
+{{ m.textarea("text", "Poznámka", rows=4, maxlength=5000) }}
 {% endblock %}

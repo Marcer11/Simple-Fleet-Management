@@ -20,6 +20,15 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 
 ## Funkce
 
+### Rozvržení aplikace
+- **výchozí obrazovka (Přehled)**: rychlé zápisy (tankování, servis, výdaj, poznámka), upozornění
+  a pod nimi časová osa všech vozidel; filtr časové osy je skrytý a zobrazí se po kliknutí na „Filtr“
+- **detail vozidla**: nahoře tlačítka pro zápis k vozidlu (tankování, servis, výdaj, poznámka, přezutí,
+  kontrola dezénu, upomínka), hlavní čísla a upozornění; údaje o vozidle, pneumatiky, pravidelný servis
+  a upomínky a spotřeba jsou ve sbalovacích sekcích; pod nimi časová osa vozidla
+- **tabulky** lze řadit kliknutím na záhlaví sloupce (datum, číslo i text, prázdné hodnoty vždy na konci)
+- formuláře jsou bez ukázkových textů a vysvětlivek u polí
+
 ### Uživatelé a sdílení
 - registrace a přihlášení (heslo hashované PBKDF2, ochrana CSRF, omezení pokusů o přihlášení)
 - každý uživatel vidí jen svá vozidla
@@ -31,14 +40,19 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 
 ### Vozidla
 Druh (auto / motorka), značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
-tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP, aktivní/neaktivní.
+tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP (jen údaj
+u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezobrazuje (zapsáním prodeje se deaktivuje).
+Seznam vozidel ukazuje tachometr, spotřebu, náklady za rok a typ pneumatik; vlastník je až v detailu vozidla.
 Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Poznámky a časová osa
 - **poznámky k vozidlu** s datem, časem a stavem tachometru (uloženo do garáže, půjčeno, nehoda…);
   stav tachometru se kontroluje proti ostatním záznamům v čase – stejný stav v různé dny je povolený
-- **časová osa** (`/timeline` a karta v detailu vozidla): tankování, servis, výdaje, poznámky, nákup
-  a prodej v jednom seznamu po měsících, filtr podle vozidla, období a druhu události
+- **časová osa** (na výchozí obrazovce a v detailu vozidla; `/timeline` přesměruje): tankování, servis,
+  výdaje, pneumatiky, poznámky, nákup a prodej v jednom seznamu po měsících, filtr podle vozidla, období
+  a druhu události; každá událost má barvu a **ikonu** (tankování, servis, STK, výdaj, pojištění,
+  dálniční známka, parkování, pneumatiky, kontrola dezénu, poškození, nehoda, garáž, půjčení…) a zabírá
+  jeden řádek + zkrácený detail (kliknutím se zobrazí celý)
 
 ### Tankování
 - datum, čas, tachometr, palivo, množství (l / kWh / kg), cena za jednotku **nebo** celková cena
@@ -66,6 +80,10 @@ Smazání vozidla je schované dole ve formuláři úprav.
   jednou z více
 - **pravidelný servis** – časový a/nebo kilometrový interval od posledního servisu daného typu;
   upozornění, když zbývá méně než 10 % intervalu, nebo po termínu
+- **univerzální servisní intervaly** (`/service-intervals`, Servis → Servisní intervaly) – platí pro všechna
+  vozidla uživatele (volitelně jen auta nebo motorky), pokud u vozidla není interval stejného typu
+  nastaven jinak; vypnutý interval vozidla univerzální interval u vozidla vypne; nabídnou se doporučené
+  (olej, filtry, brzdová kapalina, rozvody, STK, klimatizace); u sdíleného vozidla platí intervaly vlastníka
 - **upomínky** podle data a/nebo tachometru, jednorázové i opakované (denně–ročně, po X km),
   nastavitelný předstih upozornění
 - upozornění se zobrazují na přehledu a v detailu vozidla a po uložení každého záznamu
@@ -89,8 +107,6 @@ Smazání vozidla je schované dole ve formuláři úprav.
 - **auto / motorka** (nastavuje se u vozidla): motorka má jen přední a zadní kolo a nedostává upozornění
   na zimní pneumatiky; v přehledu a seznamu vozidel je ikona druhu vozidla a typu nasazených pneumatik
   u SPZ (letní ☀, zimní ❄, univerzální = napůl vločka a slunce)
-- **rozměry pneumatik dle technického průkazu** u vozidla – nabízí se při zápisu nové pneumatiky; při
-  přezutí aplikace upozorní na pneumatiku jiného rozměru
 - **kontrola dezénu** – průběžné měření během roku na obrazovce s nákresem vozidla, kde se ke každému
   kolu zapíše hloubka (u kola je vidět i poslední naměřená hodnota); kontroly jsou na časové ose
 - **poškození** (pozice, popis, cena opravy jako výdaj k vozidlu, na kterém pneumatika byla)
@@ -114,6 +130,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
   - eDálnice veřejné API pro ověření platnosti nemají, platnost se proto počítá z nákupu
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
   průměrná spotřeba, grafy měsíčních nákladů, spotřeby a ceny paliva (každé tankování)
+- **vývoj najetých kilometrů** ve statistice vozidla: stav tachometru v čase (ze všech záznamů se stavem
+  tachometru) a najeto po měsících (lineárně mezi zápisy)
 - **spotřeba podle druhu paliva** – v detailu i statistikách vozidla: hlavní a alternativní palivo
   (např. benzín a LPG) zvlášť, v rámci druhu rozpad na konkrétní paliva (Natural 95 / 98) a natankované
   množství; benzín i LPG lze zapsat ve stejný čas a při stejném stavu tachometru, AdBlue apod.

@@ -85,9 +85,9 @@ def test_profile_key_and_lookup(app, db, timeline_api):
     client = register(app, "t@example.com")
     vid = add_vehicle(client)
 
-    # bez klíče: odkaz do profilu místo tlačítka
+    # bez klíče: bez tlačítka
     form = client.get("/fuel-records/add").text
-    assert "Načíst pumpu" not in form and "nastavte API klíč" in form
+    assert "Načíst pumpu" not in form
     assert client.get("/fuel-records/timeline-stop?date=2026-11-20&time=14:35").json()["status"] == "no_key"
 
     # neplatný tvar klíče

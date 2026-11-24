@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func
 
 from models import (
-    ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap, TireTreadCheck,
+    ServiceRecord, ServiceInterval, DefaultServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap, TireTreadCheck,
 )
 from models.vehicle_note import NOTE_CATEGORIES
 from models.maintenance import (
@@ -342,6 +342,95 @@ class ExpenseService(_RecordServiceBase):
 # Pravidelný servis
 # ----------------------------------------------------------------------
 
+@dataclass
+class EffectiveInterval:
+    """Univerzální interval použitý u konkrétního vozidla (vozidlo ho nemá nastavené samo)."""
+    vehicle: object
+    default: DefaultServiceInterval
+    is_default: bool = True
+    is_active: bool = True
+    id: int = None
+    start_date: date = None
+    start_odometer: int = None
+    note: str = None
+
+    @property
+    def vehicle_id(self):
+        return self.vehicle.id
+
+    @property
+    def service_type(self):
+        return self.default.service_type
+
+    @property
+    def interval_months(self):
+        return self.default.interval_months
+
+    @property
+    def interval_km(self):
+        return self.default.interval_km
+
+
+class DefaultIntervalService:
+    """Univerzální servisní intervaly uživatele (vlastníka vozidel)."""
+
+    def __init__(self, session):
+        self.session = session
+
+    def list_for_user(self, user_id):
+        return (self.session.query(DefaultServiceInterval)
+                .filter(DefaultServiceInterval.user_id == user_id)
+                .order_by(DefaultServiceInterval.service_type).all())
+
+    def get(self, interval_id, user_id):
+        interval = self.session.get(DefaultServiceInterval, interval_id)
+        if interval is None or interval.user_id != user_id:
+            raise NotFoundError("Interval nenalezen.")
+        return interval
+
+    def _validate(self, user_id, data, exclude_id=None):
+        service_type = _clean_str(data.get("service_type"), 50, "Typ servisu", required=True)
+        months = _positive_int(data.get("interval_months"), "Časový interval")
+        km = _positive_int(data.get("interval_km"), "Kilometrový interval")
+        if not months and not km:
+            raise ValidationError("Zadejte časový nebo kilometrový interval (nebo oba).")
+        kind = data.get("vehicle_kind") or None
+        if kind not in (None, "car", "moto"):
+            raise ValidationError("Neplatný druh vozidla.")
+        for other in self.list_for_user(user_id):
+            overlap = kind is None or other.vehicle_kind is None or other.vehicle_kind == kind
+            if other.id != exclude_id and overlap and other.service_type.lower() == service_type.lower():
+                raise ValidationError(f"Interval „{service_type}“ už máte nastavený.")
+        return {"service_type": service_type, "interval_months": months or None, "interval_km": km or None,
+                "vehicle_kind": kind}
+
+    def create(self, user_id, data):
+        interval = DefaultServiceInterval(user_id=user_id, **self._validate(user_id, data))
+        self.session.add(interval)
+        self.session.commit()
+        return interval
+
+    def update(self, interval, data):
+        for key, value in self._validate(interval.user_id, data, interval.id).items():
+            setattr(interval, key, value)
+        self.session.commit()
+        return interval
+
+    def delete(self, interval):
+        self.session.delete(interval)
+        self.session.commit()
+
+    def add_suggested(self, user_id):
+        from models.maintenance import SUGGESTED_INTERVALS
+        existing = {i.service_type.lower() for i in self.list_for_user(user_id)}
+        for service_type, kind, months, km in SUGGESTED_INTERVALS:
+            if service_type.lower() not in existing:
+                self.session.add(DefaultServiceInterval(user_id=user_id, service_type=service_type,
+                                                        vehicle_kind=kind, interval_months=months,
+                                                        interval_km=km))
+        self.session.commit()
+
+
 class ServiceIntervalService(_RecordServiceBase):
     model = ServiceInterval
     date_column = "id"
@@ -353,6 +442,32 @@ class ServiceIntervalService(_RecordServiceBase):
         if only_active:
             query = query.filter(ServiceInterval.is_active.is_(True))
         return query.order_by(ServiceInterval.vehicle_id, ServiceInterval.service_type).all()
+
+    def effective_for_vehicles(self, vehicles, only_active=True):
+        """Intervaly vozidel včetně univerzálních intervalů vlastníka.
+
+        Interval nastavený u vozidla má přednost před univerzálním se stejným typem servisu
+        (i vypnutý - tím jde univerzální interval u vozidla vypnout).
+        """
+        vehicles = list(vehicles)
+        own = self.list_for_vehicles([v.id for v in vehicles], only_active=False)
+        owner_ids = {v.owner_id for v in vehicles if v.owner_id}
+        defaults = []
+        if owner_ids:
+            defaults = (self.session.query(DefaultServiceInterval)
+                        .filter(DefaultServiceInterval.user_id.in_(owner_ids))
+                        .order_by(DefaultServiceInterval.service_type).all())
+        result = []
+        for vehicle in vehicles:
+            mine = [i for i in own if i.vehicle_id == vehicle.id]
+            taken = {i.service_type.lower() for i in mine}
+            items = [i for i in mine if i.is_active or not only_active]
+            for d in defaults:
+                if d.user_id == vehicle.owner_id and d.applies_to(vehicle) and d.service_type.lower() not in taken:
+                    taken.add(d.service_type.lower())
+                    items.append(EffectiveInterval(vehicle, d))
+            result.extend(sorted(items, key=lambda i: i.service_type.lower()))
+        return result
 
     def _validate(self, data):
         _ensure_vehicle(self.session, data.get("vehicle_id"))
@@ -529,7 +644,7 @@ def collect_alerts(session, vehicles, only_alerts=True, today=None):
     odometers = {vid: vehicle_service.get_current_odometer(vid) for vid in ids}
 
     alerts = []
-    for interval in interval_service.list_for_vehicles(ids):
+    for interval in interval_service.effective_for_vehicles(vehicles):
         status = interval_service.get_status(interval, odometers[interval.vehicle_id], today)
         if status.is_alert or not only_alerts:
             alerts.append(Alert(vehicles_by_id[interval.vehicle_id], "interval",

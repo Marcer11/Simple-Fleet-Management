@@ -36,27 +36,23 @@
                 {% for s in seasons %}<option value="{{ s }}"{% if m.val('season') == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
             </select>
         </div>
-        {{ m.field("manufacturer", "Výrobce", required=true, maxlength=50, placeholder="např. Michelin", autocomplete="off") }}
-        {{ m.field("model", "Model", maxlength=50, placeholder="např. Alpin 6", autocomplete="off") }}
+        {{ m.field("manufacturer", "Výrobce", required=true, maxlength=50, autocomplete="off") }}
+        {{ m.field("model", "Model", maxlength=50, autocomplete="off") }}
         <div class="field">
             <label for="f-size">Rozměr</label>
-            <input id="f-size" name="size" type="text" maxlength="30" value="{{ m.val('size') }}" placeholder="např. 205/55 R16 91H" autocomplete="off"{% if vehicle_sizes %} list="vehicle-sizes"{% endif %}>
-            {% if vehicle_sizes %}
-            <datalist id="vehicle-sizes">{% for size, name in vehicle_sizes %}<option value="{{ size }}" label="{{ name }}">{% endfor %}</datalist>
-            <small class="help">Dle TP: {% for size, name in vehicle_sizes %}{{ name }} {{ size }}{% if not loop.last %} · {% endif %}{% endfor %}</small>
-            {% endif %}
+            <input id="f-size" name="size" type="text" maxlength="30" value="{{ m.val('size') }}" autocomplete="off">
         </div>
-        {{ m.field("quantity", "Počet kusů", "number", min=1, max=8, help="1 = jedna guma, 2 = pár, 4 = sada") }}
+        {{ m.field("quantity", "Počet kusů", "number", min=1, max=8) }}
         <div class="field">
             <label for="f-rim">Disky</label>
             <select id="f-rim" name="rim">
                 {% for value, label in rims.items() %}<option value="{{ value }}"{% if m.val('rim') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
-        {{ m.field("production_year", "Rok výroby", "number", min=1990, max=today.year + 1, help="Z kódu DOT na boku pneumatiky") }}
-        {{ m.field("dot", "DOT (týden a rok)", maxlength=10, placeholder="např. 2322", autocomplete="off") }}
-        {{ m.field("new_tread_mm", "Dezén při nákupu (mm)", inputmode="decimal", placeholder="např. 8,0", autocomplete="off", help="Z něj se počítá opotřebení") }}
-        {{ m.field("storage_location", "Místo uložení", maxlength=100, placeholder="např. sklep, pneuservis Novák", autocomplete="off") }}
+        {{ m.field("production_year", "Rok výroby", "number", min=1990, max=today.year + 1) }}
+        {{ m.field("dot", "DOT (týden a rok)", maxlength=10, autocomplete="off") }}
+        {{ m.field("new_tread_mm", "Dezén při nákupu (mm)", inputmode="decimal", autocomplete="off") }}
+        {{ m.field("storage_location", "Místo uložení", maxlength=100, autocomplete="off") }}
     </div>
     <h3 class="form-section">Nákup</h3>
     <div class="form-grid">
@@ -68,7 +64,6 @@
                 <option value="">– nezapisovat –</option>
                 {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('expense_vehicle_id') == v.id|string %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
             </select>
-            <small class="help">Výdaj „Pneumatiky“ se založí a s cenou upraví.</small>
         </div>
     </div>
     {{ m.textarea("note", "Poznámka") }}
@@ -76,7 +71,7 @@
         <summary>Vyřazení</summary>
         <div class="form-grid" style="margin-top: 10px">
             {{ m.field("retired_date", "Vyřazeno dne", "date") }}
-            {{ m.field("retired_reason", "Důvod", maxlength=200, placeholder="např. sjeté, stáří, prodáno", autocomplete="off") }}
+            {{ m.field("retired_reason", "Důvod", maxlength=200, autocomplete="off") }}
         </div>
     </details>
     <div class="form-actions">

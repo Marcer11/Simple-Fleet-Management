@@ -28,18 +28,17 @@
             <input id="f-fuel_type" name="fuel_type" type="text" required maxlength="30" list="fuel-types" value="{{ m.val('fuel_type') }}" autocomplete="off">
             {{ m.datalist("fuel-types", fuel_types) }}
             <script type="application/json" id="fuel-options">{{ {"fuels": fuel_options, "patterns": brand_patterns}|tojson }}</script>
-            <small class="help" id="fuel-type-help">Nové palivo se uloží do nabídky. <a href="/fuel-types">Upravit seznam paliv</a></small>
         </div>
-        {{ m.field("volume_liters", "Množství (l / kWh / kg)", required=true, inputmode="decimal", placeholder="0,00", autocomplete="off") }}
-        {{ m.field("unit_price", "Cena za jednotku", inputmode="decimal", placeholder="0,000", autocomplete="off", help="Stačí vyplnit jednu z cen, druhá se dopočítá.") }}
+        {{ m.field("volume_liters", "Množství (l / kWh / kg)", required=true, inputmode="decimal", autocomplete="off") }}
+        {{ m.field("unit_price", "Cena za jednotku", inputmode="decimal", autocomplete="off") }}
         {{ m.price_fields(currencies, "Celková cena") }}
     </div>
 
     <fieldset>
         <legend>Výpočet spotřeby</legend>
         <div class="form-grid">
-            {{ m.checkbox("full_tank", "Natankováno do plna", "Spotřeba se počítá mezi dvěma plnými nádržemi.") }}
-            {{ m.checkbox("skipped_refuel", "Předchozí tankování nebylo zapsáno", "Úsek se pak do spotřeby nezapočítá.") }}
+            {{ m.checkbox("full_tank", "Natankováno do plna") }}
+            {{ m.checkbox("skipped_refuel", "Předchozí tankování nebylo zapsáno") }}
         </div>
     </fieldset>
 
@@ -58,7 +57,6 @@
                 {% if timeline_ready %}
                 <small class="help" id="timeline-status" aria-live="polite"></small>
                 {% elif timeline_enabled %}
-                <small class="help">Pumpu lze dohledat z Timeline – <a href="/profile">nastavte API klíč v profilu</a>.</small>
                 {% endif %}
             </div>
             {{ m.field("station_address", "Adresa stanice", maxlength=200) }}

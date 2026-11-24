@@ -211,6 +211,30 @@ window.SfmCharts = (function () {
         });
     }
 
+    // Jednoduchý sloupcový graf po měsících (labels "YYYY-MM")
+    function monthlyBars(id, labels, values, label, unit) {
+        const el = document.getElementById(id);
+        if (!el || !window.Chart) return;
+        const p = setup();
+        const a = axes(unit);
+        return new Chart(el, {
+            type: "bar",
+            data: {
+                labels: labels.map(formatX),
+                datasets: [{ label, data: values, backgroundColor: p.series[0], borderRadius: 4,
+                             borderSkipped: "start", maxBarThickness: 36 }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: a,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (c) => `${label}: ${nf(0).format(c.parsed.y)} ${unit}` } },
+                },
+            },
+        });
+    }
+
     function unitOf(fuelName) {
         return /elekt/i.test(fuelName) ? "kWh" : (/cng/i.test(fuelName) ? "kg" : "l");
     }
@@ -220,5 +244,5 @@ window.SfmCharts = (function () {
         return el ? JSON.parse(el.textContent) : null;
     }
 
-    return { lineChart, timeChart, monthlyCosts, unitOf, readData };
+    return { lineChart, timeChart, monthlyCosts, monthlyBars, unitOf, readData };
 })();

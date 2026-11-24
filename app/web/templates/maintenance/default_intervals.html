@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Servisní intervaly{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Servisní intervaly</h1>
+        <div class="sub">Platí pro všechna vaše vozidla, pokud u vozidla nenastavíte jinak.</div>
+    </div>
+    <div class="actions"><a class="btn" href="/services">Servis</a></div>
+</div>
+
+<div class="card">
+    {% if intervals %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Servis</th><th>Pro vozidla</th><th class="num">Měsíce</th><th class="num">Kilometry</th><th></th></tr></thead>
+        <tbody>
+        {% for i in intervals %}
+        <tr{% if interval and interval.id == i.id %} class="row-active"{% endif %}>
+            <td><strong>{{ i.service_type }}</strong></td>
+            <td>{{ {"car": "Auta", "moto": "Motorky"}.get(i.vehicle_kind, "Všechna") }}</td>
+            <td class="num">{{ i.interval_months or "–" }}</td>
+            <td class="num">{{ i.interval_km|km if i.interval_km else "–" }}</td>
+            <td class="actions-cell">
+                <div class="actions" style="justify-content: flex-end">
+                    <a class="btn btn-sm" href="/service-intervals/{{ i.id }}/edit">Upravit</a>
+                    {{ m.delete_button("/service-intervals/%d/delete"|format(i.id), "Odstranit interval „%s“?"|format(i.service_type)) }}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <p>Zatím nemáte žádné univerzální intervaly.</p>
+        <form method="post" action="/service-intervals/suggested">
+            {{ m.csrf() }}
+            <button class="btn btn-primary" type="submit">Přidat doporučené (olej, filtry, rozvody, STK…)</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<form method="post" class="card" action="{{ '/service-intervals/%d/edit'|format(interval.id) if interval else '/service-intervals' }}">
+    <h2>{{ "Upravit interval" if interval else "Nový interval" }}</h2>
+    {{ m.csrf() }}
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-service_type">Servis <span class="req">*</span></label>
+            <input id="f-service_type" name="service_type" type="text" required maxlength="50" list="service-types" value="{{ m.val('service_type') }}" autocomplete="off">
+            {{ m.datalist("service-types", service_types) }}
+        </div>
+        {{ m.select("vehicle_kind", "Pro vozidla", kind_options) }}
+        {{ m.field("interval_months", "Interval (měsíce)", "number", min=1, max=240) }}
+        {{ m.field("interval_km", "Interval (km)", "number", min=1, step=1) }}
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{{ "Uložit" if interval else "Přidat" }}</button>
+        {% if interval %}<a class="btn" href="/service-intervals">Zrušit</a>{% endif %}
+    </div>
+</form>
+{% endblock %}

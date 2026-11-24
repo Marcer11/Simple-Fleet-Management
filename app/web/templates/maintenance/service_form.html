@@ -14,8 +14,7 @@
         <label class="check"><input type="checkbox" name="{{ type_prefix }}{{ t }}" value="on"{% if values.get(type_prefix ~ t) %} checked{% endif %}> {{ t }}</label>
         {% endfor %}
     </div>
-    <input id="f-service_type_other" name="service_type_other" type="text" maxlength="200" value="{{ m.val('service_type_other') }}" autocomplete="off" placeholder="Jiné – více položek oddělte čárkou" aria-label="Jiné položky servisu">
-    <small class="help">Zaškrtněte vše, co se v servisu dělalo. Pravidelný servis se stejným názvem se počítá od tohoto záznamu.</small>
+    <input id="f-service_type_other" name="service_type_other" type="text" maxlength="200" value="{{ m.val('service_type_other') }}" autocomplete="off" aria-label="Jiné položky servisu">
 </fieldset>
 {{ m.price_fields(currencies, "Cena") }}
 {{ m.textarea("note", "Poznámka / provedené práce") }}

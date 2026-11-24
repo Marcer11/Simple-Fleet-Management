@@ -56,12 +56,40 @@
 </div>
 {% endif %}
 
+{% if summary.charts.odometer|length > 1 %}
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Stav tachometru</h2>
+        <div class="chart-box"><canvas id="chart-odometer" role="img" aria-label="Stav tachometru v čase"></canvas></div>
+    </div>
+    <div class="card">
+        <h2>Najeto po měsících</h2>
+        {% if summary.charts.monthly_km %}
+        <div class="chart-box"><canvas id="chart-monthly-km" role="img" aria-label="Najeté kilometry po měsících"></canvas></div>
+        <details style="margin-top: 10px">
+            <summary class="small">Zobrazit jako tabulku</summary>
+            <div class="table-wrap">
+            <table>
+                <thead><tr><th>Měsíc</th><th class="num">Najeto</th></tr></thead>
+                <tbody>
+                {% for label in summary.charts.monthly_km_labels %}
+                <tr><td>{{ label }}</td><td class="num">{{ summary.charts.monthly_km[loop.index0]|km }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </details>
+        {% else %}<div class="empty small">Málo záznamů.</div>{% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="grid grid-2">
     <div class="card">
         <h2>Spotřeba</h2>
         {% if summary.charts.consumption %}
         <div class="chart-box"><canvas id="chart-consumption" role="img" aria-label="Spotřeba v čase"></canvas></div>
-        {% else %}<div class="empty small">Spotřeba se počítá mezi dvěma tankováními do plné nádrže.</div>{% endif %}
+        {% else %}<div class="empty small">Málo záznamů.</div>{% endif %}
     </div>
     <div class="card">
         <h2>Cena paliva za jednotku (Kč)</h2>
@@ -93,12 +121,14 @@
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=3"></script>
+<script src="/static/charts.js?v=4"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
     SfmCharts.monthlyCosts("chart-monthly", data);
+    SfmCharts.timeChart("chart-odometer", { "Tachometr": data.odometer }, { unit: "km" });
+    SfmCharts.monthlyBars("chart-monthly-km", data.monthly_km_labels, data.monthly_km, "Najeto", "km");
     const units = [...new Set(Object.keys(data.consumption).map(SfmCharts.unitOf))];
     SfmCharts.timeChart("chart-consumption", data.consumption, {
         decimals: 2, unit: units.map((u) => u + "/100 km").join(", "),

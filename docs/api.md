@@ -73,6 +73,7 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "sale": {"date": null, "odometer": null, "price_czk": null},
       "vignette": {"status": "valid", "date": "2027-02-28"},
       "is_rental": false,
+      "lender": null,
       "rental": null,
       "last_record": "2026-11-20",
       "note": "Servisní knížka v příruční schránce",
@@ -108,7 +109,8 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "sale": {"date": null, "odometer": null, "price_czk": null},
       "vignette": null,
       "is_rental": true,
-      "rental": {"provider": "Půjčovna AutoPraha", "from": "2026-05-01T08:30:00", "to": "2026-05-04"},
+      "lender": "Půjčovna AutoPraha",
+      "rental": {"from": "2026-05-01T08:30:00", "to": "2026-05-04"},
       "last_record": "2026-05-04",
       "note": null,
       "notes": []
@@ -146,7 +148,8 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `sale` | prodej: `date`, `odometer` (km), `price_czk` |
 | `vignette` | česká dálniční známka podle zapsaných výdajů, nebo `null`, když žádná není zapsaná. `status`: `valid` (platí, `date` = poslední den platnosti), `expiring` (platí, ale končí do 7 dní), `future` (koupená dopředu, `date` = první den platnosti), `expired` (`date` = poslední den poslední známky) |
 | `is_rental` | půjčené vozidlo (půjčovna, od známého) |
-| `rental` | jen u půjčeného vozidla: poslední půjčení. `provider` (od koho), `from` a `to` (datum `YYYY-MM-DD`, nebo datum a čas `YYYY-MM-DDTHH:MM:SS`, když je čas zapsaný; `to` je `null`, dokud není vráceno) |
+| `lender` | koho auto je – půjčovna nebo od koho je půjčené (text tak, jak je zapsaný u vozidla); u vlastních vozidel `null` |
+| `rental` | jen u půjčeného vozidla: poslední půjčení. `from` a `to` (datum `YYYY-MM-DD`, nebo datum a čas `YYYY-MM-DDTHH:MM:SS`, když je čas zapsaný; `to` je `null`, dokud není vráceno) |
 | `last_record` | datum posledního záznamu u vozidla (tankování, servis, výdaj, poznámka, pneumatiky, půjčení, nákup / prodej), jen do dneška |
 | `note` | poznámka v údajích vozidla (jeden text, např. kde je servisní knížka) |
 | `notes` | poznámky k vozidlu v čase (jako na časové ose: garáž, nehoda, poškození…), od nejnovější. `id`, `time` (místní čas), `odometer` (km nebo `null`), `category` (typ poznámky nebo `null`), `text` (může mít víc řádků, nebo `null`), `author` (jméno uživatele, který poznámku zapsal) |

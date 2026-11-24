@@ -34,7 +34,7 @@
         {% for v in vehicles %}
         {% set cons = consumption.get(v.id) or {} %}
         <tr{% if not v.in_use %} class="muted-row"{% endif %}>
-            <td class="nowrap" data-sort="{{ v.brand }} {{ v.model }}">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a>{% if v.is_rental %} <span class="badge badge-info">Půjčené</span>{% endif %} {{ m.role_badge(roles.get(v.id)) }}</td>
+            <td class="nowrap" data-sort="{{ v.brand }} {{ v.model }}">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a>{% if v.is_rental %} <span class="badge badge-info"{% if v.lender %} title="{{ v.lender }}"{% endif %}>Půjčené</span>{% endif %} {{ m.role_badge(roles.get(v.id)) }}</td>
             <td class="nowrap">{{ v.license_plate or "–" }}</td>
             <td class="num">{{ v.production_year or "–" }}</td>
             <td class="num nowrap">{{ odometers.get(v.id)|km }}</td>

@@ -54,9 +54,10 @@ vypršela nebo platí až od budoucího data; navazující známka koupená dop�
 Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Půjčená vozidla
-- vozidlo lze označit jako **půjčené** (formulář vozidla skryje údaje o nákupu a prodeji a po založení rovnou
-  nabídne zápis půjčení)
-- **půjčení** (opakovaně u stejného vozidla): půjčovna / od koho, půjčeno od – do, kilometry při půjčení
+- vozidlo lze označit jako **půjčené** (formulář vozidla skryje údaje o nákupu a prodeji, ukáže pole
+  „Koho auto je“ – půjčovna / od koho, a po založení rovnou nabídne zápis půjčení); „Koho auto je“ se
+  zobrazuje v detailu vozidla, v názvu půjčení a vrácení na časové ose a předává se v API (`lender`)
+- **půjčení** (opakovaně u stejného vozidla): půjčeno od – do, kilometry při půjčení
   a vrácení (najeto), půjčovné v libovolné měně (převod kurzem ČNB), poznámka; 0 km je platný stav
 - u půjčení lze zadat i čas půjčení a vrácení; bez času se vrácení řadí na konec dne (po tankování téhož dne)
 - půjčení a vrácení jsou na časové ose jako dvě události (vrácení s počtem dní a najetými km); v detailu
@@ -266,7 +267,7 @@ Authorization: Bearer fk_…
 ```
 - stejný klíč; `status=active` (výchozí) jen aktivní vozidla (jako „Jen aktivní“), `status=all` všechna
 - vrací vlastní i sdílená vozidla s údaji: SPZ, značka, model, druh, rok výroby, objem motoru, výkon,
-  VIN, barva (i barva pro zobrazení), stav (`active` / `inactive` / `sold` / `returned`), role uživatele,
+  VIN, barva (i barva pro zobrazení), koho je půjčené auto, stav (`active` / `inactive` / `sold` / `returned`), role uživatele,
   vlastník, tachometr, tankovaná paliva, průměrná spotřeba podle druhu paliva, rozměry pneumatik, nákup
   a prodej, dálniční známka, poslední půjčení, datum posledního záznamu, poznámka z údajů vozidla
   a poznámky k vozidlu v čase (od nejnovější)

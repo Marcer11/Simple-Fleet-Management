@@ -199,7 +199,6 @@ register_crud(router, CrudConfig(
 def _read_rental(form):
     data = {
         "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
-        "provider": form.str("provider", "Půjčovna / od koho", required=True, max_len=100),
         "date_from": form.date("date_from", "Půjčeno od", required=True),
         "time_from": form.time("time_from", "Čas půjčení"),
         "date_to": form.date("date_to", "Půjčeno do"),
@@ -217,7 +216,7 @@ def _read_rental(form):
 
 def _rental_values(r):
     return {
-        "vehicle_id": str(r.vehicle_id), "provider": r.provider, "date_from": iso(r.date_from),
+        "vehicle_id": str(r.vehicle_id), "date_from": iso(r.date_from),
         "time_from": r.time_from.strftime("%H:%M") if r.time_from else "",
         "date_to": iso(r.date_to), "time_to": r.time_to.strftime("%H:%M") if r.time_to else "",
         "odometer_from": iso(r.odometer_from), "odometer_to": iso(r.odometer_to),
@@ -229,8 +228,7 @@ def _rental_values(r):
 def _rental_context(db, user):
     from web.common import editable_vehicles
     vehicles = editable_vehicles(db, user)
-    providers = sorted({r.provider for v in vehicles if v.is_rental for r in v.rentals})
-    return {"vehicles": [v for v in vehicles if v.is_rental], "providers": providers}
+    return {"vehicles": [v for v in vehicles if v.is_rental]}
 
 
 register_crud(router, CrudConfig(

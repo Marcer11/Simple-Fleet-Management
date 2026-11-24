@@ -30,6 +30,7 @@ def _vehicle_values(vehicle):
         "note": vehicle.note or "", "is_active": "on" if vehicle.is_active else "",
         "purchase_price": iso(vehicle.purchase_price), "sale_price": iso(vehicle.sale_price),
         "tire_sizes": vehicle.tire_sizes or "", "is_rental": "on" if vehicle.is_rental else "",
+        "lender": vehicle.lender or "",
         "purchase_odometer": iso(vehicle.purchase_odometer), "sale_odometer": iso(vehicle.sale_odometer),
     }
 
@@ -56,6 +57,7 @@ def _read_vehicle_form(form):
         "note": form.str("note", "Poznámka"),
         "tire_sizes": form.str("tire_sizes", "Rozměry pneumatik", max_len=500),
         "is_rental": form.bool("is_rental"),
+        "lender": form.str("lender", "Koho auto je", max_len=100),
     }
     form.check()
     return data
@@ -84,9 +86,15 @@ async def list_vehicles(request: Request, show: str = "all", user=Depends(get_cu
                   show=show, inactive_count=inactive_count, tires=mounted_seasons(db, [v.id for v in vehicles]))
 
 
+def _lenders(db, user):
+    """Půjčovny / lidé, od kterých už uživatel auto měl (nabídka ve formuláři)."""
+    return sorted({v.lender for v in VehicleService(db).get_vehicles_for_user(user) if v.lender}, key=str.lower)
+
+
 @router.get("/add")
-async def add_vehicle_form(request: Request, user=Depends(get_current_user)):
-    return render(request, "vehicles/form.html", vehicle=None, values={"color_hex": "#FFFFFF", "kind": "car"})
+async def add_vehicle_form(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    return render(request, "vehicles/form.html", vehicle=None, values={"color_hex": "#FFFFFF", "kind": "car"},
+                  lenders=_lenders(db, user))
 
 
 @router.post("/add")
@@ -96,7 +104,8 @@ async def add_vehicle_post(request: Request, user=Depends(get_current_user), db=
         data = _read_vehicle_form(form)
         vehicle = VehicleService(db).create_vehicle(owner_id=user.id, **data)
     except ValidationError as e:
-        return render(request, "vehicles/form.html", status_code=400, vehicle=None, values=form.values, error=str(e))
+        return render(request, "vehicles/form.html", status_code=400, vehicle=None, values=form.values, error=str(e),
+                      lenders=_lenders(db, user))
     flash(request, f"Vozidlo {vehicle.display_name} bylo přidáno.")
     if vehicle.is_rental:  # u půjčeného vozidla rovnou zápis půjčení
         return RedirectResponse(f"/rentals/add?vehicle_id={vehicle.id}", status_code=303)
@@ -143,7 +152,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
 async def edit_vehicle_form(request: Request, vehicle_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     vehicle = VehicleService(db).get_vehicle_for_user(vehicle_id, user, ROLE_EDITOR)
     return render(request, "vehicles/form.html", vehicle=vehicle, values=_vehicle_values(vehicle),
-                  is_owner=vehicle.owner_id == user.id)
+                  is_owner=vehicle.owner_id == user.id, lenders=_lenders(db, user))
 
 
 @router.post("/{vehicle_id}/edit")
@@ -156,7 +165,7 @@ async def edit_vehicle_post(request: Request, vehicle_id: int, user=Depends(get_
     except ValidationError as e:
         db.rollback()
         return render(request, "vehicles/form.html", status_code=400, vehicle=vehicle, values=form.values,
-                      error=str(e), is_owner=vehicle.owner_id == user.id)
+                      error=str(e), is_owner=vehicle.owner_id == user.id, lenders=_lenders(db, user))
     flash(request, "Změny byly uloženy.")
     return RedirectResponse(f"/vehicles/{vehicle_id}", status_code=303)
 

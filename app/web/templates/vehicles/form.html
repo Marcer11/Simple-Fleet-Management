@@ -11,6 +11,11 @@
     <div class="form-grid">
         {{ m.select("kind", "Druh vozidla", [("car", "Auto"), ("moto", "Motorka")]) }}
         {{ m.checkbox("is_rental", "Půjčené vozidlo") }}
+        <div class="field" data-show-when="f-is_rental">
+            <label for="f-lender">Koho auto je (půjčovna / od koho)</label>
+            <input id="f-lender" name="lender" type="text" maxlength="100" list="lenders" value="{{ m.val('lender') }}" autocomplete="off">
+            {{ m.datalist("lenders", lenders or []) }}
+        </div>
         {{ m.field("brand", "Značka", required=true, maxlength=50) }}
         {{ m.field("model", "Model", required=true, maxlength=50) }}
         {{ m.field("license_plate", "SPZ", maxlength=12, style="text-transform: uppercase") }}

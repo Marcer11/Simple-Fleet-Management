@@ -208,8 +208,8 @@ def vehicles(session, user, only_active=True):
             "sale": {"date": _iso(v.sale_date), "odometer": v.sale_odometer, "price_czk": _number(v.sale_price)},
             "vignette": {"status": vignette[0], "date": _iso(vignette[1])} if vignette else None,
             "is_rental": bool(v.is_rental),
+            "lender": v.lender,
             "rental": {
-                "provider": rental.provider,
                 "from": _iso(datetime.combine(rental.date_from, rental.time_from) if rental.time_from
                              else rental.date_from),
                 "to": _iso(datetime.combine(rental.date_to, rental.time_to) if rental.date_to and rental.time_to

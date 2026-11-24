@@ -15,7 +15,7 @@ def rental(client, vid, **data):
 def test_rental_vehicle_with_repeated_rentals(app, db):
     from services.stats_service import StatsService
     client = register(app, "rent@example.com")
-    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on"})
+    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on", "lender": "Půjčovna AutoPraha"})
     assert r.status_code == 303 and r.headers["location"].startswith("/rentals/add?vehicle_id=")
     vid = int(r.headers["location"].rsplit("=", 1)[1])
     assert db.get(Vehicle, vid).is_rental is True
@@ -25,11 +25,15 @@ def test_rental_vehicle_with_repeated_rentals(app, db):
     assert "Toyota Yaris</option>" in form and "Škoda Octavia</option>" not in form
 
     assert rental(client, vid).status_code == 303
-    # stejné auto podruhé, od známého, v eurech
-    assert rental(client, vid, provider="Petr", date_from="2026-08-10", date_to="2026-08-12",
+    # stejné auto podruhé, v eurech
+    assert rental(client, vid, date_from="2026-08-10", date_to="2026-08-12",
                   odometer_from="15800", odometer_to="16100", price_paid="40", currency_code="EUR").status_code == 303
     rentals = db.query(VehicleRental).order_by(VehicleRental.date_from).all()
-    assert [x.provider for x in rentals] == ["Půjčovna AutoPraha", "Petr"]
+    assert len(rentals) == 2 and db.get(Vehicle, vid).lender == "Půjčovna AutoPraha"
+    assert "Koho auto je" not in form and 'name="provider"' not in form  # od koho je u vozidla
+    assert "Půjčené · Půjčovna AutoPraha" in client.get(f"/vehicles/{vid}").text
+    assert 'value="Půjčovna AutoPraha"' in client.get(f"/vehicles/{vid}/edit").text
+    assert '<option value="Půjčovna AutoPraha">' in client.get("/vehicles/add").text
     assert rentals[0].distance == 800 and rentals[1].price_local == 1000  # 40 EUR * 25
     # kontroly
     r = rental(client, vid, date_from="2026-09-10", date_to="2026-09-01")
@@ -57,13 +61,13 @@ def test_rental_vehicle_with_repeated_rentals(app, db):
     assert "Půjčovna AutoPraha" in detail and "/rentals/add?vehicle_id=" in detail and "Půjčené" in detail
     page = client.get("/stats?period=2026").text
     assert "Půjčovné" in page and 'data-chart-optional="chart-odometer"' in page
-    assert "Půjčení – Petr" in client.get("/?all=1").text
+    assert "Půjčení – Půjčovna AutoPraha" in client.get("/?all=1").text
     assert "Půjčené" in client.get("/vehicles").text
 
 
 def test_rental_zero_km_and_vehicle_form(app, db):
     client = register(app, "rent0@example.com")
-    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on"})
+    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on", "lender": "Půjčovna AutoPraha"})
     vid = int(r.headers["location"].rsplit("=", 1)[1])
     assert rental(client, vid, odometer_from="0", odometer_to="", price_paid="").status_code == 303
     r = db.query(VehicleRental).one()
@@ -77,7 +81,7 @@ def test_returned_rental_is_inactive_and_two_timeline_events(app, db):
     from datetime import timedelta
     from services.events import collect_events
     client = register(app, "ret@example.com")
-    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on"})
+    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on", "lender": "Půjčovna AutoPraha"})
     vid = int(r.headers["location"].rsplit("=", 1)[1])
     today = date.today()
     # běžící půjčení (vrácení až zítra) -> aktivní
@@ -163,7 +167,7 @@ def test_rental_times_order_timeline(app, db):
     from datetime import datetime, time
     from services.events import collect_events
     client = register(app, "times@example.com")
-    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on"})
+    r = post(client, "/vehicles/add", {"brand": "Toyota", "model": "Yaris", "is_rental": "on", "lender": "Půjčovna AutoPraha"})
     vid = int(r.headers["location"].rsplit("=", 1)[1])
     day = date(2026, 5, 4)
     # vrácení bez času je až po tankování téhož dne

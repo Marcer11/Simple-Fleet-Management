@@ -19,6 +19,7 @@ VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
     "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
     "tire_sizes", "purchase_odometer", "sale_odometer", "is_rental", "engine_volume", "engine_power",
+    "lender",
 )
 
 
@@ -108,7 +109,7 @@ class VehicleService:
         data = {key: value for key, value in data.items() if key in VEHICLE_FIELDS}
         errors = []
 
-        for key in ("brand", "model", "color", "note"):
+        for key in ("brand", "model", "color", "note", "lender"):
             if key in data and isinstance(data[key], str):
                 data[key] = data[key].strip() or None
 
@@ -126,6 +127,8 @@ class VehicleService:
             errors.append("Model může mít nejvýše 50 znaků.")
         if data.get("color") and len(data["color"]) > 30:
             errors.append("Barva může mít nejvýše 30 znaků.")
+        if data.get("lender") and len(data["lender"]) > 100:
+            errors.append("Koho auto je: nejvýše 100 znaků.")
 
         if "license_plate" in data:
             data["license_plate"] = normalize_plate(data["license_plate"])

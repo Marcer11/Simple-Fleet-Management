@@ -4,11 +4,6 @@
 {% set back_url = "/vehicles" %}
 {% set delete_url = "/rentals/%d/delete"|format(record.id) if record else "" %}
 {% block fields %}
-<div class="field">
-    <label for="f-provider">Půjčovna / od koho <span class="req">*</span></label>
-    <input id="f-provider" name="provider" type="text" required maxlength="100" list="providers" value="{{ m.val('provider') }}" autocomplete="off">
-    {{ m.datalist("providers", providers) }}
-</div>
 {{ m.field("date_from", "Půjčeno od", "date", required=true) }}
 {{ m.field("time_from", "Čas půjčení", "time") }}
 {{ m.field("date_to", "Půjčeno do", "date") }}

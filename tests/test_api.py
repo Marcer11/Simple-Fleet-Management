@@ -160,6 +160,7 @@ def test_api_vehicles(app):
     assert [x["plate"] for x in everything] == ["1AB2345", "2CD3456"]
     fabia = everything[1]
     assert fabia["consumption"] == [] and fabia["notes"] == []
+    assert v["lender"] is None and fabia["lender"] is None
     assert fabia["engine_volume"] is None and fabia["engine_power"] is None
     assert fabia["active"] is False and fabia["status"] == "sold"
     assert fabia["sale"] == {"date": "2025-01-10", "odometer": 0, "price_czk": None}

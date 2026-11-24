@@ -392,7 +392,7 @@ class RentalService(_RecordServiceBase):
             data.get("price_paid"), data.get("currency_code"), data["date_from"], manual_rate)
         return {
             "vehicle_id": data["vehicle_id"],
-            "provider": _clean_str(data.get("provider"), 100, "Půjčovna / od koho", required=True),
+            "provider": _clean_str(data.get("provider"), 100, "Půjčovna / od koho"),  # jen starší záznamy
             "date_from": data["date_from"],
             "time_from": time_from,
             "date_to": date_to,

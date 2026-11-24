@@ -118,7 +118,7 @@ class VehicleRental(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
-    provider = Column(String(100), nullable=False)
+    provider = Column(String(100), nullable=True)  # dřívější „od koho“ - nově je u vozidla (Vehicle.lender)
     date_from = Column(Date, nullable=False)
     time_from = Column(Time, nullable=True)
     date_to = Column(Date, nullable=True)

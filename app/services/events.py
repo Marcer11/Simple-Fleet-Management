@@ -93,6 +93,11 @@ def _qty(value):
     return text.replace(".", ",")
 
 
+def _rental_title(action, rental):
+    lender = rental.vehicle.lender or rental.provider
+    return f"{action} – {lender}" if lender else action
+
+
 def _day(d):
     return datetime.combine(d, time(0, 0))
 
@@ -215,7 +220,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                     parts.append(r.note.strip())
                 events.append(Event(KIND_RENTAL, datetime.combine(r.date_from, r.time_from or time(0, 0)),
                                     r.time_from is not None, by_id[r.vehicle_id],
-                                    f"Půjčení – {r.provider}", " · ".join(parts), r.odometer_from, r.price_local, url))
+                                    _rental_title("Půjčení", r), " · ".join(parts), r.odometer_from,
+                                    r.price_local, url))
             if r.date_to and in_range(_day(r.date_to)):
                 parts = []
                 if r.days:
@@ -225,7 +231,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                 # vrácení bez času patří na konec dne (po tankování a dalších záznamech toho dne)
                 events.append(Event(KIND_RENTAL, datetime.combine(r.date_to, r.time_to or time(0, 0)),
                                     r.time_to is not None, by_id[r.vehicle_id],
-                                    f"Vrácení – {r.provider}", " · ".join(parts), r.odometer_to, None, url,
+                                    _rental_title("Vrácení", r), " · ".join(parts), r.odometer_to, None, url,
                                     icon="return", end_of_day=True))
 
     if KIND_NOTE in kinds:

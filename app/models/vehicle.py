@@ -45,6 +45,7 @@ class Vehicle(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     # Půjčené vozidlo (z půjčovny nebo od známých) - k němu se evidují jednotlivá půjčení
     is_rental = Column(Boolean, nullable=False, default=False, server_default="0")
+    lender = Column(String(100), nullable=True)             # koho je půjčené auto (půjčovna / od koho)
     # Povolené rozměry pneumatik dle technického průkazu - jeden na řádek ("205/55 R16 91V")
     tire_sizes = Column(String(500), nullable=True)
 

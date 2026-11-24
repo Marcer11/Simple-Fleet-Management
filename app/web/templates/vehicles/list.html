@@ -22,6 +22,7 @@
             <th>SPZ</th>
             <th>Rok</th>
             <th class="num">Tachometr</th>
+            <th>Pneu</th>
             <th>Stav</th>
             <th>Přístup</th>
         </tr>
@@ -29,10 +30,11 @@
     <tbody>
         {% for v in vehicles %}
         <tr>
-            <td>{{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a></td>
+            <td class="nowrap">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a></td>
             <td class="nowrap">{{ v.license_plate or "–" }}</td>
             <td>{{ v.production_year or "–" }}</td>
             <td class="num">{{ odometers.get(v.id)|km }}</td>
+            <td>{{ m.tire_icons(tires.get(v.id)) or "–" }}</td>
             <td>{% if v.is_active %}<span class="badge badge-ok">Aktivní</span>{% else %}<span class="badge">Neaktivní</span>{% endif %}</td>
             <td><span class="small">{{ role_labels[roles.get(v.id)] }}</span></td>
         </tr>

@@ -6,9 +6,9 @@
 {% set is_owner = role == "owner" %}
 <div class="page-head">
     <div>
-        <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }}</h1>
+        <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }} {{ m.tire_icons(tire_seasons) }}</h1>
         <div class="sub">
-            {{ vehicle.license_plate or "bez SPZ" }}
+            {{ m.vehicle_icon(vehicle) }} {{ vehicle.kind_label }} · {{ vehicle.license_plate or "bez SPZ" }}
             {% if not vehicle.is_active %}<span class="badge">Neaktivní</span>{% endif %}
             {{ m.role_badge(role) }}
             {% if not is_owner and owner %}<span class="small">· vlastník {{ owner.name }}</span>{% endif %}

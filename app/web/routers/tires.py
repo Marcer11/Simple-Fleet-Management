@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 
 from models.tire import (
     DAMAGE_POSITIONS, LEGAL_MIN_TREAD, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
+    positions_for,
 )
 from models.vehicle import ROLE_EDITOR
 from services.errors import NotFoundError, ValidationError
@@ -19,7 +20,7 @@ from web.forms import FormReader, iso, parse_filter_int, rate_from_record
 
 router = APIRouter()
 
-MOUNT_ROWS = 4
+MOUNT_ROWS = 5  # 4 kola + rezerva
 STATUSES = {"active": "Na voze a uskladněné", "mounted": "Na voze", "stored": "Uskladněné",
             "retired": "Vyřazené", "all": "Všechny"}
 
@@ -194,13 +195,28 @@ def _tire_location(tire):
     return "uskladněno" + (f" – {tire.storage_location}" if tire.storage_location else "")
 
 
+def _diagram(vehicle, current, tires):
+    """Data pro nákres vozidla při přezutí (JSON pro app.js)."""
+    return {
+        "kind": vehicle.kind or "car",
+        "slots": {k: sorted(v[1]) for k, v in TIRE_POSITIONS.items()},
+        "positions": positions_for(vehicle.kind),
+        "current": [{"id": m.id, "tire": m.tire_id, "label": m.tire.label, "season": m.tire.season,
+                     "position": m.position, "position_label": m.position_label,
+                     "wheels": [list(w) for w in m.wheels]} for m in current],
+        "tires": {str(t.id): {"label": t.label, "season": t.season, "full": t.full_label} for t in tires},
+    }
+
+
 def _swap_context(db, user, vehicle, swap=None):
     tires = TireService(db).list_for_user(user, include_retired=False)
+    current = open_mounts(db, vehicle.id) if vehicle and swap is None else []
     return {
         "vehicle": vehicle, "swap": swap, "vehicles": editable_vehicles(db, user),
-        "current": open_mounts(db, vehicle.id) if vehicle and swap is None else [],
+        "current": current,
+        "diagram": _diagram(vehicle, current, tires) if vehicle and swap is None else None,
         "tire_options": [(t, _tire_location(t)) for t in tires],
-        "positions": {k: v[0] for k, v in TIRE_POSITIONS.items()}, "places": TIRE_PLACES,
+        "positions": positions_for(vehicle.kind if vehicle else None), "places": TIRE_PLACES,
         "currencies": COMMON_CURRENCIES, "mount_rows": range(MOUNT_ROWS),
         "odometer": VehicleService(db).get_current_odometer(vehicle.id) if vehicle else None,
         "can_delete": TireSwapService(db).can_delete(swap) if swap else False,
@@ -216,12 +232,14 @@ def _read_swap_base(form):
         "note": form.str("note", "Poznámka"),
         "price": _price_form(form, "Cena přezutí"),
     }
+    # tread_<id nasazení> (jedna hodnota) nebo tread_<id nasazení>_<kolo> (po kolech)
     treads = {}
-    for key in form.raw.keys():
-        if key.startswith("tread_") and key[6:].isdigit():
-            treads[int(key[6:])] = form.decimal(key, "Dezén", min_value=0)
+    for key in list(form.raw.keys()):
+        mount_id, _, wheel = key[6:].partition("_")
+        if key.startswith("tread_") and mount_id.isdigit():
+            treads.setdefault(int(mount_id), {})[wheel] = form.decimal(key, "Dezén", min_value=0)
     form.check()
-    data["treads"] = {k: v for k, v in treads.items() if v is not None}
+    data["treads"] = treads
     return data
 
 
@@ -232,8 +250,9 @@ async def swap_add_form(request: Request, user=Depends(get_current_user), db=Dep
     if vehicle_id is None and len(vehicles) == 1:
         vehicle_id = vehicles[0].id
     vehicle = _editable_vehicle(db, user, vehicle_id) if vehicle_id else None
-    values = {"swap_date": date.today().isoformat(), "place": "home", "currency_code": "CZK",
-              "mount_tire_0": request.query_params.get("tire_id", ""), "mount_pos_0": "all"}
+    values = {"swap_date": date.today().isoformat(), "place": "home", "currency_code": "CZK"}
+    if request.query_params.get("tire_id"):
+        values.update(mount_tire_0=request.query_params.get("tire_id"), mount_pos_0="all")
     return render(request, "tires/swap_form.html", values=values, **_swap_context(db, user, vehicle))
 
 
@@ -270,7 +289,13 @@ def _swap_values(swap):
               "place": swap.place, "service_place": (service.place or "") if service else "",
               "note": swap.note or "", **_price_values(service)}
     for m in swap.removed:
-        values[f"tread_{m.id}"] = iso(m.removed_tread_mm)
+        per_wheel = m.tread_map
+        if per_wheel:
+            for wheel, mm in per_wheel.items():
+                values[f"tread_{m.id}_{wheel}"] = mm
+        elif m.removed_tread_mm is not None:
+            for wheel in m.wheels:  # dříve zapsaná jedna hodnota pro všechna kola
+                values[f"tread_{m.id}_{wheel[0]}"] = iso(m.removed_tread_mm)
     return values
 
 

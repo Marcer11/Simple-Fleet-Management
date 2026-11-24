@@ -6,7 +6,9 @@ from sqlalchemy import func
 
 from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap
 from models.vehicle_note import NOTE_CATEGORIES
-from models.maintenance import REPEAT_OPTIONS, REPEAT_NONE, VIGNETTE_VARIANTS
+from models.maintenance import (
+    REPEAT_OPTIONS, REPEAT_NONE, VIGNETTE_VARIANTS, join_service_types, split_service_types,
+)
 from services.errors import ValidationError, NotFoundError
 from services.pricing import convert_price
 
@@ -170,7 +172,8 @@ class ServiceRecordService(_RecordServiceBase):
             "vehicle_id": data["vehicle_id"],
             "service_date": data["service_date"],
             "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
-            "service_type": _clean_str(data.get("service_type"), 50, "Typ servisu", required=True),
+            "service_type": _clean_str(join_service_types([data.get("service_type") or ""]), 255,
+                                       "Typ servisu", required=True),
             "place": _clean_str(data.get("place"), 100, "Místo"),
             "price_paid": price_paid,
             "currency_code": currency,
@@ -178,19 +181,35 @@ class ServiceRecordService(_RecordServiceBase):
             "note": _clean_str(data.get("note")),
         }
 
+    def search(self, vehicle_ids, date_from=None, date_to=None, service_type=None, **filters):
+        """Filtr podle typu najde i servisy, kde byl typ jednou z více položek."""
+        records = super().search(vehicle_ids, date_from, date_to, **filters)
+        if service_type:
+            wanted = service_type.strip().lower()
+            records = [r for r in records if wanted in (t.lower() for t in r.types)]
+        return records
+
     def get_service_types(self, vehicle_ids):
+        """Všechny použité položky servisu (i z vícepoložkových záznamů)."""
         if not vehicle_ids:
             return []
         rows = (self.session.query(ServiceRecord.service_type)
                 .filter(ServiceRecord.vehicle_id.in_(vehicle_ids)).distinct().all())
-        return sorted({r[0] for r in rows})
+        types = {}
+        for (value,) in rows:
+            for t in split_service_types(value):
+                types.setdefault(t.lower(), t)
+        return sorted(types.values(), key=str.lower)
 
     def get_last_service(self, vehicle_id, service_type):
-        return (self.session.query(ServiceRecord)
-                .filter(ServiceRecord.vehicle_id == vehicle_id,
-                        func.lower(ServiceRecord.service_type) == service_type.strip().lower())
-                .order_by(ServiceRecord.service_date.desc(), ServiceRecord.id.desc())
-                .first())
+        """Poslední servis, který obsahoval danou položku (sám nebo spolu s dalšími)."""
+        wanted = service_type.strip().lower()
+        pattern = f"%{wanted}%"
+        candidates = (self.session.query(ServiceRecord)
+                      .filter(ServiceRecord.vehicle_id == vehicle_id,
+                              func.lower(ServiceRecord.service_type).like(pattern))
+                      .order_by(ServiceRecord.service_date.desc(), ServiceRecord.id.desc()))
+        return next((r for r in candidates if wanted in (t.lower() for t in r.types)), None)
 
 
 # ----------------------------------------------------------------------

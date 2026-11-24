@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse, Response
 
 from services.maintenance_service import collect_alerts
 from services.stats_service import StatsService
+from services.tire_service import mounted_seasons
 from services.vehicle_service import VehicleService
 from web.deps import get_db, get_current_user, render, TEMPLATES_DIR
 
@@ -31,7 +32,7 @@ async def dashboard(request: Request, user=Depends(get_current_user), db=Depends
     } for v in vehicles]
 
     return render(request, "dashboard.html", cards=cards, alerts=alerts, year=year,
-                  roles=vehicle_service.get_roles_for_user(user),
+                  roles=vehicle_service.get_roles_for_user(user), tires=mounted_seasons(db, ids),
                   total_year_cost=sum(year_costs.values(), 0))
 
 

@@ -102,7 +102,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                        and not any(n.tire_id == m.tire_id for n in mounted)]
             if removed:
                 parts.append("sundáno: " + ", ".join(
-                    m.tire.label + (f" – dezén {_qty(m.removed_tread_mm)} mm" if m.removed_tread_mm is not None else "")
+                    m.tire.label + (f" – dezén {m.treads_label} mm" if m.treads_label else "")
                     for m in removed))
             where = s.place_label + (f" – {s.service_record.place}" if s.service_record and s.service_record.place else "")
             parts.append(where)

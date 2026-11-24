@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from models.maintenance import (
-    SERVICE_TYPES, EXPENSE_CATEGORIES, REPEAT_OPTIONS, VALIDITY_CATEGORIES, VIGNETTE_CATEGORY, VIGNETTE_VARIANTS,
+    SERVICE_TYPES, EXPENSE_CATEGORIES, join_service_types, split_service_types, REPEAT_OPTIONS, VALIDITY_CATEGORIES, VIGNETTE_CATEGORY, VIGNETTE_VARIANTS,
 )
 from models.vehicle import ROLE_EDITOR
 from services.maintenance_service import (
@@ -48,12 +48,23 @@ def _check_not_future(d, label):
 # Servis
 # ======================================================================
 
+TYPE_PREFIX = "st:"  # zaškrtávací pole položek servisu: name="st:Výměna oleje"
+
+
 def _read_service(form):
+    checked = [key[len(TYPE_PREFIX):] for key in form.raw if key.startswith(TYPE_PREFIX) and form.raw[key]]
+    # starší tvar formuláře (jedno textové pole) i vlastní položky v poli "Jiné"
+    service_type = join_service_types(checked + [form.raw.get("service_type_other") or "",
+                                                 form.raw.get("service_type") or ""])
+    if not service_type:
+        form.errors.append("Typ servisu: zaškrtněte alespoň jednu položku nebo vyplňte jinou.")
+    elif len(service_type) > 255:
+        form.errors.append("Typ servisu: nejvýše 255 znaků.")
     data = {
         "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
         "service_date": form.date("service_date", "Datum", required=True),
         "odometer": form.int("odometer", "Stav tachometru", min_value=0),
-        "service_type": form.str("service_type", "Typ servisu", required=True, max_len=50),
+        "service_type": service_type,
         "place": form.str("place", "Místo", max_len=100),
         "price_paid": form.decimal("price_paid", "Cena", min_value=0),
         "currency_code": form.str("currency_code", "Měna") or "CZK",
@@ -66,11 +77,22 @@ def _read_service(form):
 
 
 def _service_values(r):
-    return {
+    values = {
         "vehicle_id": str(r.vehicle_id), "service_date": iso(r.service_date), "odometer": iso(r.odometer),
-        "service_type": r.service_type, "place": r.place or "", "price_paid": iso(r.price_paid),
+        "place": r.place or "", "price_paid": iso(r.price_paid),
         "currency_code": r.currency_code, "manual_rate": rate_from_record(r), "note": r.note or "",
     }
+    for t in split_service_types(r.service_type):
+        values[TYPE_PREFIX + t] = "on"
+    return values
+
+
+def _service_context(db, user):
+    """Nabídka položek: výchozí seznam + vlastní položky z dřívějších servisů."""
+    known = {t.lower() for t in SERVICE_TYPES}
+    used = ServiceRecordService(db).get_service_types(VehicleService(db).get_accessible_ids(user))
+    return {"service_types": SERVICE_TYPES + [t for t in used if t.lower() not in known],
+            "type_prefix": TYPE_PREFIX}
 
 
 register_crud(router, CrudConfig(
@@ -80,7 +102,7 @@ register_crud(router, CrudConfig(
     read_form=_read_service,
     to_values=_service_values,
     default_values=lambda vid: {"service_date": date.today().isoformat(), "currency_code": "CZK"},
-    extra_context=lambda db, user: {"service_types": SERVICE_TYPES},
+    extra_context=_service_context,
     messages={"created": "Servis byl uložen.", "deleted": "Servisní záznam byl smazán."},
 ))
 

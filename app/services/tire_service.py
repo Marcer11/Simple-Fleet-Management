@@ -13,7 +13,7 @@ from sqlalchemy.orm import joinedload
 from models import Tire, TireDefect, TireMount, TireSwap
 from models.tire import (
     TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
-    TIRE_SERVICE_TYPE, slots_position,
+    TIRE_SERVICE_TYPE, MOTO_POSITIONS, format_treads, slots_position,
 )
 from services.errors import NotFoundError, ValidationError
 from services.maintenance_service import (
@@ -30,6 +30,36 @@ def _tread(value, label="Hloubka dezénu"):
     if value is not None and not (0 <= value <= TREAD_MAX):
         raise ValidationError(f"{label} musí být 0–20 mm.")
     return value
+
+
+def _apply_treads(mount, values):
+    """Dezén při sundání: values = {kolo: mm} (po kolech) nebo {"": mm} (jedna hodnota pro všechna kola).
+    Do removed_tread_mm se ukládá nejmenší naměřená hodnota - podle ní se hlídá zákonné minimum."""
+    values = values or {}
+    keys = [w[0] for w in mount.wheels]
+    per_wheel = {k: _tread(values[k]) for k in keys if values.get(k) not in (None, "")}
+    per_wheel = {k: v for k, v in per_wheel.items() if v is not None}
+    if per_wheel:
+        mount.removed_treads = format_treads({k: str(v) for k, v in per_wheel.items()})
+        mount.removed_tread_mm = min(per_wheel.values())
+    else:
+        mount.removed_treads = None
+        mount.removed_tread_mm = _tread(values.get(""))
+
+
+def mounted_seasons(session, vehicle_ids):
+    """Co je teď na vozidlech (bez rezervy): {vehicle_id: [(typ, [popisky pneumatik])]}."""
+    if not vehicle_ids:
+        return {}
+    mounts = (session.query(TireMount).options(joinedload(TireMount.tire))
+              .filter(TireMount.vehicle_id.in_(vehicle_ids), TireMount.removed_date.is_(None),
+                      TireMount.position != "spare").all())
+    result = {}
+    for m in sorted(mounts, key=lambda m: (list(TIRE_POSITIONS).index(m.position)
+                                           if m.position in TIRE_POSITIONS else 99, m.id)):
+        seasons = result.setdefault(m.vehicle_id, {})
+        seasons.setdefault(m.tire.season, []).append(f"{m.tire.label} ({m.position_label.lower()})")
+    return {vid: list(seasons.items()) for vid, seasons in result.items()}
 
 
 def _has_price(price):
@@ -195,7 +225,7 @@ class TireSwapService:
     def create(self, vehicle, swap_date, odometer, place="home", service_place=None, price=None, note=None,
                new_mounts=(), remove_ids=(), treads=None):
         """new_mounts = [(Tire, pozice)], remove_ids = id nasazení k sundání bez náhrady,
-        treads = {id nasazení: naměřený dezén při sundání}."""
+        treads = {id nasazení: {kolo: naměřený dezén při sundání}} (kolo "" = jedna hodnota pro celé nasazení)."""
         treads = treads or {}
         odometer = self._check_common(vehicle.id, swap_date, odometer, place)
         last = (self.session.query(TireSwap.swap_date).filter(TireSwap.vehicle_id == vehicle.id)
@@ -211,6 +241,8 @@ class TireSwapService:
         for tire, position in new_mounts:
             if position not in TIRE_POSITIONS:
                 raise ValidationError("Vyberte pozici pneumatiky.")
+            if vehicle.kind == "moto" and position not in MOTO_POSITIONS:
+                raise ValidationError("Na motorce lze nasadit jen přední, zadní nebo obě kola.")
             if tire.id in seen:
                 raise ValidationError(f"Pneumatika {tire.label} je vybraná dvakrát.")
             if tire.retired_date:
@@ -235,7 +267,7 @@ class TireSwapService:
             overlap = mount.slots & new_slots
             if not (explicit or moving or overlap):
                 continue
-            self._close(mount, swap, odometer, _tread(treads.get(mount.id)))
+            self._close(mount, swap, odometer, treads.get(mount.id))
             rest = mount.slots - new_slots
             if overlap and rest and not explicit and not moving:
                 # vyměněna jen část (např. přední) - zbytek zůstává na voze
@@ -260,11 +292,11 @@ class TireSwapService:
         return swap
 
     @staticmethod
-    def _close(mount, swap, km, tread):
+    def _close(mount, swap, km, treads):
         mount.removed_swap = swap
         mount.removed_date = swap.swap_date
         mount.removed_km = km
-        mount.removed_tread_mm = tread
+        _apply_treads(mount, treads)
 
     def update(self, swap, swap_date, odometer, place="home", service_place=None, price=None, note=None,
                treads=None):
@@ -284,7 +316,7 @@ class TireSwapService:
             if mount.vehicle_id == swap.vehicle_id:
                 mount.removed_km = odometer
             if treads is not None and mount.id in treads:
-                mount.removed_tread_mm = _tread(treads[mount.id])
+                _apply_treads(mount, treads[mount.id])
         self.session.flush()
         self._sync_service(swap, price, service_place)
         self.session.commit()
@@ -300,7 +332,7 @@ class TireSwapService:
             raise ValidationError("Pneumatiky z tohoto přezutí už byly později sundány – nejdřív smažte novější přezutí.")
         for mount in list(swap.removed):
             mount.removed_swap = None
-            mount.removed_date = mount.removed_km = mount.removed_tread_mm = None
+            mount.removed_date = mount.removed_km = mount.removed_tread_mm = mount.removed_treads = None
         service_record = swap.service_record
         self.session.delete(swap)
         if service_record is not None:
@@ -459,13 +491,14 @@ def winter_tire_status(today=None):
 
 
 def tire_alerts(session, vehicles, today=None):
-    """[(vozidlo, pneumatika, DueStatus)] - aktivní vozidla s nasazenými letními pneu v zimním období."""
+    """[(vozidlo, pneumatika, DueStatus)] - aktivní auta s nasazenými letními pneu v zimním období
+    (motorky zimní pneumatiky nepotřebují)."""
     status = winter_tire_status(today)
     if status is None:
         return []
     result = []
     for vehicle in vehicles:
-        if not vehicle.is_active:
+        if not vehicle.is_active or vehicle.kind == "moto":
             continue
         summer = [m for m in open_mounts(session, vehicle.id) if m.tire.season == "Letní" and m.position != "spare"]
         if summer:

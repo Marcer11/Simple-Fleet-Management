@@ -60,7 +60,9 @@ a prodeje (ztráta hodnoty), aktivní/neaktivní. Smazání vozidla je schované
 - **API pro Timeline** – Timeline si načítá tankování vozidla podle SPZ do výdajů výletů
 
 ### Servis, pravidelný servis, upomínky
-- servisní záznamy (typ, místo, cena v libovolné měně)
+- servisní záznamy (místo, cena v libovolné měně) – **více položek najednou** (olej, brzdy, STK, …
+  zaškrtnutím, vlastní položky čárkou); pravidelný servis se počítá i od servisu, kde byla jeho položka
+  jednou z více
 - **pravidelný servis** – časový a/nebo kilometrový interval od posledního servisu daného typu;
   upozornění, když zbývá méně než 10 % intervalu, nebo po termínu
 - **upomínky** podle data a/nebo tachometru, jednorázové i opakované (denně–ročně, po X km),
@@ -77,14 +79,20 @@ a prodeje (ztráta hodnoty), aktivní/neaktivní. Smazání vozidla je schované
 - **přezutí** na vozidle doma nebo v servisu (v servisu = servisní záznam „Přezutí pneumatik“ s cenou):
   pneumatiky se nasazují na pozice (všechna kola, přední / zadní náprava, jednotlivé kolo, rezerva);
   nasazení na obsazenou pozici původní pneumatiku sundá – při výměně jen předních zůstane zbytek sady
-  vzadu; nasazením na jiné vozidlo se pneumatika z původního sundá; při sundání lze zapsat dezén;
+  vzadu; nasazením na jiné vozidlo se pneumatika z původního sundá; při sundání lze zapsat dezén
+  **každého kola zvlášť** (pro zákonné minimum se hlídá nejmenší hodnota);
   stav tachometru se kontroluje proti ostatním záznamům; smazat lze přezutí, z něhož ještě nic
   nebylo sundáno (vše se vrátí, jak bylo)
+- **nákres vozidla** při přezutí – kola obarvená podle typu pneumatik; kliknutím na kolo se zobrazí, co na
+  něm je, pole pro dezén a výběr pneumatiky k nasazení na kolo, nápravu nebo všechna kola
+- **auto / motorka** (nastavuje se u vozidla): motorka má jen přední a zadní kolo a nedostává upozornění
+  na zimní pneumatiky; v přehledu a seznamu vozidel je ikona druhu vozidla a typu nasazených pneumatik
+  (letní ☀, zimní ❄, univerzální)
 - **poškození** (pozice, popis, cena opravy jako výdaj k vozidlu, na kterém pneumatika byla)
 - **životnost**: najeto (i přes více vozidel), počet nasazení a doba na voze, stáří, dezén,
   opotřebení na 1000 km a odhad km do zákonného minima (letní 1,6 mm, zimní a univerzální 4 mm),
   náklady na 1000 km; upozornění na stáří ≥ 6 let a dezén u minima
-- **upozornění na zimní pneumatiky**: od 15. 10. a v období 1. 11. – 31. 3. u aktivních vozidel,
+- **upozornění na zimní pneumatiky**: od 15. 10. a v období 1. 11. – 31. 3. u aktivních aut,
   která mají nasazené letní pneu
 - přezutí a poškození jsou i na časové ose
 

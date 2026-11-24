@@ -19,6 +19,10 @@
     --danger-soft: #fee2e2;
     --radius: 10px;
     --shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 2px 8px rgba(15, 23, 42, .05);
+    --season-summer: #d97706;
+    --season-winter: #2563eb;
+    --season-allseason: #059669;
+    --tire-rubber: #334155;
     color-scheme: light;
 }
 
@@ -42,6 +46,10 @@
         --danger: #f87171;
         --danger-soft: #3f1515;
         --shadow: none;
+        --season-summer: #fbbf24;
+        --season-winter: #60a5fa;
+        --season-allseason: #34d399;
+        --tire-rubber: #0b1016;
         color-scheme: dark;
     }
 }
@@ -406,3 +414,69 @@ table.tires .badge { margin-top: 4px; }
 .tire-car ul { list-style: none; margin: 0; padding: 0; }
 .tire-car li { padding: 3px 0; }
 .mount-row { margin-bottom: 4px; }
+/* ---------- ikony: druh vozidla a pneumatiky ---------- */
+.icon { width: 1.15em; height: 1.15em; vertical-align: -.2em; flex: none; }
+.icon-vehicle { color: var(--muted); }
+.tire-icons { display: inline-flex; gap: 2px; vertical-align: middle; }
+.season-summer { color: var(--season-summer); }
+.season-winter { color: var(--season-winter); }
+.season-allseason { color: var(--season-allseason); }
+
+/* ---------- přezutí: nákres vozidla ---------- */
+.swap-board { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 20px; align-items: start; margin: 8px 0 16px; }
+@media (max-width: 640px) { .swap-board { grid-template-columns: 1fr; } .swap-figure { max-width: 260px; margin: 0 auto; } }
+.veh-svg { width: 100%; height: auto; display: block; }
+.veh-body { fill: var(--surface-2); stroke: var(--border); stroke-width: 2; }
+.veh-glass { fill: var(--primary-soft); stroke: var(--border); stroke-width: 1.5; }
+.veh-roof { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+.veh-seat { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
+.veh-bar { fill: none; stroke: var(--muted); stroke-width: 5; stroke-linecap: round; }
+.veh-front { fill: var(--muted); font-size: 11px; }
+.wheel { cursor: pointer; outline: none; }
+.wheel-ring { fill: none; stroke: transparent; stroke-width: 3; }
+.wheel.is-selected .wheel-ring { stroke: var(--primary); }
+.wheel:focus-visible .wheel-ring { stroke: var(--primary); stroke-dasharray: 4 3; }
+.wheel-tire { fill: var(--tire-rubber); stroke: var(--surface); stroke-width: 2; }
+.wheel-rim { fill: var(--surface); opacity: .7; }
+.wheel-tread { stroke: var(--surface); stroke-width: 2; opacity: .35; }
+.wheel-summer .wheel-tire { fill: var(--season-summer); }
+.wheel-winter .wheel-tire { fill: var(--season-winter); }
+.wheel-allseason .wheel-tire { fill: var(--season-allseason); }
+.wheel-other .wheel-tire { fill: var(--muted); }
+.wheel-empty .wheel-tire { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.wheel-empty .wheel-tread { display: none; }
+.wheel-badge { fill: var(--primary); stroke: var(--surface); stroke-width: 2; }
+.wheel:hover .wheel-tire { filter: brightness(1.1); }
+.season-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; margin-top: 6px; color: var(--muted); }
+.season-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--border); }
+.swatch.wheel-summer { background: var(--season-summer); }
+.swatch.wheel-winter { background: var(--season-winter); }
+.swatch.wheel-allseason { background: var(--season-allseason); }
+.swatch.wheel-empty { background: var(--surface); border: 1px dashed var(--muted); }
+.swatch-new { background: var(--primary); border-radius: 50%; }
+.swap-side { display: grid; gap: 14px; min-width: 0; }
+.swap-figure, .swap-panel, .swap-summary { min-width: 0; }
+.swap-panel, .swap-summary { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); }
+.swap-panel h4, .swap-summary h4 { margin: 0 0 8px; font-size: 1rem; }
+.swap-summary ul { margin: 0 0 8px; padding-left: 18px; }
+.swap-summary > div + div { margin-top: 6px; }
+.swap-now { display: grid; gap: 6px; margin-bottom: 12px; }
+.swap-pick { display: grid; gap: 8px; }
+.swap-pick select { width: 100%; max-width: 100%; min-width: 0; }
+.swap-scopes { display: flex; flex-wrap: wrap; gap: 6px; }
+.swap-tread { display: grid; gap: 4px; }
+.tread-inputs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tread-inputs label { display: inline-flex; align-items: center; gap: 4px; font-size: .85rem; color: var(--muted); }
+.tread-inputs input { width: 64px; }
+.tread-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid var(--border); }
+.btn-link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; justify-self: start; }
+.btn-link:hover { text-decoration: underline; }
+.text-danger { color: var(--danger); }
+
+/* ---------- servis: více položek ---------- */
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px 14px; margin: 4px 0 6px; }
+.check-grid .check { font-weight: normal; }
+fieldset.field { border: 0; padding: 0; margin: 0; min-width: 0; }
+fieldset.field legend { padding: 0; font-weight: 600; font-size: .9rem; margin-bottom: 4px; }

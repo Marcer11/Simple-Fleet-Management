@@ -9,6 +9,7 @@
 <form method="post" class="card">
     {{ m.csrf() }}
     <div class="form-grid">
+        {{ m.select("kind", "Druh vozidla", [("car", "Auto"), ("moto", "Motorka")], help="Podle druhu se nabízí pozice pneumatik a nákres při přezutí.") }}
         {{ m.field("brand", "Značka", required=true, maxlength=50, placeholder="např. Škoda") }}
         {{ m.field("model", "Model", required=true, maxlength=50, placeholder="např. Octavia") }}
         {{ m.field("license_plate", "SPZ", maxlength=12, placeholder="např. 1A2 3456", style="text-transform: uppercase") }}

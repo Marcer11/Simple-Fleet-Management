@@ -185,3 +185,47 @@ def test_migration_converts_tire_sets(tmp_path):
         assert conn.execute(text("SELECT description FROM tire_defects")).scalar() == "Hřebík"
         tables = {r[0] for r in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))}
         assert not {"tire_sets", "tire_changes", "tire_damages"} & tables
+
+
+def test_per_wheel_treads_and_moto(app, db):
+    client = register(app, "k@example.com")
+    car = add_vehicle(client, model="Octavia")
+    moto = add_vehicle(client, brand="Honda", model="CBF", kind="moto")
+    assert db.get(Vehicle, moto).kind == "moto" and db.get(Vehicle, car).kind == "car"
+    winter = add_tire(client, db, season="Zimní", new_tread_mm="9")
+    summer = add_tire(client, db)
+    d0 = date.today() - timedelta(days=100)
+    swap(client, car, d0, 1000, [(winter, "all")])
+    mount = db.query(TireMount).filter_by(tire_id=winter.id).one()
+    # dezén po kolech - přední jiný než zadní; ukládá se i nejmenší hodnota
+    r = swap(client, car, d0 + timedelta(days=50), 6000, [(summer, "all")],
+             **{f"tread_{mount.id}_fl": "5,5", f"tread_{mount.id}_fr": "5.6",
+                f"tread_{mount.id}_rl": "7", f"tread_{mount.id}_rr": "7"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    mount = db.get(TireMount, mount.id)
+    assert mount.tread_map == {"fl": "5.5", "fr": "5.6", "rl": "7.0", "rr": "7.0"}
+    assert float(mount.removed_tread_mm) == 5.5
+    assert "LP 5,5 · PP 5,6 · LZ 7,0 · PZ 7,0" in client.get("/tires").text
+    # úprava přezutí - dezén po kolech jde opravit
+    s = mount.removed_swap
+    r = post(client, f"/tire-swaps/{s.id}/edit", {"vehicle_id": car, "swap_date": s.swap_date.isoformat(),
+                                                  "odometer": 6000, "place": "home", "currency_code": "CZK",
+                                                  f"tread_{mount.id}_fl": "6", f"tread_{mount.id}_fr": "6"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    assert db.get(TireMount, mount.id).tread_map == {"fl": "6.0", "fr": "6.0"}
+
+    # motorka: jen přední / zadní / obě kola; popisky "kolo"
+    front = add_tire(client, db, quantity="1", size="120/70 ZR17")
+    r = swap(client, moto, d0, 500, [(front, "fl")])
+    assert r.status_code == 400 and "Na motorce" in r.text
+    assert swap(client, moto, d0, 500, [(front, "front")]).status_code == 303
+    page = client.get(f"/tire-swaps/add?vehicle_id={moto}").text
+    assert "Přední kolo" in page and "Levé přední" not in page and '"kind": "moto"' in page
+    # motorka nedostane upozornění na zimní pneumatiky
+    alerts = [a for a in collect_alerts(db, [db.get(Vehicle, moto)], today=date(2026, 12, 1)) if a.kind == "tires"]
+    assert not alerts
+    # ikony typu pneumatik na přehledu a v seznamu vozidel
+    assert "Letní pneumatiky: Letní Michelin Primacy 4 (všechna kola)" in client.get("/").text
+    assert "Letní pneumatiky" in client.get("/vehicles").text

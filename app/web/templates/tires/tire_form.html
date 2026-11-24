@@ -93,7 +93,7 @@
             <td class="nowrap">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
             <td class="nowrap">{% if mnt.removed_date %}{{ mnt.removed_date|date }}<div class="small muted">{{ mnt.removed_km|km }}</div>{% else %}<span class="badge badge-ok">na voze</span>{% endif %}</td>
             <td class="num">{{ ((mnt.removed_km - mnt.mounted_km)|km) if mnt.removed_km is not none else "–" }}</td>
-            <td class="num">{{ (mnt.removed_tread_mm|num(1) ~ " mm") if mnt.removed_tread_mm is not none else "–" }}</td>
+            <td class="num">{{ (mnt.treads_label ~ " mm") if mnt.treads_label else "–" }}</td>
         </tr>
         {% endfor %}
         </tbody>

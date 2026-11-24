@@ -12,6 +12,11 @@ ROLE_OWNER = "owner"
 ROLE_LEVELS = {ROLE_VIEWER: 1, ROLE_EDITOR: 2, ROLE_OWNER: 3}
 SHARE_ROLES = {ROLE_VIEWER: "Jen náhled", ROLE_EDITOR: "Úpravy"}
 
+# Druh vozidla - podle něj nákres a pozice pneumatik (motorka má jen přední a zadní kolo)
+KIND_CAR = "car"
+KIND_MOTO = "moto"
+VEHICLE_KINDS = {KIND_CAR: "Auto", KIND_MOTO: "Motorka"}
+
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
@@ -20,6 +25,7 @@ class Vehicle(Base):
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     brand = Column(String(50), nullable=False)
     model = Column(String(50), nullable=False)
+    kind = Column(String(10), nullable=False, default=KIND_CAR, server_default=KIND_CAR)
     production_year = Column(Integer, nullable=True)
     color = Column(String(30))
     color_hex = Column(CHAR(7), nullable=False, default="#FFFFFF")
@@ -45,6 +51,14 @@ class Vehicle(Base):
     def display_name(self):
         name = f"{self.brand} {self.model}"
         return f"{name} ({self.license_plate})" if self.license_plate else name
+
+    @property
+    def is_moto(self):
+        return self.kind == KIND_MOTO
+
+    @property
+    def kind_label(self):
+        return VEHICLE_KINDS.get(self.kind or KIND_CAR, "")
 
     @property
     def value_loss(self):

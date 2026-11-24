@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
 from services.errors import ValidationError
 from services.events import collect_events
-from services.tire_service import open_mounts
+from services.tire_service import mounted_seasons, open_mounts
 from services.fuel_record_service import FuelRecordService
 from services.maintenance_service import (
     ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
@@ -22,7 +22,8 @@ router = APIRouter(prefix="/vehicles")
 
 def _vehicle_values(vehicle):
     return {
-        "brand": vehicle.brand, "model": vehicle.model, "production_year": iso(vehicle.production_year),
+        "brand": vehicle.brand, "model": vehicle.model, "kind": vehicle.kind or "car",
+        "production_year": iso(vehicle.production_year),
         "license_plate": vehicle.license_plate or "", "vin": vehicle.vin or "",
         "color": vehicle.color or "", "color_hex": vehicle.color_hex or "#FFFFFF",
         "purchase_date": iso(vehicle.purchase_date), "sale_date": iso(vehicle.sale_date),
@@ -35,6 +36,7 @@ def _read_vehicle_form(form):
     data = {
         "brand": form.str("brand", "Značka", required=True, max_len=50),
         "model": form.str("model", "Model", required=True, max_len=50),
+        "kind": form.str("kind", "Druh") or "car",
         "production_year": form.int("production_year", "Rok výroby", min_value=1901,
                                     max_value=date.today().year + 1),
         "license_plate": form.str("license_plate", "SPZ", max_len=12),
@@ -63,12 +65,12 @@ async def list_vehicles(request: Request, show: str = "active", user=Depends(get
     odometers = {v.id: service.get_current_odometer(v.id) for v in vehicles}
     inactive_count = len(service.get_vehicles_for_user(user)) - len(service.get_vehicles_for_user(user, True))
     return render(request, "vehicles/list.html", vehicles=vehicles, roles=roles, odometers=odometers,
-                  show=show, inactive_count=inactive_count)
+                  show=show, inactive_count=inactive_count, tires=mounted_seasons(db, [v.id for v in vehicles]))
 
 
 @router.get("/add")
 async def add_vehicle_form(request: Request, user=Depends(get_current_user)):
-    return render(request, "vehicles/form.html", vehicle=None, values={"color_hex": "#FFFFFF"})
+    return render(request, "vehicles/form.html", vehicle=None, values={"color_hex": "#FFFFFF", "kind": "car"})
 
 
 @router.post("/add")
@@ -115,6 +117,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         breakdown=StatsService(db).fuel_breakdown(vehicle.id),
         events=collect_events(db, [vehicle], limit=8),
         mounted_tires=open_mounts(db, vehicle.id),
+        tire_seasons=mounted_seasons(db, [vehicle.id]).get(vehicle.id),
         editable_ids={vehicle.id} if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set(),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
         owner=vehicle.owner,

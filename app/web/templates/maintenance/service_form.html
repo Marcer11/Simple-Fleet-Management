@@ -6,13 +6,17 @@
 {% block fields %}
 {{ m.field("service_date", "Datum", "date", required=true, max=today.isoformat()) }}
 {{ m.field("odometer", "Stav tachometru (km)", "number", min=0, step=1, inputmode="numeric") }}
-<div class="field">
-    <label for="f-service_type">Typ servisu <span class="req">*</span></label>
-    <input id="f-service_type" name="service_type" type="text" required maxlength="50" list="service-types" value="{{ m.val('service_type') }}" autocomplete="off">
-    {{ m.datalist("service-types", service_types) }}
-    <small class="help">Stejný název jako u pravidelného servisu → interval se počítá od tohoto záznamu.</small>
-</div>
 {{ m.field("place", "Místo / servis", maxlength=100) }}
+<fieldset class="field field-wide">
+    <legend>Co se dělalo <span class="req">*</span></legend>
+    <div class="check-grid">
+        {% for t in service_types %}
+        <label class="check"><input type="checkbox" name="{{ type_prefix }}{{ t }}" value="on"{% if values.get(type_prefix ~ t) %} checked{% endif %}> {{ t }}</label>
+        {% endfor %}
+    </div>
+    <input id="f-service_type_other" name="service_type_other" type="text" maxlength="200" value="{{ m.val('service_type_other') }}" autocomplete="off" placeholder="Jiné – více položek oddělte čárkou" aria-label="Jiné položky servisu">
+    <small class="help">Zaškrtněte vše, co se v servisu dělalo. Pravidelný servis se stejným názvem se počítá od tohoto záznamu.</small>
+</fieldset>
 {{ m.price_fields(currencies, "Cena") }}
 {{ m.textarea("note", "Poznámka / provedené práce") }}
 {% endblock %}

@@ -50,17 +50,33 @@
     {% if swap %}
     {% set removed_here = swap.removed|selectattr("vehicle_id", "equalto", vehicle.id)|list %}
     {% if removed_here %}
-    <h3 class="form-section">Sundané pneumatiky – naměřený dezén</h3>
-    <div class="form-grid">
-        {% for mnt in removed_here %}
-        {{ m.field("tread_%d"|format(mnt.id), mnt.tire.label ~ " (" ~ mnt.position_label|lower ~ "), mm", inputmode="decimal", placeholder="např. 5,5", autocomplete="off") }}
+    <h3 class="form-section">Sundané pneumatiky – naměřený dezén (mm)</h3>
+    {% for mnt in removed_here %}
+    <div class="tread-row">
+        <div><strong>{{ mnt.tire.label }}</strong> <span class="small muted">{{ mnt.position_label|lower }}</span></div>
+        <div class="tread-inputs">
+        {% for key, short, long in mnt.wheels %}
+            <label title="{{ long }}"><span>{{ short }}</span><input type="text" name="tread_{{ mnt.id }}_{{ key }}" value="{{ m.val('tread_%d_%s'|format(mnt.id, key)) }}" inputmode="decimal" placeholder="mm" autocomplete="off" aria-label="Dezén {{ long }}"></label>
         {% endfor %}
+        </div>
     </div>
+    {% endfor %}
     {% endif %}
     <p class="help">Nasazené pneumatiky se úpravou nemění – při chybě přezutí smažte a zapište znovu.
         Nasazeno: {% for mnt in swap.mounted %}{{ mnt.tire.label }} ({{ mnt.position_label|lower }}){% if not loop.last %}, {% endif %}{% else %}nic{% endfor %}.</p>
     {% else %}
 
+    {# Nákres vozidla - ovládá ho app.js nad stejnými poli formuláře, která jsou níže (bez JS fungují samostatně) #}
+    <div class="swap-board" data-swap-board hidden>
+        <div class="swap-figure" data-swap-figure></div>
+        <div class="swap-side">
+            <div class="swap-panel" data-swap-panel aria-live="polite"></div>
+            <div class="swap-summary" data-swap-summary></div>
+        </div>
+    </div>
+    <script type="application/json" id="swap-data">{{ diagram|tojson }}</script>
+
+    <div data-swap-fallback>
     <h3 class="form-section">Teď na voze</h3>
     {% if current %}
     <div class="table-wrap">
@@ -72,7 +88,11 @@
             <td>{{ mnt.tire.label }}<div class="small muted">{{ mnt.tire.quantity_label }}{% if mnt.tire.size %} · {{ mnt.tire.size }}{% endif %}</div></td>
             <td>{{ mnt.position_label }}</td>
             <td class="num">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
-            <td><input type="text" name="tread_{{ mnt.id }}" value="{{ m.val('tread_%d'|format(mnt.id)) }}" inputmode="decimal" placeholder="volitelné" aria-label="Dezén {{ mnt.tire.label }}" style="max-width: 120px"></td>
+            <td><div class="tread-inputs">
+                {% for key, short, long in mnt.wheels %}
+                <label title="{{ long }}"><span>{{ short }}</span><input type="text" name="tread_{{ mnt.id }}_{{ key }}" value="{{ m.val('tread_%d_%s'|format(mnt.id, key)) }}" inputmode="decimal" placeholder="mm" autocomplete="off" aria-label="Dezén {{ mnt.tire.label }} – {{ long }}"></label>
+                {% endfor %}
+            </div></td>
             <td><label class="check"><input type="checkbox" name="remove_{{ mnt.id }}" value="1"{% if m.val('remove_%d'|format(mnt.id)) %} checked{% endif %}> sundat</label></td>
         </tr>
         {% endfor %}
@@ -80,7 +100,7 @@
     </table>
     </div>
     <p class="help">Pneumatika nasazená na obsazenou pozici tu původní sundá automaticky. Když vyměníte jen přední,
-        zbytek sady zůstane na zadní nápravě. Dezén zapište u pneumatik, které sundáváte.</p>
+        zbytek sady zůstane na zadní nápravě. Dezén zapište u pneumatik, které sundáváte – každé kolo zvlášť.</p>
     {% else %}
     <p class="muted small">Na voze zatím není zapsaná žádná pneumatika.</p>
     {% endif %}
@@ -99,7 +119,7 @@
         <div class="field">
             <label for="f-mount_pos_{{ i }}">Pozice</label>
             <select id="f-mount_pos_{{ i }}" name="mount_pos_{{ i }}">
-                {% for key, label in positions.items() %}<option value="{{ key }}"{% if (m.val('mount_pos_%d'|format(i)) or ('all' if i == 0 else 'front' if i == 1 else 'rear')) == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                {% for key, label in positions.items() %}<option value="{{ key }}"{% if (m.val('mount_pos_%d'|format(i)) or ('front' if i == 1 else 'rear' if i == 2 else 'all')) == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
     </div>
@@ -108,6 +128,7 @@
     {% else %}
     <p class="muted small">Nemáte žádné pneumatiky. <a href="/tires/add?vehicle_id={{ vehicle.id }}">Přidejte první</a> a pak je nasaďte.</p>
     {% endif %}
+    </div>
     {% endif %}
 
     {{ m.textarea("note", "Poznámka") }}

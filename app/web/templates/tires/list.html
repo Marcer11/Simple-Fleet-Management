@@ -23,7 +23,7 @@
     {% for vid, mounts in on_cars %}
     {% set v = mounts[0].vehicle %}
     <div class="tire-car">
-        <div class="tire-car-head">{{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.display_name }}</a>
+        <div class="tire-car-head">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.display_name }}</a>
             {% if v.id in editable_ids %}<a class="btn btn-sm" href="/tire-swaps/add?vehicle_id={{ v.id }}">Přezout</a>{% endif %}</div>
         <ul>
         {% for mnt in mounts %}
@@ -117,7 +117,7 @@
     <h2>Přezutí</h2>
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Nasazeno</th><th>Kde</th><th class="num">Cena</th><th></th></tr></thead>
+        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Nasazeno</th><th>Sundáno (dezén)</th><th>Kde</th><th class="num">Cena</th><th></th></tr></thead>
         <tbody>
         {% for s in swaps %}
         <tr>
@@ -126,6 +126,8 @@
             <td class="num">{{ s.odometer|km }}</td>
             {% set stayed = s.removed|map(attribute="tire_id")|list %}
             <td>{% for mnt in s.mounted %}{% if mnt.tire_id in stayed %}<span class="muted">{{ mnt.tire.label }} <span class="small">(zůstává – {{ mnt.position_label|lower }})</span></span>{% else %}{{ mnt.tire.label }} <span class="small muted">({{ mnt.position_label|lower }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">jen sundáno</span>{% endfor %}</td>
+            {% set gone = s.removed|selectattr("vehicle_id", "equalto", s.vehicle_id)|list %}
+            <td>{% for mnt in gone %}{{ mnt.tire.label }}{% if mnt.tire_id in stayed %} <span class="small muted">(zčásti)</span>{% endif %}{% if mnt.treads_label %} <span class="small muted">({{ mnt.treads_label }} mm)</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">–</span>{% endfor %}</td>
             <td>{{ s.place_label }}{% if s.service_record and s.service_record.place %} <span class="small muted">· {{ s.service_record.place }}</span>{% endif %}</td>
             <td class="num">{{ s.service_record.price_local|czk(0) if s.service_record and s.service_record.price_local is not none else "–" }}</td>
             <td class="actions-cell">{% if s.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/tire-swaps/{{ s.id }}/edit">Upravit</a>{% endif %}</td>

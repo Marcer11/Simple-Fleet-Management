@@ -6,7 +6,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 from models import Vehicle, VehicleShare, FuelRecord, ServiceRecord, Expense, VehicleNote
-from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
+from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES, VEHICLE_KINDS, KIND_CAR
 from services.errors import ValidationError, NotFoundError, PermissionDeniedError
 from services.pricing import to_decimal, Q2
 from services.user_service import normalize_email
@@ -17,7 +17,7 @@ VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 # Pole, která lze u vozidla nastavit
 VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
-    "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price",
+    "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
 )
 
 
@@ -108,6 +108,10 @@ class VehicleService:
 
         if not data.get("brand") or not data.get("model"):
             errors.append("Značka a model jsou povinné.")
+        if "kind" in data:
+            data["kind"] = data["kind"] or KIND_CAR
+            if data["kind"] not in VEHICLE_KINDS:
+                errors.append("Neplatný druh vozidla.")
         if data.get("brand") and len(data["brand"]) > 50:
             errors.append("Značka může mít nejvýše 50 znaků.")
         if data.get("model") and len(data["model"]) > 50:

@@ -85,6 +85,27 @@
 <span class="color-dot {{ size }}" style="background: {{ vehicle.color_hex or '#FFFFFF' }}" title="{{ vehicle.color or '' }}"></span>
 {%- endmacro %}
 
+{% macro vehicle_icon(vehicle) -%}
+{% if vehicle.kind == "moto" -%}
+<svg class="icon icon-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Motorka"><title>Motorka</title><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 10h5.5l4 6M9 10 8 7H5.5M14.5 10 16 7h2.5"/></svg>
+{%- else -%}
+<svg class="icon icon-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Auto"><title>Auto</title><path d="M5 16H3v-3.5L5 8a2 2 0 0 1 1.8-1.2h10.4A2 2 0 0 1 19 8l2 4.5V16h-2M9 16h6M4 12h16"/><circle cx="7" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/></svg>
+{%- endif %}
+{%- endmacro %}
+
+{# Ikony typu nasazených pneumatik: entries = [(typ, [popisky])] z tire_service.mounted_seasons #}
+{% macro tire_icons(entries) -%}
+{% if entries %}<span class="tire-icons">{% for season, labels in entries %}
+{%- set cls = {"Letní": "summer", "Zimní": "winter", "Univerzální": "allseason"}.get(season, "other") %}
+{%- set text = season ~ " pneumatiky: " ~ labels|join(", ") %}
+<svg class="icon season-{{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" role="img" aria-label="{{ text }}"><title>{{ text }}</title>
+{%- if cls == "summer" %}<circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>
+{%- elif cls == "winter" %}<path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 3.5 12 5.5l3-2M9 20.5l3-2 3 2M3.6 10.6 6.8 9 6.5 5.4M20.4 13.4 17.2 15l.3 3.6M3.6 13.4 6.8 15l-.3 3.6M20.4 10.6 17.2 9l.3-3.6"/>
+{%- elif cls == "allseason" %}<circle cx="12" cy="12" r="3.3" fill="currentColor"/><path d="M12 2v5M12 17v5M3.3 7l4.3 2.5M16.4 14.5l4.3 2.5M3.3 17l4.3-2.5M16.4 9.5l4.3-2.5M9.5 3.5 12 5l2.5-1.5M9.5 20.5 12 19l2.5 1.5"/>
+{%- else %}<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>{% endif %}</svg>
+{%- endfor %}</span>{% endif %}
+{%- endmacro %}
+
 {% macro role_badge(role) -%}
 {% if role and role != 'owner' %}<span class="badge badge-info" title="Sdílené vozidlo">Sdíleno · {{ role_labels[role] }}</span>{% endif %}
 {%- endmacro %}

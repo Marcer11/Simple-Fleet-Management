@@ -8,6 +8,23 @@ SERVICE_TYPES = [
     "Klimatizace", "Baterie", "Karoserie", "Pravidelná prohlídka", "Oprava", "Ostatní",
 ]
 
+SERVICE_TYPE_SEPARATOR = ", "
+
+
+def split_service_types(value):
+    """"Výměna oleje, Brzdy" -> ["Výměna oleje", "Brzdy"] (bez prázdných a duplicit)."""
+    result = []
+    for part in (value or "").split(","):
+        part = part.strip()
+        if part and part.lower() not in (x.lower() for x in result):
+            result.append(part)
+    return result
+
+
+def join_service_types(types):
+    return SERVICE_TYPE_SEPARATOR.join(split_service_types(",".join(t for t in types if t)))
+
+
 REPEAT_NONE = "none"
 REPEAT_OPTIONS = {
     REPEAT_NONE: "Jednorázově",
@@ -43,7 +60,7 @@ class ServiceRecord(Base):
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
     service_date = Column(Date, nullable=False)
     odometer = Column(Integer, nullable=True)
-    service_type = Column(String(50), nullable=False)
+    service_type = Column(String(255), nullable=False)  # jedna nebo více položek oddělených ", "
     place = Column(String(100), nullable=True)
     price_paid = Column(DECIMAL(12, 3), nullable=True)
     currency_code = Column(CHAR(3), nullable=False, default="CZK")
@@ -51,6 +68,10 @@ class ServiceRecord(Base):
     note = Column(Text, nullable=True)
 
     vehicle = relationship("Vehicle", back_populates="service_records")
+
+    @property
+    def types(self):
+        return split_service_types(self.service_type)
 
 
 class ServiceInterval(Base):

@@ -20,6 +20,12 @@ TIRE_POSITIONS = {
     "rr": ("Pravé zadní", frozenset({"rr"})),
     "spare": ("Rezerva", frozenset({"spare"})),
 }
+# Motorka: stejné pozice (náprava = kolo), jen jiné popisky; jednotlivá kola a rezerva nedávají smysl
+MOTO_POSITIONS = {"all": "Obě kola", "front": "Přední kolo", "rear": "Zadní kolo"}
+# Kola pro zápis dezénu: klíč, krátký a dlouhý popis
+CAR_WHEELS = [("fl", "LP", "levé přední"), ("fr", "PP", "pravé přední"), ("rl", "LZ", "levé zadní"),
+              ("rr", "PZ", "pravé zadní"), ("spare", "R", "rezerva")]
+MOTO_WHEELS = [("f", "P", "přední"), ("r", "Z", "zadní")]
 DAMAGE_POSITIONS = ["Levá přední", "Pravá přední", "Levá zadní", "Pravá zadní", "Přední", "Zadní", "Rezerva"]
 # Zákonné minimum hloubky dezénu (mm): zimní a univerzální (v zimním období) 4 mm, letní 1,6 mm
 LEGAL_MIN_TREAD = {"Zimní": 4.0, "Univerzální": 4.0, "Letní": 1.6}
@@ -28,8 +34,39 @@ TIRE_SERVICE_TYPE = "Přezutí pneumatik"
 TIRE_MAX_AGE_YEARS = 6  # starší pneumatiky tvrdnou - doporučená výměna
 
 
-def position_label(position):
+def position_label(position, kind=None):
+    if kind == "moto" and position in MOTO_POSITIONS:
+        return MOTO_POSITIONS[position]
     return TIRE_POSITIONS.get(position, (position or "", None))[0]
+
+
+def positions_for(kind):
+    """Pozice nabízené pro druh vozidla: {klíč: popisek}."""
+    if kind == "moto":
+        return dict(MOTO_POSITIONS)
+    return {key: label for key, (label, _) in TIRE_POSITIONS.items()}
+
+
+def tread_wheels(position, kind=None):
+    """Kola, která pozice zabírá - pro zápis dezénu po kolech: [(klíč, zkratka, popis)]."""
+    slots = position_slots(position)
+    if kind == "moto":
+        return [w for w in MOTO_WHEELS if (w[0] == "f" and "fl" in slots) or (w[0] == "r" and "rl" in slots)]
+    return [w for w in CAR_WHEELS if w[0] in slots]
+
+
+def parse_treads(value):
+    """"fl=5.5;fr=5.6" -> {"fl": "5.5", "fr": "5.6"}"""
+    result = {}
+    for part in (value or "").split(";"):
+        key, _, mm = part.partition("=")
+        if key.strip() and mm.strip():
+            result[key.strip()] = mm.strip()
+    return result
+
+
+def format_treads(treads):
+    return ";".join(f"{key}={value}" for key, value in treads.items() if value is not None) or None
 
 
 def position_slots(position):
@@ -149,7 +186,8 @@ class TireMount(Base):
     removed_swap_id = Column(Integer, ForeignKey("tire_swaps.id", ondelete="SET NULL"), nullable=True, index=True)
     removed_date = Column(Date, nullable=True)
     removed_km = Column(Integer, nullable=True)
-    removed_tread_mm = Column(DECIMAL(3, 1), nullable=True)  # naměřeno při sundání
+    removed_tread_mm = Column(DECIMAL(3, 1), nullable=True)  # naměřeno při sundání (nejmenší z kol)
+    removed_treads = Column(String(60), nullable=True)  # po kolech: "fl=5.5;fr=5.6;rl=6.5;rr=6.4"
 
     tire = relationship("Tire", back_populates="mounts")
     vehicle = relationship("Vehicle")
@@ -157,12 +195,35 @@ class TireMount(Base):
     removed_swap = relationship("TireSwap", foreign_keys=[removed_swap_id], back_populates="removed")
 
     @property
+    def kind(self):
+        return self.vehicle.kind if self.vehicle is not None else None
+
+    @property
     def position_label(self):
-        return position_label(self.position)
+        return position_label(self.position, self.kind)
 
     @property
     def slots(self):
         return position_slots(self.position)
+
+    @property
+    def wheels(self):
+        return tread_wheels(self.position, self.kind)
+
+    @property
+    def tread_map(self):
+        return parse_treads(self.removed_treads)
+
+    @property
+    def treads_label(self):
+        """Dezén při sundání pro zobrazení: "LP 5,5 · PP 5,6 · LZ 6,5" nebo jen "5,5"."""
+        values = self.tread_map
+        if values:
+            short = {w[0]: w[1] for w in CAR_WHEELS + MOTO_WHEELS}
+            return " · ".join(f"{short.get(k, k)} {v.replace('.', ',')}" for k, v in values.items())
+        if self.removed_tread_mm is not None:
+            return f"{self.removed_tread_mm}".replace(".", ",")
+        return ""
 
 
 class TireDefect(Base):

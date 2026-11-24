@@ -1,4 +1,6 @@
 """Seznam paliv, který si uživatel spravuje sám (nabízí se ve formuláři tankování)."""
+import re
+
 from sqlalchemy import func
 
 from models import FuelRecord, FuelType
@@ -6,6 +8,7 @@ from models.fuel_record import FUEL_CATEGORIES, FUEL_TYPES, guess_fuel_category
 from models.vehicle import ROLE_EDITOR
 from services.errors import NotFoundError, ValidationError
 from services.fuel_record_service import FuelRecordService
+from services.stations import KNOWN_BRANDS, station_brand
 from services.vehicle_service import VehicleService
 
 MAX_NAME = 30
@@ -53,6 +56,28 @@ class FuelTypeService:
         return item
 
     @staticmethod
+    def clean_brands(value):
+        """Text 'orlen, Shell ,benzina' -> 'ORLEN,Shell' (značky jako v přehledu stanic, bez duplicit)."""
+        brands = []
+        for part in re.split(r"[,;\n]", value or ""):
+            part = " ".join(part.split())
+            if not part:
+                continue
+            brand = station_brand(part)
+            if brand.lower() not in {b.lower() for b in brands}:
+                brands.append(brand)
+        text = ",".join(brands)
+        if len(text) > 255:
+            raise ValidationError("Seznam pump je příliš dlouhý.")
+        return text or None
+
+    def brand_suggestions(self, user):
+        """Značky pump pro našeptávání: známé značky + značky stanic, kde uživatel tankoval."""
+        ids = VehicleService(self.session).get_accessible_ids(user)
+        used = {station_brand(n) for n in FuelRecordService(self.session).get_used_values(ids, "station_name")}
+        return sorted(used | set(KNOWN_BRANDS), key=str.lower)
+
+    @staticmethod
     def _clean(name, category):
         name = " ".join((name or "").split())
         if not name:
@@ -82,17 +107,18 @@ class FuelTypeService:
             self.session.add(item)
         return item.name, item.category or ""  # "" = palivo bez druhu (neodhadovat)
 
-    def create(self, user, name, category):
+    def create(self, user, name, category, station_brands=None):
         name, category = self._clean(name, category)
+        brands = self.clean_brands(station_brands)
         self.list_for_user(user)
         if self._find(user, name):
             raise ValidationError(f"Palivo „{name}“ už v seznamu je.")
-        item = FuelType(user_id=user.id, name=name, category=category)
+        item = FuelType(user_id=user.id, name=name, category=category, station_brands=brands)
         self.session.add(item)
         self.session.commit()
         return item
 
-    def update(self, user, item, name, category):
+    def update(self, user, item, name, category, station_brands=None):
         """Přejmenuje palivo / změní druh - i u tankování vozidel, která uživatel smí upravovat."""
         name, category = self._clean(name, category)
         other = self._find(user, name)
@@ -100,6 +126,7 @@ class FuelTypeService:
             raise ValidationError(f"Palivo „{name}“ už v seznamu je.")
         old_name = item.name
         item.name, item.category = name, category
+        item.station_brands = self.clean_brands(station_brands)
 
         ids = VehicleService(self.session).get_accessible_ids(user, ROLE_EDITOR)
         records = (self.session.query(FuelRecord)

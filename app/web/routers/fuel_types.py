@@ -17,7 +17,8 @@ router = APIRouter(prefix="/fuel-types")
 
 
 def _page(request, db, user, status_code=200, error=None, values=None):
-    items = FuelTypeService(db).list_for_user(user)
+    service = FuelTypeService(db)
+    items = service.list_for_user(user)
     ids = VehicleService(db).get_accessible_ids(user)
     usage = Counter()
     if ids:
@@ -26,7 +27,8 @@ def _page(request, db, user, status_code=200, error=None, values=None):
         usage.update({name: count for name, count in rows})
     return render(request, "fuel_types/list.html", status_code=status_code, error=error,
                   items=items, usage={t.id: usage.get(t.name.lower(), 0) for t in items},
-                  categories=[(c, fuel_unit(c)) for c in FUEL_CATEGORIES], values=values or {})
+                  categories=[(c, fuel_unit(c)) for c in FUEL_CATEGORIES], values=values or {},
+                  brands=service.brand_suggestions(user))
 
 
 @router.get("")
@@ -38,7 +40,8 @@ async def list_fuel_types(request: Request, user=Depends(get_current_user), db=D
 async def add_fuel_type(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
     form = FormReader(await request.form())
     try:
-        item = FuelTypeService(db).create(user, form.raw.get("name"), form.raw.get("category"))
+        item = FuelTypeService(db).create(user, form.raw.get("name"), form.raw.get("category"),
+                                          form.raw.get("station_brands"))
     except ValidationError as e:
         db.rollback()
         return _page(request, db, user, 400, str(e), values=form.values)
@@ -52,7 +55,8 @@ async def edit_fuel_type(request: Request, fuel_type_id: int, user=Depends(get_c
     item = service.get(user, fuel_type_id)
     form = FormReader(await request.form())
     try:
-        changed = service.update(user, item, form.raw.get("name"), form.raw.get("category"))
+        changed = service.update(user, item, form.raw.get("name"), form.raw.get("category"),
+                                 form.raw.get("station_brands"))
     except ValidationError as e:
         db.rollback()
         return _page(request, db, user, 400, str(e))

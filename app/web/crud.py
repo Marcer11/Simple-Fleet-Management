@@ -24,6 +24,7 @@ class CrudConfig:
     extra_context: Callable = lambda db, user: {}
     messages: dict = field(default_factory=dict)
     prefill_params: tuple = ()       # pole formuláře, která lze předvyplnit z URL (?category=...)
+    track_author: bool = False       # uložit created_by_id (kdo záznam zapsal)
 
 
 def register_crud(router: APIRouter, cfg: CrudConfig):
@@ -46,6 +47,8 @@ def register_crud(router: APIRouter, cfg: CrudConfig):
         try:
             data = cfg.read_form(form)
             vehicle = VehicleService(db).get_vehicle_for_user(data["vehicle_id"], user, ROLE_EDITOR)
+            if cfg.track_author:
+                data["created_by_id"] = user.id
             cfg.service_cls(db).create(**data)
         except (ValidationError, NotFoundError) as e:
             db.rollback()

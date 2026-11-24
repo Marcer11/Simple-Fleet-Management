@@ -65,7 +65,6 @@
             {% endif %}
             {% if is_owner %}
             <a class="btn btn-sm" href="/vehicles/{{ vehicle.id }}/sharing">Sdílení</a>
-            {{ m.delete_button("/vehicles/%d/delete"|format(vehicle.id), "Opravdu smazat vozidlo včetně všech tankování, servisů, výdajů a upomínek?", "Smazat") }}
             {% else %}
             <form method="post" action="/vehicles/{{ vehicle.id }}/leave" data-confirm="Opravdu ukončit sdílení tohoto vozidla?">
                 {{ m.csrf() }}
@@ -82,7 +81,10 @@
         <div><div class="label">VIN</div><div class="value">{{ vehicle.vin or "–" }}</div></div>
         <div><div class="label">Barva</div><div class="value">{{ vehicle.color or "–" }}</div></div>
         <div><div class="label">Zakoupeno</div><div class="value">{{ vehicle.purchase_date|date or "–" }}</div></div>
+        <div><div class="label">Pořizovací cena</div><div class="value">{{ vehicle.purchase_price|czk(0) }}</div></div>
         <div><div class="label">Prodáno</div><div class="value">{{ vehicle.sale_date|date or "–" }}</div></div>
+        {% if vehicle.sale_price is not none %}<div><div class="label">Prodejní cena</div><div class="value">{{ vehicle.sale_price|czk(0) }}</div></div>{% endif %}
+        {% if vehicle.value_loss is not none %}<div><div class="label">Ztráta hodnoty</div><div class="value">{{ vehicle.value_loss|czk(0) }}</div></div>{% endif %}
         {% for cat, e, days_left, renew_from in validities %}
         <div>
             <div class="label">{{ cat }}</div>
@@ -97,6 +99,22 @@
         {% endfor %}
     </div>
     {% if vehicle.note %}<p style="white-space: pre-line; margin-bottom: 0">{{ vehicle.note }}</p>{% endif %}
+</div>
+
+{# ------------------------------------------------ časová osa #}
+<div class="card">
+    <div class="card-head">
+        <h2>Časová osa</h2>
+        <div class="actions">
+            <a class="small" href="/timeline?vehicle_id={{ vehicle.id }}&all=1">Celá časová osa</a>
+            {% if can_edit %}<a class="btn btn-sm btn-primary" href="/notes/add?vehicle_id={{ vehicle.id }}">+ Poznámka</a>{% endif %}
+        </div>
+    </div>
+    {% if events %}
+    {% with show_vehicle=false, with_year=true %}{% include "_timeline_items.html" %}{% endwith %}
+    {% else %}
+    <div class="empty small">Zatím žádné události. Poznámkou si můžete zapsat třeba uložení do garáže, půjčení nebo nehodu.</div>
+    {% endif %}
 </div>
 
 {# ------------------------------------------------ tankování #}

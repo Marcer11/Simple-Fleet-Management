@@ -30,8 +30,14 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
   - uživatel, se kterým je vozidlo sdíleno, může sdílení sám ukončit
 
 ### Vozidla
-Značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum nákupu
-a prodeje, aktivní/neaktivní.
+Značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum a cena nákupu
+a prodeje (ztráta hodnoty), aktivní/neaktivní. Smazání vozidla je schované dole ve formuláři úprav.
+
+### Poznámky a časová osa
+- **poznámky k vozidlu** s datem, časem a stavem tachometru (uloženo do garáže, půjčeno, nehoda…);
+  stav tachometru se kontroluje proti ostatním záznamům v čase – stejný stav v různé dny je povolený
+- **časová osa** (`/timeline` a karta v detailu vozidla): tankování, servis, výdaje, poznámky, nákup
+  a prodej v jednom seznamu po měsících, filtr podle vozidla, období a druhu události
 
 ### Tankování
 - datum, čas, tachometr, palivo, množství (l / kWh / kg), cena za jednotku **nebo** celková cena
@@ -47,6 +53,8 @@ a prodeje, aktivní/neaktivní.
 - **vlastní seznam paliv** (Tankování → Paliva): nově zadané palivo se uloží do nabídky; každé palivo má
   *druh* (benzín, nafta, LPG, CNG, elektřina), podle kterého se počítá spotřeba a určuje jednotka –
   Natural 95 i Verva 100 jsou benzín; přejmenování se promítne i do zapsaných tankování
+- palivo lze navázat na **značky pump** (Verva 100 → ORLEN, V-Power → Shell, i víc značek);
+  formulář tankování pak u dané pumpy nabízí jen její paliva a paliva bez omezení
 - **přehled čerpacích stanic** – značka (podle názvu stanice) → jednotlivé stanice podle adresy,
   počet tankování, množství, útrata, průměrná cena za litr
 - **API pro Timeline** – Timeline si načítá tankování vozidla podle SPZ do výdajů výletů

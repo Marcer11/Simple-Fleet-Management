@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Časová osa{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Časová osa</h1>
+        <div class="sub">{% if vehicle %}{{ vehicle.display_name }}{% else %}Všechna vozidla{% endif %} – tankování, servis, výdaje a poznámky</div>
+    </div>
+    <div class="actions">
+        <a class="btn btn-primary" href="/notes/add{% if vehicle %}?vehicle_id={{ vehicle.id }}{% endif %}">+ Poznámka</a>
+    </div>
+</div>
+
+<div class="card">
+    {% call m.period_filter("/timeline", vehicles, filters) %}
+    <fieldset class="field kind-filter">
+        <legend>Zobrazit</legend>
+        <div class="check-row">
+        {% for key, label in kinds.items() %}
+        <label class="check"><input type="checkbox" name="kind" value="{{ key }}"{% if key in filters.kinds %} checked{% endif %}> {{ label }}</label>
+        {% endfor %}
+        </div>
+    </fieldset>
+    {% endcall %}
+
+    {% if groups %}
+    {% for month, events in groups %}
+    <h2 class="tl-month">{{ months[month.month - 1]|capitalize }} {{ month.year }}</h2>
+    {% include "_timeline_items.html" %}
+    {% endfor %}
+    <p class="help">Událostí: {{ count }}.</p>
+    {% else %}
+    <div class="empty">Ve zvoleném období nejsou žádné události.</div>
+    {% endif %}
+</div>
+{% endblock %}

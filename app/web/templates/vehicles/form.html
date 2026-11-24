@@ -23,7 +23,9 @@
             </div>
         </div>
         {{ m.field("purchase_date", "Datum nákupu", "date") }}
+        {{ m.field("purchase_price", "Pořizovací cena (Kč)", inputmode="decimal", placeholder="0", autocomplete="off") }}
         {{ m.field("sale_date", "Datum prodeje", "date") }}
+        {{ m.field("sale_price", "Prodejní cena (Kč)", inputmode="decimal", placeholder="0", autocomplete="off") }}
         {{ m.textarea("note", "Poznámka") }}
     </div>
     <div class="form-actions">
@@ -31,4 +33,13 @@
         <a class="btn" href="{{ '/vehicles/%d'|format(vehicle.id) if vehicle else '/vehicles' }}">Zrušit</a>
     </div>
 </form>
+
+{% if vehicle and is_owner %}
+<details class="danger-zone">
+    <summary>Smazání vozidla</summary>
+    <p class="small muted">Smaže vozidlo včetně všech tankování, servisů, výdajů, upomínek a poznámek. Nelze vrátit.
+        Prodané nebo nepoužívané vozidlo raději jen deaktivujte – historie i statistiky zůstanou.</p>
+    {{ m.delete_button("/vehicles/%d/delete"|format(vehicle.id), "Opravdu nenávratně smazat vozidlo " ~ vehicle.display_name ~ " včetně všech záznamů?", "Smazat vozidlo") }}
+</details>
+{% endif %}
 {% endblock %}

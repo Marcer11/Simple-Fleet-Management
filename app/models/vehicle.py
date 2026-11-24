@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Boolean, Date, DateTime, Text, CHAR, ForeignKey, UniqueConstraint, func
+    Column, Integer, String, Boolean, Date, DateTime, Text, CHAR, DECIMAL, ForeignKey, UniqueConstraint, func
 )
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -28,6 +28,8 @@ class Vehicle(Base):
     note = Column(Text, nullable=True)
     purchase_date = Column(Date, nullable=True)
     sale_date = Column(Date, nullable=True)
+    purchase_price = Column(DECIMAL(12, 2), nullable=True)  # Kč
+    sale_price = Column(DECIMAL(12, 2), nullable=True)      # Kč
     is_active = Column(Boolean, nullable=False, default=True)
 
     owner = relationship("User", back_populates="vehicles")
@@ -37,11 +39,19 @@ class Vehicle(Base):
     service_intervals = relationship("ServiceInterval", back_populates="vehicle", cascade="all, delete-orphan")
     reminders = relationship("Reminder", back_populates="vehicle", cascade="all, delete-orphan")
     expenses = relationship("Expense", back_populates="vehicle", cascade="all, delete-orphan")
+    notes = relationship("VehicleNote", back_populates="vehicle", cascade="all, delete-orphan")
 
     @property
     def display_name(self):
         name = f"{self.brand} {self.model}"
         return f"{name} ({self.license_plate})" if self.license_plate else name
+
+    @property
+    def value_loss(self):
+        """Ztráta hodnoty (nákup - prodej), pokud známe obě ceny."""
+        if self.purchase_price is None or self.sale_price is None:
+            return None
+        return self.purchase_price - self.sale_price
 
     def __repr__(self):
         return f"{self.id}: {self.brand} {self.model} ({self.license_plate})"

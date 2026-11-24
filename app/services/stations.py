@@ -40,6 +40,12 @@ _BRANDS = [
     (r"\bpre\b", "PRE"),
 ]
 _BRAND_RES = [(re.compile(pattern, re.IGNORECASE), brand) for pattern, brand in _BRANDS]
+KNOWN_BRANDS = sorted({brand for _, brand in _BRANDS}, key=str.lower)
+
+
+def brand_patterns():
+    """Vzory pro rozpoznání značky v prohlížeči (formulář tankování)."""
+    return [[pattern, brand] for pattern, brand in _BRANDS]
 
 
 def station_brand(name):

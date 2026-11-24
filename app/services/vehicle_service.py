@@ -1,12 +1,14 @@
 import re
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
-from models import Vehicle, VehicleShare, FuelRecord, ServiceRecord, Expense
+from models import Vehicle, VehicleShare, FuelRecord, ServiceRecord, Expense, VehicleNote
 from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
 from services.errors import ValidationError, NotFoundError, PermissionDeniedError
+from services.pricing import to_decimal, Q2
 from services.user_service import normalize_email
 
 HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -15,7 +17,7 @@ VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 # Pole, která lze u vozidla nastavit
 VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
-    "vin", "note", "purchase_date", "sale_date", "is_active",
+    "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price",
 )
 
 
@@ -134,6 +136,12 @@ class VehicleService:
         year = data.get("production_year")
         if year is not None and not (1901 <= int(year) <= date.today().year + 1):
             errors.append("Neplatný rok výroby.")
+
+        for key, label in (("purchase_price", "Pořizovací cena"), ("sale_price", "Prodejní cena")):
+            if key in data:
+                data[key] = to_decimal(data[key], Q2)
+                if data[key] is not None and not (0 <= data[key] < Decimal("10000000000")):
+                    errors.append(f"{label} musí být kladné číslo.")
 
         purchase, sale = data.get("purchase_date"), data.get("sale_date")
         if purchase and sale and sale < purchase:
@@ -282,6 +290,7 @@ class VehicleService:
             self.session.query(func.max(FuelRecord.odometer)).filter(FuelRecord.vehicle_id == vehicle_id).scalar(),
             self.session.query(func.max(ServiceRecord.odometer)).filter(ServiceRecord.vehicle_id == vehicle_id).scalar(),
             self.session.query(func.max(Expense.odometer)).filter(Expense.vehicle_id == vehicle_id).scalar(),
+            self.session.query(func.max(VehicleNote.odometer)).filter(VehicleNote.vehicle_id == vehicle_id).scalar(),
         ]
         values = [v for v in values if v is not None]
         return max(values) if values else None

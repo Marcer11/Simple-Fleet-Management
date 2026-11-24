@@ -3,8 +3,9 @@ from datetime import date
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, SHARE_ROLES
+from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
 from services.errors import ValidationError
+from services.events import collect_events
 from services.fuel_record_service import FuelRecordService
 from services.maintenance_service import (
     ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
@@ -25,6 +26,7 @@ def _vehicle_values(vehicle):
         "color": vehicle.color or "", "color_hex": vehicle.color_hex or "#FFFFFF",
         "purchase_date": iso(vehicle.purchase_date), "sale_date": iso(vehicle.sale_date),
         "note": vehicle.note or "", "is_active": "on" if vehicle.is_active else "",
+        "purchase_price": iso(vehicle.purchase_price), "sale_price": iso(vehicle.sale_price),
     }
 
 
@@ -40,6 +42,8 @@ def _read_vehicle_form(form):
         "color_hex": form.str("color_hex", "Barva (HEX)") or "#FFFFFF",
         "purchase_date": form.date("purchase_date", "Datum nákupu"),
         "sale_date": form.date("sale_date", "Datum prodeje"),
+        "purchase_price": form.decimal("purchase_price", "Pořizovací cena", min_value=0),
+        "sale_price": form.decimal("sale_price", "Prodejní cena", min_value=0),
         "note": form.str("note", "Poznámka"),
     }
     form.check()
@@ -108,6 +112,8 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         avg_consumption=StatsService(db).avg_consumption(vehicle.id),
         profile=StatsService(db).usage_profile(vehicle.id),
         breakdown=StatsService(db).fuel_breakdown(vehicle.id),
+        events=collect_events(db, [vehicle], limit=8),
+        editable_ids={vehicle.id} if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set(),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
         owner=vehicle.owner,
     )
@@ -116,7 +122,8 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
 @router.get("/{vehicle_id}/edit")
 async def edit_vehicle_form(request: Request, vehicle_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     vehicle = VehicleService(db).get_vehicle_for_user(vehicle_id, user, ROLE_EDITOR)
-    return render(request, "vehicles/form.html", vehicle=vehicle, values=_vehicle_values(vehicle))
+    return render(request, "vehicles/form.html", vehicle=vehicle, values=_vehicle_values(vehicle),
+                  is_owner=vehicle.owner_id == user.id)
 
 
 @router.post("/{vehicle_id}/edit")
@@ -128,7 +135,8 @@ async def edit_vehicle_post(request: Request, vehicle_id: int, user=Depends(get_
         service.update_vehicle(vehicle, _read_vehicle_form(form))
     except ValidationError as e:
         db.rollback()
-        return render(request, "vehicles/form.html", status_code=400, vehicle=vehicle, values=form.values, error=str(e))
+        return render(request, "vehicles/form.html", status_code=400, vehicle=vehicle, values=form.values,
+                      error=str(e), is_owner=vehicle.owner_id == user.id)
     flash(request, "Změny byly uloženy.")
     return RedirectResponse(f"/vehicles/{vehicle_id}", status_code=303)
 

@@ -10,7 +10,7 @@ from services.errors import ValidationError, NotFoundError
 from services.fuel_record_service import FuelRecordService
 from services.fuel_type_service import FuelTypeService
 from services.pricing import fuel_prices
-from services.stations import station_overview
+from services.stations import brand_patterns, station_overview
 from services.vehicle_service import VehicleService
 from web.common import (
     editable_vehicles, visible_vehicles, check_record_access, flash_vehicle_alerts,
@@ -120,6 +120,9 @@ def _form_context(db, user, record=None):
         "record": record,
         "vehicles": vehicles,
         "fuel_types": FuelTypeService(db).names(user),
+        # nabídka paliv podle pumpy (Verva 100 jen u ORLEN) - filtruje app.js
+        "fuel_options": [{"name": t.name, "brands": t.brands} for t in FuelTypeService(db).list_for_user(user)],
+        "brand_patterns": brand_patterns(),
         "payment_methods": PAYMENT_METHODS,
         "currencies": COMMON_CURRENCIES,
         "stations": service.get_used_values(ids, "station_name"),

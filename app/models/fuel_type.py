@@ -14,8 +14,15 @@ class FuelType(Base):
     name = Column(String(30), nullable=False)
     # Druh (Benzín, Nafta, LPG, CNG, Elektřina) - None = vlastní řada spotřeby
     category = Column(String(15), nullable=True)
+    # Značky pump, u kterých se palivo nabízí (např. "ORLEN" pro Verva 100), oddělené čárkou;
+    # prázdné = u všech pump
+    station_brands = Column(String(255), nullable=True)
 
     user = relationship("User")
+
+    @property
+    def brands(self):
+        return [b for b in (self.station_brands or "").split(",") if b]
 
     def __repr__(self):
         return f"FuelType id={self.id} name={self.name} category={self.category}"

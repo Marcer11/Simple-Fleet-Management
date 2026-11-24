@@ -9,7 +9,8 @@ from models.maintenance import (
 )
 from models.vehicle import ROLE_EDITOR
 from services.maintenance_service import (
-    ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
+    ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
+    collect_alerts,
 )
 from services.vehicle_service import VehicleService
 from web.common import (
@@ -332,3 +333,57 @@ async def export_expenses(request: Request, user=Depends(get_current_user), db=D
 def alerts_for_user(db, user):
     vehicles = VehicleService(db).get_vehicles_for_user(user, only_active=True)
     return collect_alerts(db, vehicles)
+
+
+# ======================================================================
+# Poznámky k vozidlu (garáž, půjčeno, nehoda…) - zobrazují se na časové ose
+# ======================================================================
+
+def _read_note(form):
+    from datetime import datetime, time
+    data = {
+        "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
+        "note_date": form.date("note_date", "Datum", required=True),
+        "note_time": form.time("note_time", "Čas"),
+        "odometer": form.int("odometer", "Stav tachometru", min_value=0),
+        "category": form.str("category", "Typ", max_len=40),
+        "text": form.str("text", "Poznámka", max_len=5000),
+    }
+    form.check()
+    return {
+        "vehicle_id": data["vehicle_id"],
+        "note_datetime": datetime.combine(data["note_date"], data["note_time"] or time(12, 0)),
+        "odometer": data["odometer"], "category": data["category"], "text": data["text"],
+    }
+
+
+def _note_values(n):
+    return {
+        "vehicle_id": str(n.vehicle_id), "note_date": n.note_datetime.date().isoformat(),
+        "note_time": n.note_datetime.strftime("%H:%M"), "odometer": iso(n.odometer),
+        "category": n.category or "", "text": n.text or "",
+    }
+
+
+def _note_defaults(vehicle_id):
+    from datetime import datetime
+    now = datetime.now()
+    return {"note_date": now.date().isoformat(), "note_time": now.strftime("%H:%M")}
+
+
+register_crud(router, CrudConfig(
+    prefix="/notes",
+    service_cls=VehicleNoteService,
+    template="maintenance/note_form.html",
+    read_form=_read_note,
+    to_values=_note_values,
+    default_values=_note_defaults,
+    extra_context=lambda db, user: {
+        "note_categories": VehicleNoteService(db).get_categories(
+            VehicleService(db).get_accessible_ids(user)),
+    },
+    messages={"created": "Poznámka byla uložena.", "updated": "Poznámka byla upravena.",
+              "deleted": "Poznámka byla smazána."},
+    prefill_params=("category",),
+    track_author=True,
+))

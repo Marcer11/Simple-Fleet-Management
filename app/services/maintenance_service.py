@@ -1,10 +1,11 @@
 import calendar
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
 
-from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle
+from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord
+from models.vehicle_note import NOTE_CATEGORIES
 from models.maintenance import REPEAT_OPTIONS, REPEAT_NONE, VIGNETTE_VARIANTS
 from services.errors import ValidationError, NotFoundError
 from services.pricing import convert_price
@@ -522,3 +523,80 @@ def collect_alerts(session, vehicles, only_alerts=True, today=None):
                 s.km_left if s.km_left is not None else 10 ** 9)
 
     return sorted(alerts, key=sort_key)
+
+
+# ----------------------------------------------------------------------
+# Poznámky k vozidlu
+# ----------------------------------------------------------------------
+
+class VehicleNoteService(_RecordServiceBase):
+    model = VehicleNote
+    date_column = "note_datetime"
+
+    def _validate(self, data):
+        _ensure_vehicle(self.session, data.get("vehicle_id"))
+        if not data.get("note_datetime"):
+            raise ValidationError("Datum a čas poznámky jsou povinné.")
+        category = _clean_str(data.get("category"), 40, "Typ")
+        text = _clean_str(data.get("text"), 5000, "Poznámka")
+        if not category and not text:
+            raise ValidationError("Vyplňte typ nebo text poznámky.")
+        odometer = _positive_int(data.get("odometer"), "Stav tachometru")
+        if odometer is not None:
+            self._check_odometer(data["vehicle_id"], data["note_datetime"], odometer, data.get("id"))
+        return {
+            "vehicle_id": data["vehicle_id"],
+            "note_datetime": data["note_datetime"],
+            "odometer": odometer,
+            "category": category,
+            "text": text,
+            "created_by_id": data.get("created_by_id"),
+        }
+
+    def update(self, record, data):
+        # id, aby se poznámka při kontrole tachometru neporovnávala sama se sebou
+        return super().update(record, {**data, "id": record.id})
+
+    def _check_odometer(self, vehicle_id, when, odometer, exclude_id=None):
+        """Stav tachometru musí odpovídat ostatním záznamům vozidla v čase.
+
+        Stejný stav v různé dny je v pořádku (motorka přes zimu v garáži). Servis a výdaje mají
+        jen datum - ze stejného dne se neporovnávají.
+        """
+        readings = []  # (čas, km, popis)
+        for r in (self.session.query(FuelRecord.refuel_datetime, FuelRecord.odometer)
+                  .filter(FuelRecord.vehicle_id == vehicle_id)):
+            readings.append((r[0], r[1], "tankování", True))
+        notes = self.session.query(VehicleNote.note_datetime, VehicleNote.odometer, VehicleNote.id).filter(
+            VehicleNote.vehicle_id == vehicle_id, VehicleNote.odometer.isnot(None))
+        for when_, km, note_id in notes:
+            if note_id != exclude_id:
+                readings.append((when_, km, "poznámky", True))
+        for model, column, label in ((ServiceRecord, ServiceRecord.service_date, "servisu"),
+                                     (Expense, Expense.expense_date, "výdaje")):
+            for d, km in (self.session.query(column, model.odometer)
+                          .filter(model.vehicle_id == vehicle_id, model.odometer.isnot(None))):
+                readings.append((datetime.combine(d, datetime.min.time()), km, label, False))
+
+        for at, km, label, has_time in readings:
+            before = at < when if has_time else at.date() < when.date()
+            after = at > when if has_time else at.date() > when.date()
+            if before and km > odometer:
+                raise ValidationError(f"Stav tachometru ({odometer} km) je nižší než u {label} "
+                                      f"{at:%d.%m.%Y} ({km} km).")
+            if after and km < odometer:
+                raise ValidationError(f"Stav tachometru ({odometer} km) je vyšší než u {label} "
+                                      f"{at:%d.%m.%Y} ({km} km).")
+
+    def get_categories(self, vehicle_ids):
+        """Návrhy typu: výchozí + dříve použité."""
+        used = []
+        if vehicle_ids:
+            used = [r[0] for r in self.session.query(VehicleNote.category)
+                    .filter(VehicleNote.vehicle_id.in_(vehicle_ids), VehicleNote.category.isnot(None)).distinct()]
+        seen, result = set(), []
+        for name in NOTE_CATEGORIES + sorted(used):
+            if name.lower() not in seen:
+                seen.add(name.lower())
+                result.append(name)
+        return result

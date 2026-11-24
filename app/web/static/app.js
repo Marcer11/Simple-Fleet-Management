@@ -207,6 +207,7 @@
                 .then(function (data) {
                     if (data.status === "found") {
                         station.value = data.name;
+                        if (window.sfmRefreshFuels) window.sfmRefreshFuels();
                         if (address) address.value = data.address || "";
                         let text = "Načteno z Timeline";
                         if (data.arrive && data.leave) text += ` (u pumpy ${data.arrive.slice(11, 16)}–${data.leave.slice(11, 16)})`;
@@ -223,6 +224,35 @@
                     lookup.textContent = label;
                 });
         });
+    }
+
+    // Tankování: nabídka paliv podle pumpy (palivo s vyplněnými pumpami se nabízí jen u nich)
+    const fuelOptions = document.getElementById("fuel-options");
+    const fuelList = document.getElementById("fuel-types");
+    const stationInput = document.getElementById("f-station_name");
+    if (fuelOptions && fuelList && stationInput) {
+        const config = JSON.parse(fuelOptions.textContent);
+        const patterns = config.patterns.map(function (p) {
+            try { return [new RegExp(p[0], "i"), p[1]]; } catch (e) { return null; }
+        }).filter(Boolean);
+        function brandOf(name) {
+            name = name.trim().replace(/\s+/g, " ");
+            if (!name) return "";
+            for (const [re, brand] of patterns) if (re.test(name)) return brand;
+            return name.split(" ")[0];
+        }
+        function refreshFuels() {
+            const brand = brandOf(stationInput.value).toLowerCase();
+            fuelList.replaceChildren(...config.fuels
+                .filter(function (f) {
+                    return !brand || !f.brands.length || f.brands.some(function (b) { return b.toLowerCase() === brand; });
+                })
+                .map(function (f) { const o = document.createElement("option"); o.value = f.name; return o; }));
+        }
+        stationInput.addEventListener("input", refreshFuels);
+        stationInput.addEventListener("change", refreshFuels);
+        refreshFuels();
+        window.sfmRefreshFuels = refreshFuels;  // po načtení pumpy z Timeline
     }
 
     // Kopírování do schránky: <button data-copy="id-pole">

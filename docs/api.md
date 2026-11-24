@@ -67,6 +67,7 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "owner": "Martin",
       "odometer": 154320,
       "fuel_types": ["Natural 95"],
+      "consumption": [{"fuel": "Benzín", "value": 6.42, "unit": "l"}],
       "tire_sizes": ["205/55 R16 91V"],
       "purchase": {"date": "2021-03-15", "odometer": 61200, "price_czk": 389000.0},
       "sale": {"date": null, "odometer": null, "price_czk": null},
@@ -74,7 +75,13 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "is_rental": false,
       "rental": null,
       "last_record": "2026-11-20",
-      "note": null
+      "note": "Servisní knížka v příruční schránce",
+      "notes": [
+        {"id": "93", "time": "2026-11-20T18:05:00", "odometer": 154320, "category": "Garáž",
+         "text": "Uloženo v garáži u chalupy", "author": "Martin"},
+        {"id": "71", "time": "2026-08-02T09:40:00", "odometer": null, "category": null,
+         "text": "Škrábnutí na zadním nárazníku\nNafoceno", "author": "Jana"}
+      ]
     },
     {
       "id": "17",
@@ -95,6 +102,7 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "owner": "Martin",
       "odometer": 15420,
       "fuel_types": ["Natural 95"],
+      "consumption": [],
       "tire_sizes": [],
       "purchase": {"date": null, "odometer": null, "price_czk": null},
       "sale": {"date": null, "odometer": null, "price_czk": null},
@@ -102,7 +110,8 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "is_rental": true,
       "rental": {"provider": "Půjčovna AutoPraha", "from": "2026-05-01T08:30:00", "to": "2026-05-04"},
       "last_record": "2026-05-04",
-      "note": null
+      "note": null,
+      "notes": []
     }
   ]
 }
@@ -122,7 +131,8 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `production_year` | rok výroby |
 | `engine_volume` | objem motoru v cm³ (u elektromobilu může být `0`) |
 | `engine_power` | výkon v kW |
-| `color`, `color_hex` | barva slovy a barva v evidenci (`#RRGGBB`, vždy vyplněná) |
+| `color` | barva slovy (jak je zapsaná v evidenci) |
+| `color_hex` | barva pro zobrazení – barva, kterou evidence vozidlo označuje v seznamech a grafech (`#RRGGBB`, vždy vyplněná, výchozí `#FFFFFF`) |
 | `vin` | VIN |
 | `active` | `true` = aktivní vozidlo (viz výše) |
 | `status` | `active`, `inactive` (ručně vyřazené), `sold` (prodané), `returned` (vrácené půjčené) |
@@ -130,6 +140,7 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `owner` | jméno vlastníka vozidla |
 | `odometer` | nejvyšší známý stav tachometru v km ze všech záznamů |
 | `fuel_types` | paliva, která se do vozidla tankovala (abecedně) |
+| `consumption` | průměrná spotřeba za celou dobu, zvlášť pro každý druh paliva: `fuel` (druh: Benzín, Nafta, LPG, CNG, Elektřina…), `value` (spotřeba na 100 km, 2 desetinná místa), `unit` (`l`, `kg` nebo `kWh`). Počítá se metodou „plná–plná“ (od tankování do plna po další tankování do plna); dokud nejsou aspoň dvě tankování do plna, je seznam prázdný. Hlavní palivo bývá první, pořadí ale není zaručené |
 | `tire_sizes` | rozměry pneumatik podle technického průkazu |
 | `purchase` | nákup: `date`, `odometer` (km), `price_czk` |
 | `sale` | prodej: `date`, `odometer` (km), `price_czk` |
@@ -137,7 +148,8 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `is_rental` | půjčené vozidlo (půjčovna, od známého) |
 | `rental` | jen u půjčeného vozidla: poslední půjčení. `provider` (od koho), `from` a `to` (datum `YYYY-MM-DD`, nebo datum a čas `YYYY-MM-DDTHH:MM:SS`, když je čas zapsaný; `to` je `null`, dokud není vráceno) |
 | `last_record` | datum posledního záznamu u vozidla (tankování, servis, výdaj, poznámka, pneumatiky, půjčení, nákup / prodej), jen do dneška |
-| `note` | poznámka k vozidlu |
+| `note` | poznámka v údajích vozidla (jeden text, např. kde je servisní knížka) |
+| `notes` | poznámky k vozidlu v čase (jako na časové ose: garáž, nehoda, poškození…), od nejnovější. `id`, `time` (místní čas), `odometer` (km nebo `null`), `category` (typ poznámky nebo `null`), `text` (může mít víc řádků, nebo `null`), `author` (jméno uživatele, který poznámku zapsal) |
 
 Data jsou ve formátu `YYYY-MM-DD`, časy jsou místní (Praha) bez časové zóny, částky jsou čísla v Kč.
 

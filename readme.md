@@ -266,9 +266,10 @@ Authorization: Bearer fk_…
 ```
 - stejný klíč; `status=active` (výchozí) jen aktivní vozidla (jako „Jen aktivní“), `status=all` všechna
 - vrací vlastní i sdílená vozidla s údaji: SPZ, značka, model, druh, rok výroby, objem motoru, výkon,
-  VIN, barva, stav (`active` / `inactive` / `sold` / `returned`), role uživatele, vlastník, tachometr,
-  tankovaná paliva, rozměry pneumatik, nákup a prodej, dálniční známka, poslední půjčení, datum
-  posledního záznamu, poznámka
+  VIN, barva (i barva pro zobrazení), stav (`active` / `inactive` / `sold` / `returned`), role uživatele,
+  vlastník, tachometr, tankovaná paliva, průměrná spotřeba podle druhu paliva, rozměry pneumatik, nákup
+  a prodej, dálniční známka, poslední půjčení, datum posledního záznamu, poznámka z údajů vozidla
+  a poznámky k vozidlu v čase (od nejnovější)
 
 ## Nasazení na server
 

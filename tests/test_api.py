@@ -125,6 +125,11 @@ def test_api_vehicles(app):
                                             "color_hex": "#FFFFFF", "kind": "car", "is_active": "on",
                                             "sale_date": "2025-01-10", "sale_odometer": "0"})
     add_fuel(client, active, date(2026, 7, 1), "1000", "40")
+    add_fuel(client, active, date(2026, 7, 8), "1500", "30")
+    post(client, "/notes/add", {"vehicle_id": active, "note_date": "2026-07-05", "note_time": "10:00",
+                                "category": "Garáž", "text": "U chalupy", "odometer": "1200"})
+    post(client, "/notes/add", {"vehicle_id": active, "note_date": "2026-07-09", "note_time": "08:15",
+                                "text": "Škrábnutí\nNafoceno"})
     other = register(app, "other-veh@example.com")
     add_vehicle(other, model="Cizí", license_plate="9ZZ9999")
 
@@ -138,7 +143,13 @@ def test_api_vehicles(app):
     assert [v["plate"] for v in data["vehicles"]] == ["1AB2345"]
     v = data["vehicles"][0]
     assert v["id"] == str(active) and v["name"] == "Škoda Octavia" and v["active"] is True
-    assert v["status"] == "active" and v["role"] == "owner" and v["odometer"] == 1000
+    assert v["status"] == "active" and v["role"] == "owner" and v["odometer"] == 1500
+    assert v["color_hex"] == "#FFFFFF"
+    assert v["consumption"] == [{"fuel": "Benzín", "value": 6.0, "unit": "l"}]
+    assert [(n["time"], n["category"], n["text"], n["odometer"]) for n in v["notes"]] == [
+        ("2026-07-09T08:15:00", None, "Škrábnutí\nNafoceno", None),
+        ("2026-07-05T10:00:00", "Garáž", "U chalupy", 1200)]
+    assert v["notes"][0]["author"]
     assert (v["engine_volume"], v["engine_power"]) == (1498, 110)
     detail = client.get(f"/vehicles/{active}").text.replace(" ", " ")
     assert "1 498 cm³" in detail and "110 kW" in detail and "150 k" in detail
@@ -148,6 +159,7 @@ def test_api_vehicles(app):
     everything = vehicles_api(app, key, status="all").json()["vehicles"]
     assert [x["plate"] for x in everything] == ["1AB2345", "2CD3456"]
     fabia = everything[1]
+    assert fabia["consumption"] == [] and fabia["notes"] == []
     assert fabia["engine_volume"] is None and fabia["engine_power"] is None
     assert fabia["active"] is False and fabia["status"] == "sold"
     assert fabia["sale"] == {"date": "2025-01-10", "odometer": 0, "price_czk": None}

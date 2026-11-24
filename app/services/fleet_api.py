@@ -10,7 +10,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import joinedload
 
-from models import FuelRecord, User
+from models import FuelRecord, User, VehicleNote
 from services.errors import NotFoundError, ValidationError
 from services.vehicle_service import VehicleService, normalize_plate
 
@@ -161,6 +161,22 @@ def vehicles(session, user, only_active=True):
                 .filter(FuelRecord.vehicle_id.in_(ids)).distinct())
         for vid, fuel in rows:
             fuel_types.setdefault(vid, []).append(fuel)
+    notes = {}
+    if ids:
+        query = (session.query(VehicleNote).options(joinedload(VehicleNote.created_by))
+                 .filter(VehicleNote.vehicle_id.in_(ids))
+                 .order_by(VehicleNote.note_datetime.desc(), VehicleNote.id.desc()))
+        for n in query:
+            notes.setdefault(n.vehicle_id, []).append({
+                "id": str(n.id),
+                "time": n.note_datetime.replace(microsecond=0).isoformat(),
+                "odometer": n.odometer,
+                "category": n.category,
+                "text": n.text,
+                "author": n.created_by.name if n.created_by else None,
+            })
+    from services.stats_service import StatsService
+    stats = StatsService(session)
     result = []
     for v in sorted(items, key=lambda v: (not v.in_use, v.brand.lower(), v.model.lower(), v.id)):
         vignette = vignettes.get(v.id)
@@ -184,6 +200,8 @@ def vehicles(session, user, only_active=True):
             "owner": v.owner.name if v.owner else None,
             "odometer": service.get_current_odometer(v.id),
             "fuel_types": sorted(fuel_types.get(v.id, [])),
+            "consumption": [{"fuel": fuel, "value": round(float(info["value"]), 2), "unit": info["unit"]}
+                            for fuel, info in stats.avg_consumption(v.id).items()],
             "tire_sizes": v.tire_size_list,
             "purchase": {"date": _iso(v.purchase_date), "odometer": v.purchase_odometer,
                          "price_czk": _number(v.purchase_price)},
@@ -199,6 +217,7 @@ def vehicles(session, user, only_active=True):
             } if rental else None,
             "last_record": _iso(last_dates.get(v.id)),
             "note": v.note,
+            "notes": notes.get(v.id, []),
         })
     return result
 

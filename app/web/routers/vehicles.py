@@ -29,6 +29,8 @@ def _vehicle_values(vehicle):
         "purchase_date": iso(vehicle.purchase_date), "sale_date": iso(vehicle.sale_date),
         "note": vehicle.note or "", "is_active": "on" if vehicle.is_active else "",
         "purchase_price": iso(vehicle.purchase_price), "sale_price": iso(vehicle.sale_price),
+        "tire_sizes": vehicle.tire_sizes or "",
+        "purchase_odometer": iso(vehicle.purchase_odometer), "sale_odometer": iso(vehicle.sale_odometer),
     }
 
 
@@ -47,7 +49,10 @@ def _read_vehicle_form(form):
         "sale_date": form.date("sale_date", "Datum prodeje"),
         "purchase_price": form.decimal("purchase_price", "Pořizovací cena", min_value=0),
         "sale_price": form.decimal("sale_price", "Prodejní cena", min_value=0),
+        "purchase_odometer": form.int("purchase_odometer", "Km při nákupu", min_value=0),
+        "sale_odometer": form.int("sale_odometer", "Km při prodeji", min_value=0),
         "note": form.str("note", "Poznámka"),
+        "tire_sizes": form.str("tire_sizes", "Rozměry pneumatik", max_len=500),
     }
     form.check()
     return data

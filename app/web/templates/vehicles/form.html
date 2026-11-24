@@ -25,8 +25,16 @@
         </div>
         {{ m.field("purchase_date", "Datum nákupu", "date") }}
         {{ m.field("purchase_price", "Pořizovací cena (Kč)", inputmode="decimal", placeholder="0", autocomplete="off") }}
+        {{ m.field("purchase_odometer", "Stav tachometru při nákupu (km)", "number", min=0, step=1, inputmode="numeric") }}
         {{ m.field("sale_date", "Datum prodeje", "date") }}
         {{ m.field("sale_price", "Prodejní cena (Kč)", inputmode="decimal", placeholder="0", autocomplete="off") }}
+        {{ m.field("sale_odometer", "Stav tachometru při prodeji (km)", "number", min=0, step=1, inputmode="numeric") }}
+        <div class="field field-wide">
+            <label for="f-tire_sizes">Rozměry pneumatik dle technického průkazu</label>
+            <textarea id="f-tire_sizes" name="tire_sizes" rows="3" maxlength="500" placeholder="205/55 R16 91V&#10;225/45 R17 91W">{{ m.val('tire_sizes') }}</textarea>
+            <small class="help">Každý rozměr na samostatný řádek (u motorky např. „přední 120/70 ZR17 58W“). Nabídnou se při
+                zápisu nové pneumatiky a při přezutí aplikace upozorní na pneumatiku jiného rozměru.</small>
+        </div>
         {{ m.textarea("note", "Poznámka") }}
     </div>
     <div class="form-actions">

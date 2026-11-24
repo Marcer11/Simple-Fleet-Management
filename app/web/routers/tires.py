@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 
 from models.tire import (
     DAMAGE_POSITIONS, LEGAL_MIN_TREAD, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
-    positions_for,
+    positions_for, size_fits,
 )
 from models.vehicle import ROLE_EDITOR
 from services.errors import NotFoundError, ValidationError
@@ -91,8 +91,11 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
 # ----------------------------------------------------------------------
 
 def _tire_context(db, user, tire=None):
+    vehicles = editable_vehicles(db, user)
+    # rozměry dle technických průkazů vozidel - nabídka do pole Rozměr
+    sizes = [(size, v.display_name) for v in vehicles if v.is_active for size in v.tire_size_list]
     return {"tire": tire, "seasons": TIRE_SEASONS, "rims": TIRE_RIMS, "currencies": COMMON_CURRENCIES,
-            "vehicles": editable_vehicles(db, user)}
+            "vehicles": vehicles, "vehicle_sizes": sizes}
 
 
 def _read_tire(form):
@@ -204,7 +207,9 @@ def _diagram(vehicle, current, tires):
         "current": [{"id": m.id, "tire": m.tire_id, "label": m.tire.label, "season": m.tire.season,
                      "position": m.position, "position_label": m.position_label,
                      "wheels": [list(w) for w in m.wheels]} for m in current],
-        "tires": {str(t.id): {"label": t.label, "season": t.season, "full": t.full_label} for t in tires},
+        "sizes": vehicle.tire_size_list,
+        "tires": {str(t.id): {"label": t.label, "season": t.season, "full": t.full_label, "size": t.size or "",
+                              "fits": size_fits(t.size, vehicle.tire_size_list)} for t in tires},
     }
 
 
@@ -280,6 +285,10 @@ async def swap_add(request: Request, user=Depends(get_current_user), db=Depends(
         return render(request, "tires/swap_form.html", status_code=400, values=form.values, error=str(e),
                       **_swap_context(db, user, vehicle))
     flash(request, "Přezutí bylo uloženo.")
+    for tire, _ in new_mounts:
+        if size_fits(tire.size, vehicle.tire_size_list) is False:
+            flash(request, f"Pozor: {tire.label} má rozměr {tire.size}, v technickém průkazu je "
+                           f"{', '.join(vehicle.tire_size_list)}.", "warning")
     return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
 
 

@@ -38,7 +38,14 @@
         </div>
         {{ m.field("manufacturer", "Výrobce", required=true, maxlength=50, placeholder="např. Michelin", autocomplete="off") }}
         {{ m.field("model", "Model", maxlength=50, placeholder="např. Alpin 6", autocomplete="off") }}
-        {{ m.field("size", "Rozměr", maxlength=30, placeholder="např. 205/55 R16 91H", autocomplete="off") }}
+        <div class="field">
+            <label for="f-size">Rozměr</label>
+            <input id="f-size" name="size" type="text" maxlength="30" value="{{ m.val('size') }}" placeholder="např. 205/55 R16 91H" autocomplete="off"{% if vehicle_sizes %} list="vehicle-sizes"{% endif %}>
+            {% if vehicle_sizes %}
+            <datalist id="vehicle-sizes">{% for size, name in vehicle_sizes %}<option value="{{ size }}" label="{{ name }}">{% endfor %}</datalist>
+            <small class="help">Dle TP: {% for size, name in vehicle_sizes %}{{ name }} {{ size }}{% if not loop.last %} · {% endif %}{% endfor %}</small>
+            {% endif %}
+        </div>
         {{ m.field("quantity", "Počet kusů", "number", min=1, max=8, help="1 = jedna guma, 2 = pár, 4 = sada") }}
         <div class="field">
             <label for="f-rim">Disky</label>

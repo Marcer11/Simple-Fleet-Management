@@ -36,7 +36,11 @@ class Vehicle(Base):
     sale_date = Column(Date, nullable=True)
     purchase_price = Column(DECIMAL(12, 2), nullable=True)  # Kč
     sale_price = Column(DECIMAL(12, 2), nullable=True)      # Kč
+    purchase_odometer = Column(Integer, nullable=True)      # km při nákupu
+    sale_odometer = Column(Integer, nullable=True)          # km při prodeji
     is_active = Column(Boolean, nullable=False, default=True)
+    # Povolené rozměry pneumatik dle technického průkazu - jeden na řádek ("205/55 R16 91V")
+    tire_sizes = Column(String(500), nullable=True)
 
     owner = relationship("User", back_populates="vehicles")
     shares = relationship("VehicleShare", back_populates="vehicle", cascade="all, delete-orphan")
@@ -59,6 +63,17 @@ class Vehicle(Base):
     @property
     def kind_label(self):
         return VEHICLE_KINDS.get(self.kind or KIND_CAR, "")
+
+    @property
+    def tire_size_list(self):
+        return [line.strip() for line in (self.tire_sizes or "").splitlines() if line.strip()]
+
+    @property
+    def owned_km(self):
+        """Najeto za dobu vlastnictví (prodej - nákup), pokud známe oba stavy."""
+        if self.purchase_odometer is None or self.sale_odometer is None:
+            return None
+        return self.sale_odometer - self.purchase_odometer
 
     @property
     def value_loss(self):

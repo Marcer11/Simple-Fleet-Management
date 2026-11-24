@@ -29,8 +29,8 @@
         <div class="title">
             {{ m.color_dot(v, "lg") }}
             <div>
-                <h3>{{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a> {{ m.tire_icons(tires.get(v.id)) }}</h3>
-                <div class="muted small">{{ v.license_plate or "bez SPZ" }} {{ m.role_badge(roles.get(v.id)) }}</div>
+                <h3>{{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.brand }} {{ v.model }}</a></h3>
+                <div class="muted small plate-line">{{ v.license_plate or "bez SPZ" }} {{ m.tire_icons(tires.get(v.id)) }} {{ m.role_badge(roles.get(v.id)) }}</div>
             </div>
         </div>
         <div class="facts">

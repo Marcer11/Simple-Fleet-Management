@@ -420,7 +420,7 @@ table.tires .badge { margin-top: 4px; }
 .tire-icons { display: inline-flex; gap: 2px; vertical-align: middle; }
 .season-summer { color: var(--season-summer); }
 .season-winter { color: var(--season-winter); }
-.season-allseason { color: var(--season-allseason); }
+.season-allseason { color: var(--muted); }  /* jen dělicí čára, poloviny mají vlastní barvu */
 
 /* ---------- přezutí: nákres vozidla ---------- */
 .swap-board { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 20px; align-items: start; margin: 8px 0 16px; }
@@ -441,7 +441,9 @@ table.tires .badge { margin-top: 4px; }
 .wheel-tread { stroke: var(--surface); stroke-width: 2; opacity: .35; }
 .wheel-summer .wheel-tire { fill: var(--season-summer); }
 .wheel-winter .wheel-tire { fill: var(--season-winter); }
-.wheel-allseason .wheel-tire { fill: var(--season-allseason); }
+.wheel-allseason .wheel-tire { fill: url(#sfm-allseason); }
+.stop-winter { stop-color: var(--season-winter); }
+.stop-summer { stop-color: var(--season-summer); }
 .wheel-other .wheel-tire { fill: var(--muted); }
 .wheel-empty .wheel-tire { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
 .wheel-empty .wheel-tread { display: none; }
@@ -452,7 +454,7 @@ table.tires .badge { margin-top: 4px; }
 .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--border); }
 .swatch.wheel-summer { background: var(--season-summer); }
 .swatch.wheel-winter { background: var(--season-winter); }
-.swatch.wheel-allseason { background: var(--season-allseason); }
+.swatch.wheel-allseason { background: linear-gradient(90deg, var(--season-winter) 50%, var(--season-summer) 50%); }
 .swatch.wheel-empty { background: var(--surface); border: 1px dashed var(--muted); }
 .swatch-new { background: var(--primary); border-radius: 50%; }
 .swap-side { display: grid; gap: 14px; min-width: 0; }
@@ -474,6 +476,8 @@ table.tires .badge { margin-top: 4px; }
 .btn-link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; justify-self: start; }
 .btn-link:hover { text-decoration: underline; }
 .text-danger { color: var(--danger); }
+.text-warning { color: var(--warning); margin: 0; }
+.plate-line { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ---------- servis: více položek ---------- */
 .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px 14px; margin: 4px 0 6px; }

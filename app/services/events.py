@@ -156,11 +156,16 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         for v in vehicles:
             if v.purchase_date and in_range(_day(v.purchase_date)):
                 events.append(Event(KIND_VEHICLE, _day(v.purchase_date), False, v, "Nákup vozidla",
-                                    amount=v.purchase_price, url=f"/vehicles/{v.id}/edit"))
+                                    odometer=v.purchase_odometer, amount=v.purchase_price,
+                                    url=f"/vehicles/{v.id}/edit"))
             if v.sale_date and in_range(_day(v.sale_date)):
-                detail = f"ztráta hodnoty {_qty(v.value_loss)} Kč" if v.value_loss is not None else ""
-                events.append(Event(KIND_VEHICLE, _day(v.sale_date), False, v, "Prodej vozidla", detail,
-                                    amount=v.sale_price, url=f"/vehicles/{v.id}/edit"))
+                parts = []
+                if v.value_loss is not None:
+                    parts.append(f"ztráta hodnoty {_qty(v.value_loss)} Kč")
+                if v.owned_km is not None:
+                    parts.append(f"najeto za vlastnictví {v.owned_km:,} km".replace(",", " "))
+                events.append(Event(KIND_VEHICLE, _day(v.sale_date), False, v, "Prodej vozidla", " · ".join(parts),
+                                    odometer=v.sale_odometer, amount=v.sale_price, url=f"/vehicles/{v.id}/edit"))
 
     # nejnovější nahoře; ve stejný den události s časem před celodenními
     events.sort(key=lambda e: (e.when.date(), e.has_time, e.when.time(), e.odometer or 0), reverse=True)

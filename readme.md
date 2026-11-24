@@ -30,8 +30,9 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
   - uživatel, se kterým je vozidlo sdíleno, může sdílení sám ukončit
 
 ### Vozidla
-Značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum a cena nákupu
-a prodeje (ztráta hodnoty), aktivní/neaktivní. Smazání vozidla je schované dole ve formuláři úprav.
+Druh (auto / motorka), značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
+tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP, aktivní/neaktivní.
+Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Poznámky a časová osa
 - **poznámky k vozidlu** s datem, časem a stavem tachometru (uloženo do garáže, půjčeno, nehoda…);
@@ -87,7 +88,9 @@ a prodeje (ztráta hodnoty), aktivní/neaktivní. Smazání vozidla je schované
   něm je, pole pro dezén a výběr pneumatiky k nasazení na kolo, nápravu nebo všechna kola
 - **auto / motorka** (nastavuje se u vozidla): motorka má jen přední a zadní kolo a nedostává upozornění
   na zimní pneumatiky; v přehledu a seznamu vozidel je ikona druhu vozidla a typu nasazených pneumatik
-  (letní ☀, zimní ❄, univerzální)
+  u SPZ (letní ☀, zimní ❄, univerzální = napůl vločka a slunce)
+- **rozměry pneumatik dle technického průkazu** u vozidla – nabízí se při zápisu nové pneumatiky; při
+  přezutí aplikace upozorní na pneumatiku jiného rozměru
 - **poškození** (pozice, popis, cena opravy jako výdaj k vozidlu, na kterém pneumatika byla)
 - **životnost**: najeto (i přes více vozidel), počet nasazení a doba na voze, stáří, dezén,
   opotřebení na 1000 km a odhad km do zákonného minima (letní 1,6 mm, zimní a univerzální 4 mm),

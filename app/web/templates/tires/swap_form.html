@@ -5,7 +5,8 @@
 <div class="page-head">
     <div>
         <h1>{{ "Upravit přezutí" if swap else "Přezutí pneumatik" }}</h1>
-        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
+        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer %} · tachometr {{ odometer|km }}{% endif %}
+            {% if vehicle.tire_size_list %}· dle TP {{ vehicle.tire_size_list|join(", ") }}{% endif %}</div>{% endif %}
     </div>
 </div>
 

@@ -18,6 +18,7 @@ VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
     "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
+    "tire_sizes", "purchase_odometer", "sale_odometer",
 )
 
 
@@ -137,6 +138,17 @@ class VehicleService:
             else:
                 data["color_hex"] = data["color_hex"].upper()
 
+        if "tire_sizes" in data:
+            lines = re.split(r"[\r\n;]+", data["tire_sizes"] or "")
+            sizes = []
+            for line in lines:
+                line = re.sub(r"\s+", " ", line).strip()
+                if line and line.lower() not in (s.lower() for s in sizes):
+                    sizes.append(line)
+            data["tire_sizes"] = "\n".join(sizes) or None
+            if data["tire_sizes"] and len(data["tire_sizes"]) > 500:
+                errors.append("Rozměry pneumatik mohou mít nejvýše 500 znaků.")
+
         year = data.get("production_year")
         if year is not None and not (1901 <= int(year) <= date.today().year + 1):
             errors.append("Neplatný rok výroby.")
@@ -146,6 +158,14 @@ class VehicleService:
                 data[key] = to_decimal(data[key], Q2)
                 if data[key] is not None and not (0 <= data[key] < Decimal("10000000000")):
                     errors.append(f"{label} musí být kladné číslo.")
+
+        for key, label in (("purchase_odometer", "Stav tachometru při nákupu"),
+                           ("sale_odometer", "Stav tachometru při prodeji")):
+            if data.get(key) is not None and not (0 <= int(data[key]) < 10_000_000):
+                errors.append(f"{label} musí být kladné číslo.")
+        if (data.get("purchase_odometer") is not None and data.get("sale_odometer") is not None
+                and data["sale_odometer"] < data["purchase_odometer"]):
+            errors.append("Kilometry při prodeji nemohou být menší než při nákupu.")
 
         purchase, sale = data.get("purchase_date"), data.get("sale_date")
         if purchase and sale and sale < purchase:
@@ -296,6 +316,10 @@ class VehicleService:
             self.session.query(func.max(Expense.odometer)).filter(Expense.vehicle_id == vehicle_id).scalar(),
             self.session.query(func.max(VehicleNote.odometer)).filter(VehicleNote.vehicle_id == vehicle_id).scalar(),
         ]
+        # u nově koupeného vozidla bez záznamů aspoň stav při nákupu, u prodaného stav při prodeji
+        vehicle = self.session.get(Vehicle, vehicle_id)
+        if vehicle is not None:
+            values += [vehicle.purchase_odometer, vehicle.sale_odometer]
         values = [v for v in values if v is not None]
         return max(values) if values else None
 

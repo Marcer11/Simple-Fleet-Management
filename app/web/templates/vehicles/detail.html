@@ -6,9 +6,9 @@
 {% set is_owner = role == "owner" %}
 <div class="page-head">
     <div>
-        <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }} {{ m.tire_icons(tire_seasons) }}</h1>
+        <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }}</h1>
         <div class="sub">
-            {{ m.vehicle_icon(vehicle) }} {{ vehicle.kind_label }} · {{ vehicle.license_plate or "bez SPZ" }}
+            {{ m.vehicle_icon(vehicle) }} {{ vehicle.kind_label }} · {{ vehicle.license_plate or "bez SPZ" }} {{ m.tire_icons(tire_seasons) }}
             {% if not vehicle.is_active %}<span class="badge">Neaktivní</span>{% endif %}
             {{ m.role_badge(role) }}
             {% if not is_owner and owner %}<span class="small">· vlastník {{ owner.name }}</span>{% endif %}
@@ -80,9 +80,11 @@
         <div><div class="label">Rok výroby</div><div class="value">{{ vehicle.production_year or "–" }}</div></div>
         <div><div class="label">VIN</div><div class="value">{{ vehicle.vin or "–" }}</div></div>
         <div><div class="label">Barva</div><div class="value">{{ vehicle.color or "–" }}</div></div>
-        <div><div class="label">Zakoupeno</div><div class="value">{{ vehicle.purchase_date|date or "–" }}</div></div>
+        <div><div class="label">Zakoupeno</div><div class="value">{{ vehicle.purchase_date|date or "–" }}{% if vehicle.purchase_odometer is not none %} <span class="small muted">· {{ vehicle.purchase_odometer|km }}</span>{% endif %}</div></div>
         <div><div class="label">Pořizovací cena</div><div class="value">{{ vehicle.purchase_price|czk(0) }}</div></div>
-        <div><div class="label">Prodáno</div><div class="value">{{ vehicle.sale_date|date or "–" }}</div></div>
+        <div><div class="label">Prodáno</div><div class="value">{{ vehicle.sale_date|date or "–" }}{% if vehicle.sale_odometer is not none %} <span class="small muted">· {{ vehicle.sale_odometer|km }}</span>{% endif %}</div></div>
+        {% if vehicle.owned_km is not none %}<div><div class="label">Najeto za vlastnictví</div><div class="value">{{ vehicle.owned_km|km }}</div></div>
+        {% elif vehicle.purchase_odometer is not none and odometer and odometer >= vehicle.purchase_odometer %}<div><div class="label">Najeto od nákupu</div><div class="value">{{ (odometer - vehicle.purchase_odometer)|km }}</div></div>{% endif %}
         {% if vehicle.sale_price is not none %}<div><div class="label">Prodejní cena</div><div class="value">{{ vehicle.sale_price|czk(0) }}</div></div>{% endif %}
         {% if vehicle.value_loss is not none %}<div><div class="label">Ztráta hodnoty</div><div class="value">{{ vehicle.value_loss|czk(0) }}</div></div>{% endif %}
         {% for cat, e, days_left, renew_from in validities %}
@@ -126,6 +128,8 @@
             {% if can_edit %}<a class="btn btn-sm btn-primary" href="/tire-swaps/add?vehicle_id={{ vehicle.id }}">Přezutí</a>{% endif %}
         </div>
     </div>
+    {% if vehicle.tire_size_list %}<p class="small muted">Rozměry dle TP: {{ vehicle.tire_size_list|join(" · ") }}</p>
+    {% elif can_edit %}<p class="small muted">Rozměry pneumatik dle technického průkazu si můžete <a href="/vehicles/{{ vehicle.id }}/edit">doplnit u vozidla</a>.</p>{% endif %}
     {% if mounted_tires %}
     <ul class="alert-list">
         {% for mnt in mounted_tires %}

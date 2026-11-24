@@ -229,3 +229,28 @@ def test_per_wheel_treads_and_moto(app, db):
     # ikony typu pneumatik na přehledu a v seznamu vozidel
     assert "Letní pneumatiky: Letní Michelin Primacy 4 (všechna kola)" in client.get("/").text
     assert "Letní pneumatiky" in client.get("/vehicles").text
+
+
+def test_vehicle_tire_sizes(app, db):
+    from models.tire import size_core, size_fits
+    assert size_core("225/45 ZR17 91W") == "225/45R17" and size_core("120/70-17") == "120/70R17"
+    assert size_fits("205/55 R16 91V", ["přední 205/55R16 94H"]) is True
+    assert size_fits("195/65 R15", ["205/55 R16"]) is False and size_fits("", ["205/55 R16"]) is None
+    client = register(app, "s@example.com")
+    car = add_vehicle(client, model="Astra", tire_sizes="205/55 R16 91V\r\n  225/45   R17 91W \r\n205/55 r16 91v")
+    vehicle = db.get(Vehicle, car)
+    assert vehicle.tire_size_list == ["205/55 R16 91V", "225/45 R17 91W"]
+    form = client.get("/tires/add").text
+    assert 'list="vehicle-sizes"' in form and '<option value="225/45 R17 91W" label="Škoda Astra">' in form
+    assert "Rozměry dle TP: 205/55 R16 91V · 225/45 R17 91W" in client.get(f"/vehicles/{car}").text
+    wrong = add_tire(client, db, size="195/65 R15 91H")
+    page = client.get(f"/tire-swaps/add?vehicle_id={car}").text
+    assert '"fits": false' in page and "dle TP 205/55 R16 91V, 225/45 R17 91W" in page
+    r = swap(client, car, date.today(), 1000, [(wrong, "all")])
+    assert r.status_code == 303
+    assert "v technickém průkazu je 205/55 R16 91V, 225/45 R17 91W" in client.get(f"/vehicles/{car}").text
+    # univerzální pneumatiky: svisle rozdělená ikona (půl vločky, půl slunce)
+    allseason = add_tire(client, db, season="Univerzální")
+    swap(client, car, date.today(), 1000, [(allseason, "all")])
+    dash = client.get("/").text
+    assert "Univerzální pneumatiky:" in dash and 'class="season-winter"' in dash and 'class="season-summer"' in dash

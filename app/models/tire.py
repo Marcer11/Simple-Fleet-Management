@@ -1,4 +1,5 @@
 """Pneumatiky: jednotlivé gumy / páry / sady, které lze nasazovat na různá vozidla."""
+import re
 from datetime import date
 
 from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey, DECIMAL, CHAR, Index
@@ -53,6 +54,24 @@ def tread_wheels(position, kind=None):
     if kind == "moto":
         return [w for w in MOTO_WHEELS if (w[0] == "f" and "fl" in slots) or (w[0] == "r" and "rl" in slots)]
     return [w for w in CAR_WHEELS if w[0] in slots]
+
+
+_SIZE_RE = re.compile(r"(\d{2,3})\s*/\s*(\d{2,3})\s*-?\s*Z?R?F?\s*(\d{2})", re.IGNORECASE)
+
+
+def size_core(value):
+    """Základ rozměru bez indexů: "225/45 ZR17 91W" -> "225/45R17" (pro porovnání s technickým průkazem)."""
+    match = _SIZE_RE.search(value or "")
+    return f"{match.group(1)}/{match.group(2)}R{match.group(3)}" if match else None
+
+
+def size_fits(size, allowed):
+    """True/False, zda rozměr pneumatiky odpovídá některému z povolených; None = nelze posoudit."""
+    core = size_core(size)
+    cores = {c for c in (size_core(a) for a in allowed or []) if c}
+    if not core or not cores:
+        return None
+    return core in cores
 
 
 def parse_treads(value):

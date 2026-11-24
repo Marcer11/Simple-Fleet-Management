@@ -119,3 +119,26 @@ def test_note_odometer_order(app, db):
     r = post(client, f"/notes/{first.id}/edit", {"vehicle_id": vid, "note_date": first.note_datetime.date().isoformat(),
                                                  "note_time": "11:00", "odometer": 14200, "category": "Garáž"})
     assert r.status_code == 303, r.text
+
+
+def test_purchase_and_sale_odometer(app, db):
+    from models import Vehicle
+    from services.vehicle_service import VehicleService
+    client = register(app, "odo@example.com")
+    car = add_vehicle(client, purchase_date="2020-05-01", purchase_odometer="45000", purchase_price="250000")
+    assert VehicleService(db).get_current_odometer(car) == 45000  # zatím bez záznamů
+    r = post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia", "purchase_date": "2020-05-01",
+                                               "purchase_odometer": "45000", "sale_date": "2026-05-01",
+                                               "sale_odometer": "40000"})
+    assert r.status_code == 400 and "nemohou být menší" in r.text
+    r = post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia", "purchase_date": "2020-05-01",
+                                               "purchase_odometer": "45000", "sale_date": "2026-05-01",
+                                               "sale_odometer": "145000", "purchase_price": "250000",
+                                               "sale_price": "100000"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    assert db.get(Vehicle, car).owned_km == 100000
+    detail = client.get(f"/vehicles/{car}").text
+    assert "Najeto za vlastnictví" in detail and "45 000 km" in detail.replace("\xa0", " ")
+    timeline = client.get("/timeline?all=1").text.replace("\xa0", " ")
+    assert "najeto za vlastnictví 100 000 km" in timeline

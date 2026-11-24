@@ -526,12 +526,23 @@
             const sel = h("select", { "aria-label": "Pneumatika k nasazení" });
             sel.appendChild(h("option", { value: "" }, "– vyberte pneumatiku –"));
             ids.forEach(function (id) {
-                const o = h("option", { value: id }, data.tires[id].full);
+                const o = h("option", { value: id }, data.tires[id].full +
+                    (data.tires[id].fits === false ? " – jiný rozměr než v TP" : ""));
                 if (state.next && state.next.tire === id) o.selected = true;
                 sel.appendChild(o);
             });
             pick.appendChild(h("label", { class: "small" }, "Nasadit:"));
             pick.appendChild(sel);
+            const sizeNote = h("p", { class: "small text-warning", role: "status" });
+            function checkSize() {
+                const t = data.tires[sel.value];
+                sizeNote.textContent = t && t.fits === false
+                    ? "Rozměr " + t.size + " není v technickém průkazu (" + data.sizes.join(", ") + ")." : "";
+                sizeNote.hidden = !sizeNote.textContent;
+            }
+            sel.addEventListener("change", checkSize);
+            checkSize();
+            pick.appendChild(sizeNote);
             const scopes = h("div", { class: "swap-scopes" });
             scopesFor(wheel).forEach(function (sc) {
                 const b = h("button", { type: "button", class: "btn btn-sm" + (state.next && state.next.position === sc[0] ? " btn-primary" : "") }, sc[1]);
@@ -562,8 +573,10 @@
             const ul = h("ul");
             plan.forEach(function (p) {
                 const li = h("li");
-                li.appendChild(h("strong", {}, (data.tires[p.tire] || {}).label || "?"));
+                const t = data.tires[p.tire] || {};
+                li.appendChild(h("strong", {}, t.label || "?"));
                 li.appendChild(document.createTextNode(" → " + (data.positions[p.position] || p.position).toLowerCase() + " "));
+                if (t.fits === false) li.appendChild(h("span", { class: "small text-warning" }, "(jiný rozměr než v TP) "));
                 const x = h("button", { type: "button", class: "btn-link small", "aria-label": "Zrušit" }, "zrušit");
                 x.addEventListener("click", function () { clearRow(p.row); render(); });
                 li.appendChild(x);
@@ -600,6 +613,12 @@
             figure.replaceChildren();
             const svg = el("svg", { viewBox: "0 0 260 344", class: "veh-svg" + (moto ? " is-moto" : ""), role: "group",
                 "aria-label": "Nákres vozidla – vyberte kolo" });
+            // univerzální = svisle napůl zimní a letní
+            const defs = el("defs", {}, svg);
+            const grad = el("linearGradient", { id: "sfm-allseason", x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+            [[0, "winter"], [0.5, "winter"], [0.5, "summer"], [1, "summer"]].forEach(function (s) {
+                el("stop", { offset: s[0], class: "stop-" + s[1] }, grad);
+            });
             drawBody(svg);
             WHEELS.forEach(function (w) { drawWheel(svg, w, stateOf(w, plan)); });
             figure.appendChild(svg);

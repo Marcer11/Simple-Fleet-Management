@@ -249,15 +249,26 @@
             for (const [re, brand] of patterns) if (re.test(name)) return brand;
             return name.split(" ")[0];
         }
+        const fuelVehicle = document.getElementById("f-vehicle_id");
+        function vehicleFuels() {
+            const option = fuelVehicle && fuelVehicle.selectedOptions[0];
+            const value = option ? option.getAttribute("data-fuels") : "";
+            return value ? value.split("|") : [];
+        }
         function refreshFuels() {
             const brand = brandOf(stationInput.value).toLowerCase();
+            const allowed = vehicleFuels();  // druhy paliva vozidla (prázdné = neuvedeno, nabízí se vše)
             fuelList.replaceChildren(...config.fuels
+                .filter(function (f) {
+                    return !allowed.length || !f.category || allowed.indexOf(f.category) !== -1;
+                })
                 .filter(function (f) {
                     return !brand || !f.brands.length || f.brands.some(function (b) { return b.toLowerCase() === brand; });
                 })
                 .map(function (f) { const o = document.createElement("option"); o.value = f.name; return o; }));
         }
         stationInput.addEventListener("input", refreshFuels);
+        if (fuelVehicle) fuelVehicle.addEventListener("change", refreshFuels);
         stationInput.addEventListener("change", refreshFuels);
         refreshFuels();
         window.sfmRefreshFuels = refreshFuels;  // po načtení pumpy z Timeline

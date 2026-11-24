@@ -53,7 +53,8 @@
         {% for v in vehicles %}
         <option value="{{ v.id }}"{% if val('vehicle_id') == v.id|string %} selected{% endif %}
             {%- if odometers and odometers.get(v.id) %} data-odometer="{{ odometers.get(v.id) }}"{% endif %}
-            {%- if fuels and fuels.get(v.id) %} data-fuel="{{ fuels.get(v.id) }}"{% endif %}>{{ v.display_name }}{% if not v.is_active %} (neaktivní){% endif %}</option>
+            {%- if fuels and fuels.get(v.id) %} data-fuel="{{ fuels.get(v.id) }}"{% endif %}
+            {%- if fuels is not none and v.fuels %} data-fuels="{{ v.fuels|join('|') }}"{% endif %}>{{ v.display_name }}{% if not v.is_active %} (neaktivní){% endif %}</option>
         {% endfor %}
     </select>
 </div>

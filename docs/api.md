@@ -58,6 +58,8 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "production_year": 2019,
       "engine_volume": 1498,
       "engine_power": 110,
+      "fuel": "Benzín",
+      "alt_fuel": "LPG",
       "color": "šedá",
       "color_hex": "#8A8D8F",
       "vin": "TMBJJ7NE0K0123456",
@@ -66,8 +68,8 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "role": "owner",
       "owner": "Martin",
       "odometer": 154320,
-      "fuel_types": ["Natural 95"],
-      "consumption": [{"fuel": "Benzín", "value": 6.42, "unit": "l"}],
+      "fuel_types": ["LPG", "Natural 95"],
+      "consumption": [{"fuel": "Benzín", "value": 7.1, "unit": "l"}, {"fuel": "LPG", "value": 9.35, "unit": "l"}],
       "tire_sizes": ["205/55 R16 91V"],
       "purchase": {"date": "2021-03-15", "odometer": 61200, "price_czk": 389000.0},
       "sale": {"date": null, "odometer": null, "price_czk": null},
@@ -94,6 +96,8 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "production_year": null,
       "engine_volume": null,
       "engine_power": null,
+      "fuel": "Benzín",
+      "alt_fuel": null,
       "color": null,
       "color_hex": "#FFFFFF",
       "vin": null,
@@ -133,6 +137,8 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `production_year` | rok výroby |
 | `engine_volume` | objem motoru v cm³ (u elektromobilu může být `0`) |
 | `engine_power` | výkon v kW |
+| `fuel` | druh paliva vozidla: `Benzín`, `Nafta`, `LPG`, `CNG` nebo `Elektřina`; `null` = neuvedeno |
+| `alt_fuel` | alternativní palivo (stejné hodnoty), např. `LPG` nebo `CNG` u benzínového auta, `Elektřina` u plug-in hybridu; `null` = žádné. Je vyplněné jen spolu s `fuel` a nikdy není stejné jako `fuel` |
 | `color` | barva slovy (jak je zapsaná v evidenci) |
 | `color_hex` | barva pro zobrazení – barva, kterou evidence vozidlo označuje v seznamech a grafech (`#RRGGBB`, vždy vyplněná, výchozí `#FFFFFF`) |
 | `vin` | VIN |
@@ -141,7 +147,7 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `role` | vztah uživatele k vozidlu: `owner` (vlastník), `editor` (může zapisovat), `viewer` (jen čte) |
 | `owner` | jméno vlastníka vozidla |
 | `odometer` | nejvyšší známý stav tachometru v km ze všech záznamů |
-| `fuel_types` | paliva, která se do vozidla tankovala (abecedně) |
+| `fuel_types` | konkrétní paliva, která se do vozidla tankovala, tak jak je uživatel pojmenoval (Natural 95, Verva Diesel…), abecedně |
 | `consumption` | průměrná spotřeba za celou dobu, zvlášť pro každý druh paliva: `fuel` (druh: Benzín, Nafta, LPG, CNG, Elektřina…), `value` (spotřeba na 100 km, 2 desetinná místa), `unit` (`l`, `kg` nebo `kWh`). Počítá se metodou „plná–plná“ (od tankování do plna po další tankování do plna); dokud nejsou aspoň dvě tankování do plna, je seznam prázdný. Hlavní palivo bývá první, pořadí ale není zaručené |
 | `tire_sizes` | rozměry pneumatik podle technického průkazu |
 | `purchase` | nákup: `date`, `odometer` (km), `price_czk` |

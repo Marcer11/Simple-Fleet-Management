@@ -87,13 +87,14 @@
 
 {# ------------------------------------------------ údaje o vozidle #}
 <details class="fold">
-    <summary><span>Údaje o vozidle</span><span class="fold-hint">{{ vehicle.kind_label }}{% if vehicle.production_year %} · {{ vehicle.production_year }}{% endif %}{% if vehicle.engine_power is not none %} · {{ vehicle.engine_power }} kW{% endif %}{% if owner and not is_owner %} · vlastník {{ owner.name }}{% endif %}</span></summary>
+    <summary><span>Údaje o vozidle</span><span class="fold-hint">{{ vehicle.kind_label }}{% if vehicle.production_year %} · {{ vehicle.production_year }}{% endif %}{% if vehicle.fuel %} · {{ vehicle.fuels|join(" + ") }}{% endif %}{% if vehicle.engine_power is not none %} · {{ vehicle.engine_power }} kW{% endif %}{% if owner and not is_owner %} · vlastník {{ owner.name }}{% endif %}</span></summary>
     <div class="fold-body">
         <div class="details">
             <div><div class="label">Druh</div><div class="value">{{ vehicle.kind_label }}</div></div>
             <div><div class="label">SPZ</div><div class="value">{{ vehicle.license_plate or "–" }}</div></div>
             {% if vehicle.is_rental %}<div><div class="label">Koho auto je</div><div class="value">{{ vehicle.lender or "–" }}</div></div>{% endif %}
             <div><div class="label">Rok výroby</div><div class="value">{{ vehicle.production_year or "–" }}</div></div>
+            <div><div class="label">Palivo</div><div class="value">{{ vehicle.fuel or "–" }}{% if vehicle.alt_fuel %} + {{ vehicle.alt_fuel }}{% endif %}</div></div>
             <div><div class="label">Objem motoru</div><div class="value">{% if vehicle.engine_volume is not none %}{{ vehicle.engine_volume|num(0) }} cm³{% else %}–{% endif %}</div></div>
             <div><div class="label">Výkon</div><div class="value">{% if vehicle.engine_power is not none %}{{ vehicle.engine_power }} kW <span class="small muted">· {{ vehicle.engine_power_hp }} k</span>{% else %}–{% endif %}</div></div>
             <div><div class="label">VIN</div><div class="value">{{ vehicle.vin or "–" }}</div></div>

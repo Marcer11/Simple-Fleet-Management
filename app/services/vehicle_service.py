@@ -19,7 +19,7 @@ VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
     "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
     "tire_sizes", "purchase_odometer", "sale_odometer", "is_rental", "engine_volume", "engine_power",
-    "lender",
+    "lender", "fuel", "alt_fuel",
 )
 
 
@@ -127,6 +127,16 @@ class VehicleService:
             errors.append("Model může mít nejvýše 50 znaků.")
         if data.get("color") and len(data["color"]) > 30:
             errors.append("Barva může mít nejvýše 30 znaků.")
+        from models.fuel_record import FUEL_CATEGORIES
+        for key in ("fuel", "alt_fuel"):
+            if key in data:
+                data[key] = (data[key] or "").strip() or None
+                if data[key] is not None and data[key] not in FUEL_CATEGORIES:
+                    errors.append("Neznámý druh paliva.")
+        if data.get("alt_fuel") and data.get("alt_fuel") == data.get("fuel"):
+            errors.append("Alternativní palivo musí být jiné než hlavní.")
+        if data.get("alt_fuel") and not data.get("fuel"):
+            errors.append("K alternativnímu palivu vyberte i hlavní palivo.")
         if data.get("lender") and len(data["lender"]) > 100:
             errors.append("Koho auto je: nejvýše 100 znaků.")
 

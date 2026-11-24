@@ -103,3 +103,21 @@ def test_alembic_env_uses_url_unchanged(tmp_path):
     cfg.attributes["database_url"] = f"sqlite:///{db}"
     command.upgrade(cfg, "head")
     assert db.exists()
+
+
+def test_vehicle_fuel_and_lender_prefilled_from_records(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'prefill.db'}")
+    with engine.begin() as conn:
+        _upgrade(conn, "0018_engine")
+        conn.execute(text("INSERT INTO vehicles (id, brand, model, is_active, color_hex, is_rental) VALUES"
+                          " (1, 'Škoda', 'Octavia', 1, '#FFFFFF', 0), (2, 'Toyota', 'Yaris', 1, '#FFFFFF', 1)"))
+        for i, (vid, cat) in enumerate([(1, "LPG"), (1, "LPG"), (1, "Benzín"), (1, "LPG"), (2, "Benzín")]):
+            conn.execute(text("INSERT INTO fuel_records (vehicle_id, refuel_datetime, odometer, fuel_type,"
+                              " fuel_category, volume_liters, price_paid, currency_code, full_tank, skipped_refuel)"
+                              " VALUES (:v, :t, :o, :c, :c, 30, 1000, 'CZK', 1, 0)"),
+                         {"v": vid, "t": f"2026-01-0{i + 1} 10:00:00", "o": 1000 + i, "c": cat})
+        conn.execute(text("INSERT INTO vehicle_rentals (vehicle_id, provider, date_from, currency_code) VALUES"
+                          " (2, 'Stará půjčovna', '2026-01-01', 'CZK'), (2, 'AutoPraha', '2026-05-01', 'CZK')"))
+        _upgrade(conn)
+        rows = conn.execute(text("SELECT id, fuel, alt_fuel, lender FROM vehicles ORDER BY id")).all()
+    assert [tuple(r) for r in rows] == [(1, "Benzín", "LPG", None), (2, "Benzín", None, "AutoPraha")]

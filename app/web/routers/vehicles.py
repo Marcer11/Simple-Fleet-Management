@@ -31,6 +31,7 @@ def _vehicle_values(vehicle):
         "purchase_price": iso(vehicle.purchase_price), "sale_price": iso(vehicle.sale_price),
         "tire_sizes": vehicle.tire_sizes or "", "is_rental": "on" if vehicle.is_rental else "",
         "lender": vehicle.lender or "",
+        "fuel": vehicle.fuel or "", "alt_fuel": vehicle.alt_fuel or "",
         "purchase_odometer": iso(vehicle.purchase_odometer), "sale_odometer": iso(vehicle.sale_odometer),
     }
 
@@ -58,6 +59,8 @@ def _read_vehicle_form(form):
         "tire_sizes": form.str("tire_sizes", "Rozměry pneumatik", max_len=500),
         "is_rental": form.bool("is_rental"),
         "lender": form.str("lender", "Koho auto je", max_len=100),
+        "fuel": form.str("fuel", "Palivo"),
+        "alt_fuel": form.str("alt_fuel", "Alternativní palivo"),
     }
     form.check()
     return data

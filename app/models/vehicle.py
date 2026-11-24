@@ -31,6 +31,8 @@ class Vehicle(Base):
     production_year = Column(Integer, nullable=True)
     engine_volume = Column(Integer, nullable=True)          # objem motoru v cm³
     engine_power = Column(Integer, nullable=True)           # výkon v kW
+    fuel = Column(String(15), nullable=True)                # druh paliva (Benzín, Nafta, LPG, CNG, Elektřina)
+    alt_fuel = Column(String(15), nullable=True)            # alternativní palivo (např. LPG u benzínu)
     color = Column(String(30))
     color_hex = Column(CHAR(7), nullable=False, default="#FFFFFF")
     license_plate = Column(String(10), index=True)
@@ -100,6 +102,11 @@ class Vehicle(Base):
     @property
     def tire_size_list(self):
         return [line.strip() for line in (self.tire_sizes or "").splitlines() if line.strip()]
+
+    @property
+    def fuels(self):
+        """Druhy paliva vozidla (hlavní, alternativní); prázdné = neuvedeno."""
+        return [f for f in (self.fuel, self.alt_fuel) if f]
 
     @property
     def engine_power_hp(self):

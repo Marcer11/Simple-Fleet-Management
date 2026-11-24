@@ -191,6 +191,8 @@ def vehicles(session, user, only_active=True):
             "production_year": v.production_year,
             "engine_volume": v.engine_volume,
             "engine_power": v.engine_power,
+            "fuel": v.fuel,
+            "alt_fuel": v.alt_fuel,
             "color": v.color,
             "color_hex": v.color_hex,
             "vin": v.vin,

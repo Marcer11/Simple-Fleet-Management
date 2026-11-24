@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from models.fuel_record import PAYMENT_METHODS
+from models.fuel_record import PAYMENT_METHODS, guess_fuel_category
 from models.vehicle import ROLE_EDITOR
 from services import fuel_import, timeline
 from services.errors import ValidationError, NotFoundError
@@ -200,18 +200,30 @@ def _form_context(db, user, record=None):
     ids = [v.id for v in vehicles]
     service = FuelRecordService(db)
     last_records = {v.id: service.get_last_record(v.id) for v in vehicles}
+    fuel_list = FuelTypeService(db).list_for_user(user)
+    options = [{"name": t.name, "brands": t.brands, "category": t.category or guess_fuel_category(t.name)}
+               for t in fuel_list]
+
+    def default_fuel(vehicle):
+        """Palivo předvyplněné u vozidla: naposledy tankované, jinak první palivo jeho druhu."""
+        last = last_records.get(vehicle.id)
+        if last:
+            return last.fuel_type
+        return next((o["name"] for o in options if vehicle.fuel and o["category"] == vehicle.fuel), "")
+
     return {
         "record": record,
         "vehicles": vehicles,
         "fuel_types": FuelTypeService(db).names(user),
         # nabídka paliv podle pumpy (Verva 100 jen u ORLEN) - filtruje app.js
-        "fuel_options": [{"name": t.name, "brands": t.brands} for t in FuelTypeService(db).list_for_user(user)],
+        # (a podle paliva vozidla: benzínové auto s LPG nabízí benzín a LPG)
+        "fuel_options": options,
         "brand_patterns": brand_patterns(),
         "payment_methods": PAYMENT_METHODS,
         "currencies": COMMON_CURRENCIES,
         "stations": service.get_used_values(ids, "station_name"),
         "last_odometers": {v.id: VehicleService(db).get_current_odometer(v.id) for v in vehicles},
-        "last_fuel_types": {vid: (r.fuel_type if r else "") for vid, r in last_records.items()},
+        "last_fuel_types": {v.id: default_fuel(v) for v in vehicles},
         "timeline_enabled": timeline.is_enabled(),
         "timeline_ready": timeline.is_enabled() and bool(user.timeline_api_key),
     }

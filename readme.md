@@ -43,7 +43,9 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
   - uživatel, se kterým je vozidlo sdíleno, může sdílení sám ukončit
 
 ### Vozidla
-Druh (auto / motorka), značka, model, rok výroby, objem motoru (cm³), výkon (kW, v detailu i v koních), barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
+Druh (auto / motorka), značka, model, rok výroby, palivo a alternativní palivo (benzín, nafta, LPG, CNG,
+elektřina – formulář tankování pak nabízí jen paliva těchto druhů a u vozidla bez tankování předvyplní
+hlavní palivo), objem motoru (cm³), výkon (kW, v detailu i v koních), barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
 tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP (jen údaj
 u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezobrazuje (zapsáním prodeje se deaktivuje).
 Seznam vozidel ve výchozím stavu ukazuje všechna vozidla seřazená podle posledního záznamu (sloupec „Poslední
@@ -267,7 +269,7 @@ Authorization: Bearer fk_…
 ```
 - stejný klíč; `status=active` (výchozí) jen aktivní vozidla (jako „Jen aktivní“), `status=all` všechna
 - vrací vlastní i sdílená vozidla s údaji: SPZ, značka, model, druh, rok výroby, objem motoru, výkon,
-  VIN, barva (i barva pro zobrazení), koho je půjčené auto, stav (`active` / `inactive` / `sold` / `returned`), role uživatele,
+  palivo a alternativní palivo, VIN, barva (i barva pro zobrazení), koho je půjčené auto, stav (`active` / `inactive` / `sold` / `returned`), role uživatele,
   vlastník, tachometr, tankovaná paliva, průměrná spotřeba podle druhu paliva, rozměry pneumatik, nákup
   a prodej, dálniční známka, poslední půjčení, datum posledního záznamu, poznámka z údajů vozidla
   a poznámky k vozidlu v čase (od nejnovější)

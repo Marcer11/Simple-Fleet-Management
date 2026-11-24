@@ -109,3 +109,45 @@ def test_api_errors(app):
     assert api(app, "tl_" + "x" * 43, **ok).status_code == 401
     assert TestClient(app).get("/api/refuels", params=ok,
                                headers={"Authorization": "Basic abc"}).status_code == 401
+
+
+def vehicles_api(app, api_key, **params):
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    return TestClient(app).get("/api/vehicles", params=params, headers=headers)
+
+
+def test_api_vehicles(app):
+    client = register(app, "vehapi@example.com")
+    key = new_key(client)
+    active = add_vehicle(client, model="Octavia", license_plate="1ab 2345", engine_volume="1498", engine_power="110")
+    sold = add_vehicle(client, model="Fabia", license_plate="2CD3456")
+    post(client, f"/vehicles/{sold}/edit", {"brand": "Škoda", "model": "Fabia", "license_plate": "2CD3456",
+                                            "color_hex": "#FFFFFF", "kind": "car", "is_active": "on",
+                                            "sale_date": "2025-01-10", "sale_odometer": "0"})
+    add_fuel(client, active, date(2026, 7, 1), "1000", "40")
+    other = register(app, "other-veh@example.com")
+    add_vehicle(other, model="Cizí", license_plate="9ZZ9999")
+
+    assert vehicles_api(app, None).status_code == 401
+    assert vehicles_api(app, key, status="sold").status_code == 400
+
+    r = vehicles_api(app, key)
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    data = r.json()
+    assert data["status"] == "active"
+    assert [v["plate"] for v in data["vehicles"]] == ["1AB2345"]
+    v = data["vehicles"][0]
+    assert v["id"] == str(active) and v["name"] == "Škoda Octavia" and v["active"] is True
+    assert v["status"] == "active" and v["role"] == "owner" and v["odometer"] == 1000
+    assert (v["engine_volume"], v["engine_power"]) == (1498, 110)
+    detail = client.get(f"/vehicles/{active}").text.replace(" ", " ")
+    assert "1 498 cm³" in detail and "110 kW" in detail and "150 k" in detail
+    assert 'value="1498"' in client.get(f"/vehicles/{active}/edit").text
+    assert v["fuel_types"] == ["Benzín"] and v["vignette"] is None and v["rental"] is None
+
+    everything = vehicles_api(app, key, status="all").json()["vehicles"]
+    assert [x["plate"] for x in everything] == ["1AB2345", "2CD3456"]
+    fabia = everything[1]
+    assert fabia["engine_volume"] is None and fabia["engine_power"] is None
+    assert fabia["active"] is False and fabia["status"] == "sold"
+    assert fabia["sale"] == {"date": "2025-01-10", "odometer": 0, "price_czk": None}

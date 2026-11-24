@@ -29,6 +29,8 @@ class Vehicle(Base):
     model = Column(String(50), nullable=False)
     kind = Column(String(10), nullable=False, default=KIND_CAR, server_default=KIND_CAR)
     production_year = Column(Integer, nullable=True)
+    engine_volume = Column(Integer, nullable=True)          # objem motoru v cm³
+    engine_power = Column(Integer, nullable=True)           # výkon v kW
     color = Column(String(30))
     color_hex = Column(CHAR(7), nullable=False, default="#FFFFFF")
     license_plate = Column(String(10), index=True)
@@ -97,6 +99,11 @@ class Vehicle(Base):
     @property
     def tire_size_list(self):
         return [line.strip() for line in (self.tire_sizes or "").splitlines() if line.strip()]
+
+    @property
+    def engine_power_hp(self):
+        """Výkon v koních (1 kW = 1,36 k)."""
+        return round(self.engine_power * 1.35962) if self.engine_power is not None else None
 
     @property
     def owned_km(self):

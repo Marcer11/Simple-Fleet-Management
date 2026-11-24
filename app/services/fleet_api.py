@@ -135,6 +135,74 @@ def refuel_json(record):
     }
 
 
+def _iso(value):
+    return value.isoformat() if value is not None else None
+
+
+def _status(vehicle):
+    if vehicle.is_sold:
+        return "sold"
+    if vehicle.is_returned:
+        return "returned"
+    return "active" if vehicle.is_active else "inactive"
+
+
+def vehicles(session, user, only_active=True):
+    """Vozidla uživatele (vlastní i sdílená) s údaji pro API, seřazená podle značky a modelu."""
+    service = VehicleService(session)
+    items = service.get_vehicles_for_user(user, only_active=only_active)
+    ids = [v.id for v in items]
+    roles = service.get_roles_for_user(user)
+    vignettes = service.vignette_status(items)
+    last_dates = service.last_record_dates(items)
+    fuel_types = {}
+    if ids:
+        rows = (session.query(FuelRecord.vehicle_id, FuelRecord.fuel_type)
+                .filter(FuelRecord.vehicle_id.in_(ids)).distinct())
+        for vid, fuel in rows:
+            fuel_types.setdefault(vid, []).append(fuel)
+    result = []
+    for v in sorted(items, key=lambda v: (not v.in_use, v.brand.lower(), v.model.lower(), v.id)):
+        vignette = vignettes.get(v.id)
+        rental = v.last_rental if v.is_rental else None
+        result.append({
+            "id": str(v.id),
+            "plate": normalize_plate(v.license_plate),
+            "name": f"{v.brand} {v.model}".strip(),
+            "brand": v.brand,
+            "model": v.model,
+            "kind": v.kind or "car",
+            "production_year": v.production_year,
+            "engine_volume": v.engine_volume,
+            "engine_power": v.engine_power,
+            "color": v.color,
+            "color_hex": v.color_hex,
+            "vin": v.vin,
+            "active": v.in_use,
+            "status": _status(v),
+            "role": roles.get(v.id),
+            "owner": v.owner.name if v.owner else None,
+            "odometer": service.get_current_odometer(v.id),
+            "fuel_types": sorted(fuel_types.get(v.id, [])),
+            "tire_sizes": v.tire_size_list,
+            "purchase": {"date": _iso(v.purchase_date), "odometer": v.purchase_odometer,
+                         "price_czk": _number(v.purchase_price)},
+            "sale": {"date": _iso(v.sale_date), "odometer": v.sale_odometer, "price_czk": _number(v.sale_price)},
+            "vignette": {"status": vignette[0], "date": _iso(vignette[1])} if vignette else None,
+            "is_rental": bool(v.is_rental),
+            "rental": {
+                "provider": rental.provider,
+                "from": _iso(datetime.combine(rental.date_from, rental.time_from) if rental.time_from
+                             else rental.date_from),
+                "to": _iso(datetime.combine(rental.date_to, rental.time_to) if rental.date_to and rental.time_to
+                           else rental.date_to),
+            } if rental else None,
+            "last_record": _iso(last_dates.get(v.id)),
+            "note": v.note,
+        })
+    return result
+
+
 def vehicle_json(vehicle):
     return {"plate": normalize_plate(vehicle.license_plate),
             "name": f"{vehicle.brand} {vehicle.model}".strip()}

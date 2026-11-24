@@ -23,6 +23,7 @@ def _vehicle_values(vehicle):
     return {
         "brand": vehicle.brand, "model": vehicle.model, "kind": vehicle.kind or "car",
         "production_year": iso(vehicle.production_year),
+        "engine_volume": iso(vehicle.engine_volume), "engine_power": iso(vehicle.engine_power),
         "license_plate": vehicle.license_plate or "", "vin": vehicle.vin or "",
         "color": vehicle.color or "", "color_hex": vehicle.color_hex or "#FFFFFF",
         "purchase_date": iso(vehicle.purchase_date), "sale_date": iso(vehicle.sale_date),
@@ -40,6 +41,8 @@ def _read_vehicle_form(form):
         "kind": form.str("kind", "Druh") or "car",
         "production_year": form.int("production_year", "Rok výroby", min_value=1901,
                                     max_value=date.today().year + 1),
+        "engine_volume": form.int("engine_volume", "Objem motoru", min_value=0, max_value=20_000),
+        "engine_power": form.int("engine_power", "Výkon", min_value=0, max_value=2_000),
         "license_plate": form.str("license_plate", "SPZ", max_len=12),
         "vin": form.str("vin", "VIN", max_len=20),
         "color": form.str("color", "Barva", max_len=30),

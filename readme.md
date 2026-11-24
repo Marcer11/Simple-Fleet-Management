@@ -43,7 +43,7 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
   - uživatel, se kterým je vozidlo sdíleno, může sdílení sám ukončit
 
 ### Vozidla
-Druh (auto / motorka), značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
+Druh (auto / motorka), značka, model, rok výroby, objem motoru (cm³), výkon (kW, v detailu i v koních), barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
 tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP (jen údaj
 u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezobrazuje (zapsáním prodeje se deaktivuje).
 Seznam vozidel ve výchozím stavu ukazuje všechna vozidla seřazená podle posledního záznamu (sloupec „Poslední
@@ -236,9 +236,10 @@ Aplikace Timeline (běží na stejném serveru) zná podle záznamů polohy, u k
 - dotaz jde přes server aplikace (`/fuel-records/timeline-stop`), klíč se do prohlížeče
   nedostane; klíč ani poloha se nelogují, timeout 5 s, výpadek Timeline neblokuje uložení
 
-### API pro Timeline (tankování do výdajů výletů)
+### API pro Timeline (tankování do výdajů výletů, seznam vozidel)
 
-Opačným směrem si Timeline z evidence načítá tankování vozidla podle SPZ.
+Opačným směrem si Timeline z evidence načítá tankování vozidla podle SPZ a seznam vozidel.
+Popis pro volající stranu (parametry, ukázky odpovědí, význam položek) je v [docs/api.md](docs/api.md).
 - uživatel si v **Profilu → API klíč pro Timeline** vygeneruje klíč (`fk_…`); ukáže se jen jednou,
   v databázi je uložen jen jeho SHA-256; „Vygenerovat nový“ starý zneplatní, „Zrušit“ ho smaže
 - Timeline běží na stejném serveru, volá tedy přímo `http://127.0.0.1:8000/api/refuels`
@@ -258,6 +259,16 @@ Authorization: Bearer fk_…
   zapsal; u záznamů před touto verzí `null`)
 - chyby jako `{"error": "…"}`: 401 chybějící/neplatný klíč, 404 vozidlo nenalezeno nebo bez přístupu,
   400 špatné parametry
+
+```
+GET /api/vehicles?status=active
+Authorization: Bearer fk_…
+```
+- stejný klíč; `status=active` (výchozí) jen aktivní vozidla (jako „Jen aktivní“), `status=all` všechna
+- vrací vlastní i sdílená vozidla s údaji: SPZ, značka, model, druh, rok výroby, objem motoru, výkon,
+  VIN, barva, stav (`active` / `inactive` / `sold` / `returned`), role uživatele, vlastník, tachometr,
+  tankovaná paliva, rozměry pneumatik, nákup a prodej, dálniční známka, poslední půjčení, datum
+  posledního záznamu, poznámka
 
 ## Nasazení na server
 

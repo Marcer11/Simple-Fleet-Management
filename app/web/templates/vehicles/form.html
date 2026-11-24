@@ -15,6 +15,8 @@
         {{ m.field("model", "Model", required=true, maxlength=50) }}
         {{ m.field("license_plate", "SPZ", maxlength=12, style="text-transform: uppercase") }}
         {{ m.field("production_year", "Rok výroby", "number", min=1901, max=today.year + 1) }}
+        {{ m.field("engine_volume", "Objem motoru (cm³)", "number", min=0, max=20000, step=1, inputmode="numeric") }}
+        {{ m.field("engine_power", "Výkon (kW)", "number", min=0, max=2000, step=1, inputmode="numeric") }}
         {{ m.field("vin", "VIN", maxlength=20, style="text-transform: uppercase") }}
         {{ m.field("color", "Barva", maxlength=30) }}
         <div class="field">

@@ -21,6 +21,18 @@ def _error(status_code, message):
     return response
 
 
+@router.get("/vehicles")
+async def api_vehicles(request: Request, db=Depends(get_db)):
+    """Seznam vozidel uživatele s údaji; status=active (výchozí) nebo all (viz docs/api.md)."""
+    user = fleet_api.user_for_key(db, fleet_api.bearer_token(request.headers.get("authorization")))
+    if user is None:
+        return _error(401, "chybí nebo neplatný API klíč")
+    status = (request.query_params.get("status") or "active").strip().lower()
+    if status not in ("active", "all"):
+        return _error(400, "status může být jen „active“ nebo „all“")
+    return _json({"status": status, "vehicles": fleet_api.vehicles(db, user, only_active=status == "active")})
+
+
 @router.get("/refuels")
 async def api_refuels(request: Request, db=Depends(get_db)):
     """Tankování vozidla podle SPZ za období (viz readme, Napojení na Timeline)."""

@@ -18,7 +18,7 @@ VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
     "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
-    "tire_sizes", "purchase_odometer", "sale_odometer", "is_rental",
+    "tire_sizes", "purchase_odometer", "sale_odometer", "is_rental", "engine_volume", "engine_power",
 )
 
 
@@ -159,6 +159,10 @@ class VehicleService:
         year = data.get("production_year")
         if year is not None and not (1901 <= int(year) <= date.today().year + 1):
             errors.append("Neplatný rok výroby.")
+
+        for key, label, limit in (("engine_volume", "Objem motoru", 20_000), ("engine_power", "Výkon", 2_000)):
+            if data.get(key) is not None and not (0 <= int(data[key]) <= limit):
+                errors.append(f"{label} musí být mezi 0 a {limit}.")
 
         for key, label in (("purchase_price", "Pořizovací cena"), ("sale_price", "Prodejní cena")):
             if key in data:

@@ -80,6 +80,13 @@ Smazání vozidla je schované dole ve formuláři úprav.
 - **dohledání pumpy z aplikace Timeline** – tlačítko „Načíst pumpu“ podle data a času tankování
   doplní název a adresu stanice ze záznamů polohy (viz [Napojení na Timeline](#napojení-na-timeline))
 - filtrování (vozidlo, období, palivo) a export do CSV
+- **import z CSV** (Tankování → Import CSV): sloupce `datum; čas; cena; měna; množství; tachometr; pumpa;
+  palivo; platba; částečně` (oddělené středníkem, záhlaví nepovinné, UTF-8 i Windows-1250)
+  - datum jako číslo z Excelu (46193), `24.11.2026` nebo `2026-11-24`; čas jako zlomek dne (0,7319) nebo `17:34`
+  - cena za litr nebo celková (volí se při importu), prázdná měna = CZK, platba DKV = Tankovací karta,
+    Hotově = Hotovost; částečně `1` = nedotankováno do plna
+  - pumpa (i s adresou) se u každého tankování dohledá v Timeline, jinak se použije pumpa ze souboru bez adresy
+  - nejdřív náhled (chybné řádky, už zapsaná tankování se stejným časem a tachometrem se přeskočí), pak uložení
 - **vlastní seznam paliv** (Tankování → Paliva): nově zadané palivo se uloží do nabídky; každé palivo má
   *druh* (benzín, nafta, LPG, CNG, elektřina), podle kterého se počítá spotřeba a určuje jednotka –
   Natural 95 i Verva 100 jsou benzín; přejmenování se promítne i do zapsaných tankování

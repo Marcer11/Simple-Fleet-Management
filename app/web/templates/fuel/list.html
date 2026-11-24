@@ -7,6 +7,7 @@
     <div class="actions">
         <a class="btn" href="/fuel-records/stations?{{ request.query_params }}">Čerpací stanice</a>
         <a class="btn" href="/fuel-types">Paliva</a>
+        <a class="btn" href="/fuel-records/import{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Import CSV</a>
         <a class="btn" href="/fuel-records/export.csv?{{ request.query_params }}">Export CSV</a>
         <a class="btn btn-primary" href="/fuel-records/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Přidat tankování</a>
     </div>

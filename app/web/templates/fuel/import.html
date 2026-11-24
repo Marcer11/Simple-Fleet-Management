@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Import tankování{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Import tankování</h1>
+        <div class="sub">CSV se sloupci: {{ columns|join("; ") }}</div>
+    </div>
+    <div class="actions"><a class="btn" href="/fuel-records">Tankování</a></div>
+</div>
+
+{% if not vehicles %}
+<div class="card empty"><p>Nemáte žádné vozidlo, do kterého můžete zapisovat.</p></div>
+{% else %}
+<form method="post" action="/fuel-records/import" enctype="multipart/form-data" class="card">
+    {{ m.csrf() }}
+    <div class="form-grid">
+        {{ m.vehicle_select(vehicles) }}
+        <div class="field">
+            <label for="f-file">Soubor CSV <span class="req">*</span></label>
+            <input id="f-file" name="file" type="file" accept=".csv,text/csv,text/plain" required>
+        </div>
+        {{ m.select("price_mode", "Cena v souboru je", [("unit", "za litr / jednotku"), ("total", "celková")]) }}
+    </div>
+    <p class="small muted">{% if timeline_ready %}Pumpa se u každého tankování dohledá v Timeline; když se nenajde, použije se pumpa ze souboru (bez adresy).{% else %}Pumpa a adresa se dohledají v Timeline, když si v <a href="/profile">profilu</a> nastavíte API klíč – jinak se použije pumpa ze souboru.{% endif %}</p>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Načíst náhled</button></div>
+</form>
+{% endif %}
+
+{% if rows is not none %}
+<div class="card">
+    <div class="card-head">
+        <h2>Náhled – {{ vehicle.display_name }}</h2>
+        <span class="small muted">{{ rows|rejectattr("duplicate")|list|length }} k importu{% if rows|selectattr("duplicate")|list %} · {{ rows|selectattr("duplicate")|list|length }} už zapsáno{% endif %}{% if errors %} · {{ errors|length }} chybných řádků{% endif %}</span>
+    </div>
+    {% if warning %}<div class="alert alert-warning">{{ warning }}</div>{% endif %}
+    {% if errors %}
+    <div class="alert alert-danger">
+        <strong>Tyto řádky se neimportují:</strong>
+        <ul class="small">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    {% if rows %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Datum</th><th class="num">Tachometr</th><th>Palivo</th><th class="num">Množství</th>
+            <th class="num">Cena/jedn.</th><th class="num">Cena</th><th>Pumpa</th><th>Platba</th><th>Plná</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+        <tr{% if r.duplicate %} class="muted-row"{% endif %}>
+            <td class="nowrap">{{ r.at|datetime }}</td>
+            <td class="num nowrap">{{ r.odometer|km }}</td>
+            <td>{{ r.fuel }}</td>
+            <td class="num">{{ r.volume|qty }}</td>
+            <td class="num nowrap">{% if r.unit_price is not none %}{{ r.unit_price|qty }}{% else %}{{ (r.total_price / r.volume)|num(2) }}{% endif %} {{ r.currency }}</td>
+            <td class="num nowrap">{% if r.total_price is not none %}{{ r.total_price|qty }}{% else %}{{ (r.unit_price * r.volume)|num(2) }}{% endif %} {{ r.currency }}</td>
+            <td>{% if r.duplicate %}<span class="badge">už zapsáno</span>{% else %}{{ r.station or "–" }}{% if r.from_timeline %} <span class="badge badge-info" title="{{ r.address or '' }}">Timeline</span>{% endif %}{% endif %}</td>
+            <td>{{ r.payment or "" }}</td>
+            <td>{{ "ano" if r.full_tank else "částečně" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+    {% if rows|rejectattr("duplicate")|list %}
+    <form method="post" action="/fuel-records/import/confirm" class="form-actions">
+        {{ m.csrf() }}
+        <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+        <textarea name="payload" hidden>{{ payload }}</textarea>
+        <button type="submit" class="btn btn-primary">Importovat {{ rows|rejectattr("duplicate")|list|length }} tankování</button>
+        <a class="btn" href="/fuel-records/import?vehicle_id={{ vehicle.id }}">Zrušit</a>
+    </form>
+    {% else %}
+    <p class="muted">Nic nového k importu.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

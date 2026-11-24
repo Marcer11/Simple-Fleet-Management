@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, Request
@@ -5,7 +6,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from models.fuel_record import PAYMENT_METHODS
 from models.vehicle import ROLE_EDITOR
-from services import timeline
+from services import fuel_import, timeline
 from services.errors import ValidationError, NotFoundError
 from services.fuel_record_service import FuelRecordService
 from services.fuel_type_service import FuelTypeService
@@ -84,6 +85,89 @@ async def stations(request: Request, user=Depends(get_current_user), db=Depends(
               "brands": len(overview), "stations": sum(len(b["stations"]) for b in overview)}
     return render(request, "fuel/stations.html", vehicles=vehicles, filters=filters,
                   overview=overview, totals=totals)
+
+
+# ----------------------------------------------------------------------
+# Import z CSV: nahrání -> náhled (s pumpami z Timeline) -> uložení
+# ----------------------------------------------------------------------
+
+def _import_page(request, db, user, status_code=200, **context):
+    return render(request, "fuel/import.html", status_code=status_code, vehicles=editable_vehicles(db, user),
+                  columns=fuel_import.COLUMNS, timeline_ready=timeline.is_enabled() and bool(user.timeline_api_key),
+                  **{"values": {}, "rows": None, "errors": [], **context})
+
+
+@router.get("/import")
+async def import_form(request: Request, vehicle_id: int = None, user=Depends(get_current_user), db=Depends(get_db)):
+    vehicles = editable_vehicles(db, user)
+    if vehicle_id is None and len(vehicles) == 1:
+        vehicle_id = vehicles[0].id
+    return _import_page(request, db, user, values={"vehicle_id": str(vehicle_id or ""), "price_mode": "unit"})
+
+
+@router.post("/import")
+async def import_preview(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    form = await request.form()
+    values = {"vehicle_id": form.get("vehicle_id") or "", "price_mode": form.get("price_mode") or "unit"}
+    upload = form.get("file")
+    try:
+        vehicle = VehicleService(db).get_vehicle_for_user(int(values["vehicle_id"] or 0), user, ROLE_EDITOR)
+    except (ValueError, NotFoundError):
+        return _import_page(request, db, user, 400, values=values, error="Vyberte vozidlo.")
+    content = await upload.read() if upload is not None and hasattr(upload, "read") else b""
+    if not content.strip():
+        return _import_page(request, db, user, 400, values=values, error="Vyberte soubor CSV.")
+    if len(content) > 2_000_000:
+        return _import_page(request, db, user, 400, values=values, error="Soubor je příliš velký (nejvýše 2 MB).")
+
+    rows, errors = fuel_import.parse_csv(content, price_is_total=values["price_mode"] == "total")
+    # už zapsaná tankování (stejný čas a tachometr) se znovu neimportují
+    existing = {(r.refuel_datetime.replace(second=0, microsecond=0), r.odometer)
+                for r in FuelRecordService(db).search([vehicle.id])}
+    for row in rows:
+        row["duplicate"] = (row["at"], row["odometer"]) in existing
+    new_rows = [r for r in rows if not r["duplicate"]]
+    warning = fuel_import.lookup_stations(new_rows, user.timeline_api_key)
+    return _import_page(request, db, user, values=values, vehicle=vehicle, rows=rows, errors=errors,
+                        warning=warning, payload=json.dumps(fuel_import.to_payload(new_rows), ensure_ascii=False))
+
+
+@router.post("/import/confirm")
+async def import_confirm(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    form = await request.form()
+    try:
+        vehicle = VehicleService(db).get_vehicle_for_user(int(form.get("vehicle_id") or 0), user, ROLE_EDITOR)
+        rows = fuel_import.from_payload(json.loads(form.get("payload") or "[]"))
+    except (ValueError, KeyError, TypeError, NotFoundError):
+        flash(request, "Import se nepodařilo načíst – nahrajte soubor znovu.", "danger")
+        return RedirectResponse("/fuel-records/import", status_code=303)
+
+    service, fuel_types = FuelRecordService(db), FuelTypeService(db)
+    imported, failed = 0, []
+    for row in sorted(rows, key=lambda r: (r["at"], r["odometer"])):
+        try:
+            if row["at"].date() > date.today():
+                raise ValidationError("datum je v budoucnosti")
+            name, category = fuel_types.resolve(user, row["fuel"])
+            prices = fuel_prices(row["volume"], row["unit_price"], row["total_price"], row["currency"],
+                                 row["at"].date())
+            service.create_fuel_record(
+                vehicle_id=vehicle.id, refuel_datetime=row["at"], odometer=row["odometer"], fuel_type=name,
+                fuel_category=category, volume_liters=row["volume"], **prices,
+                payment_method=row.get("payment"), station_name=row.get("station"),
+                station_address=row.get("address"), full_tank=bool(row.get("full_tank")),
+                created_by_id=user.id)
+            imported += 1
+        except ValidationError as e:
+            db.rollback()
+            failed.append(f"{row['at']:%d.%m.%Y %H:%M}: {e}")
+    if imported:
+        flash(request, f"Importováno tankování: {imported}.")
+    for message in failed[:10]:
+        flash(request, f"Neimportováno – {message}", "danger")
+    if len(failed) > 10:
+        flash(request, f"… a dalších {len(failed) - 10} chyb.", "danger")
+    return RedirectResponse(f"/fuel-records?vehicle_id={vehicle.id}&all=1", status_code=303)
 
 
 @router.get("/timeline-stop")

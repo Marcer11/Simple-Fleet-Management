@@ -77,6 +77,7 @@ async def list_vehicles(request: Request, show: str = "all", user=Depends(get_cu
     inactive_count = len(service.get_vehicles_for_user(user)) - len(service.get_vehicles_for_user(user, True))
     return render(request, "vehicles/list.html", vehicles=vehicles, roles=roles, odometers=odometers,
                   consumption=consumption, year_costs=year_costs, last_dates=last_dates,
+                  vignettes=service.vignette_status(vehicles),
                   show=show, inactive_count=inactive_count, tires=mounted_seasons(db, [v.id for v in vehicles]))
 
 

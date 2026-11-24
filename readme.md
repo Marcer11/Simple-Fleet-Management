@@ -48,7 +48,9 @@ tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví)
 u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezobrazuje (zapsáním prodeje se deaktivuje).
 Seznam vozidel ve výchozím stavu ukazuje všechna vozidla seřazená podle posledního záznamu (sloupec „Poslední
 záznam“, záložka „Jen aktivní“), dále tachometr, spotřebu, náklady za rok, typ pneumatik a stav (aktivní /
-neaktivní / prodáno / vráceno); vlastník je až v detailu vozidla.
+neaktivní / prodáno / vráceno); vlastník je až v detailu vozidla. Sloupec „Známka“ ukazuje ikonu dálniční
+známky podle výdajů s platností: zelená = platí (v nápovědě do kdy), oranžová = končí do týdne, šedá =
+vypršela nebo platí až od budoucího data; navazující známka koupená dopředu platnost prodlužuje.
 Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Půjčená vozidla

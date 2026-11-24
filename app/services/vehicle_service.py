@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, or_
@@ -384,6 +384,44 @@ class VehicleService:
         for v in vehicles:
             add(v.id, v.purchase_date)
             add(v.id, v.sale_date)
+        return result
+
+    def vignette_status(self, vehicles, soon_days=7):
+        """Dálniční známka každého vozidla: {vehicle_id: (stav, datum)} podle výdajů s platností.
+
+        Stav: "valid" (platí dnes, datum = konec platnosti), "expiring" (platí, ale končí do soon_days dní),
+        "future" (koupená dopředu, datum = začátek platnosti), "expired" (datum = konec poslední).
+        Vozidla bez známky ve výsledku nejsou.
+        """
+        from models.maintenance import VIGNETTE_CATEGORY
+        ids = [v.id for v in vehicles]
+        if not ids:
+            return {}
+        today = date.today()
+        rows = list(self.session.query(Expense.vehicle_id, Expense.valid_from, Expense.valid_until)
+                .filter(Expense.vehicle_id.in_(ids), Expense.category == VIGNETTE_CATEGORY,
+                        Expense.valid_until.isnot(None)))
+        current, upcoming, past = {}, {}, {}
+        for vid, valid_from, valid_until in rows:
+            starts = valid_from or valid_until
+            if starts <= today <= valid_until:
+                current[vid] = max(current.get(vid, valid_until), valid_until)
+            elif starts > today:
+                upcoming[vid] = min(upcoming.get(vid, starts), starts)
+            else:
+                past[vid] = max(past.get(vid, valid_until), valid_until)
+        result = {}
+        for vid in ids:
+            if vid in current:
+                until = current[vid]
+                # navazující známka koupená dopředu prodlužuje platnost
+                if vid in upcoming and upcoming[vid] <= until + timedelta(days=1):
+                    until = max(u for v, f, u in rows if v == vid and (f or u) > today)
+                result[vid] = ("expiring" if (until - today).days < soon_days else "valid", until)
+            elif vid in upcoming:
+                result[vid] = ("future", upcoming[vid])
+            elif vid in past:
+                result[vid] = ("expired", past[vid])
         return result
 
     def get_orphan_vehicles(self):

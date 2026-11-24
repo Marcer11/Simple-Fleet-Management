@@ -300,6 +300,10 @@ legend { font-weight: 600; padding: 0 6px; }
     border: 1px solid var(--border);
     white-space: nowrap;
 }
+.vignette { display: inline-flex; }
+.vignette-valid { color: var(--ok); }
+.vignette-expiring { color: var(--warning); }
+.vignette-future, .vignette-expired { color: var(--muted); opacity: .55; }
 .badge-ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
 .badge-warning { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
 .badge-danger { background: var(--danger-soft); color: var(--danger); border-color: transparent; }

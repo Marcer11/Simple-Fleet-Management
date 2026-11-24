@@ -124,6 +124,14 @@
 {%- endmacro %}
 
 {# Ikony typu nasazených pneumatik: entries = [(typ, [popisky])] z tire_service.mounted_seasons #}
+{% macro vignette_icon(status) -%}
+{% if status %}{% set state, day = status %}{% set text = {
+    "valid": "Dálniční známka platí do " ~ day|date,
+    "expiring": "Dálniční známka končí " ~ day|date,
+    "future": "Dálniční známka platí až od " ~ day|date,
+    "expired": "Dálniční známka vypršela " ~ day|date}[state] %}<span class="vignette vignette-{{ state }}" title="{{ text }}">{{ icon("road", text) }}</span>{% endif %}
+{%- endmacro %}
+
 {% macro tire_icons(entries) -%}
 {% if entries %}<span class="tire-icons">{% for season, labels in entries %}{{ season_icon(season, season ~ " pneumatiky: " ~ labels|join(", ")) }}{% endfor %}</span>{% endif %}
 {%- endmacro %}

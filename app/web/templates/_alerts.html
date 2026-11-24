@@ -27,7 +27,7 @@
                 <button class="btn btn-sm" type="submit">Vyřízeno</button>
             </form>
             {% elif a.kind == "tires" %}
-            <a class="btn btn-sm" href="/tire-changes/add?vehicle_id={{ a.vehicle.id }}">Zapsat přezutí</a>
+            <a class="btn btn-sm" href="/tire-swaps/add?vehicle_id={{ a.vehicle.id }}">Zapsat přezutí</a>
             {% else %}
             <a class="btn btn-sm" href="/services/add?vehicle_id={{ a.vehicle.id }}">Zapsat servis</a>
             {% endif %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ "Upravit pneumatiku" if tire else "Nová pneumatika" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ "Upravit pneumatiku" if tire else "Nová pneumatika" }}</h1>
+        <div class="sub">Jedna guma, pár nebo celá sada – kterou nasazujete společně</div>
+    </div>
+    {% if tire %}
+    <div class="actions">
+        <a class="btn" href="/tire-defects/add?tire_id={{ tire.id }}">Zapsat poškození</a>
+        {% if not tire.retired_date %}<a class="btn btn-primary" href="/tire-swaps/add?tire_id={{ tire.id }}{% if stats.mount %}&vehicle_id={{ stats.mount.vehicle_id }}{% endif %}">Nasadit / přezout</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% if tire and stats %}
+<div class="kpis">
+    <div class="kpi"><div class="label">Stav</div><div class="value">{% if stats.mount %}Na voze{% elif tire.retired_date %}Vyřazeno{% else %}Uskladněno{% endif %}</div>
+        <div class="hint">{% if stats.mount %}{{ stats.mount.vehicle.display_name }} – {{ stats.mount.position_label|lower }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
+    <div class="kpi"><div class="label">Najeto</div><div class="value">{{ stats.km|km }}</div><div class="hint">{{ stats.mounts }}× nasazeno, {{ stats.used_years|num(1) }} roku na voze</div></div>
+    <div class="kpi"><div class="label">Dezén</div><div class="value">{{ (stats.tread|num(1) ~ " mm") if stats.tread is not none else "–" }}</div>
+        <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.legal_min_tread|num(1) }} mm{% endif %}</div></div>
+    <div class="kpi"><div class="label">Náklady</div><div class="value">{{ stats.cost|czk(0) if stats.cost else "–" }}</div><div class="hint">{{ (stats.cost_per_1000|czk(0) ~ " / 1000 km") if stats.cost_per_1000 else "" }}</div></div>
+</div>
+{% if stats.warnings %}<div class="card">{% for level, text in stats.warnings %}<span class="badge badge-{{ level }}">{{ text }}</span> {% endfor %}</div>{% endif %}
+{% endif %}
+
+<form method="post" class="card">
+    {{ m.csrf() }}
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-season">Typ <span class="req">*</span></label>
+            <select id="f-season" name="season" required>
+                {% for s in seasons %}<option value="{{ s }}"{% if m.val('season') == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+        </div>
+        {{ m.field("manufacturer", "Výrobce", required=true, maxlength=50, placeholder="např. Michelin", autocomplete="off") }}
+        {{ m.field("model", "Model", maxlength=50, placeholder="např. Alpin 6", autocomplete="off") }}
+        {{ m.field("size", "Rozměr", maxlength=30, placeholder="např. 205/55 R16 91H", autocomplete="off") }}
+        {{ m.field("quantity", "Počet kusů", "number", min=1, max=8, help="1 = jedna guma, 2 = pár, 4 = sada") }}
+        <div class="field">
+            <label for="f-rim">Disky</label>
+            <select id="f-rim" name="rim">
+                {% for value, label in rims.items() %}<option value="{{ value }}"{% if m.val('rim') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        {{ m.field("production_year", "Rok výroby", "number", min=1990, max=today.year + 1, help="Z kódu DOT na boku pneumatiky") }}
+        {{ m.field("dot", "DOT (týden a rok)", maxlength=10, placeholder="např. 2322", autocomplete="off") }}
+        {{ m.field("new_tread_mm", "Dezén při nákupu (mm)", inputmode="decimal", placeholder="např. 8,0", autocomplete="off", help="Z něj se počítá opotřebení") }}
+        {{ m.field("storage_location", "Místo uložení", maxlength=100, placeholder="např. sklep, pneuservis Novák", autocomplete="off") }}
+    </div>
+    <h3 class="form-section">Nákup</h3>
+    <div class="form-grid">
+        {{ m.field("purchase_date", "Datum nákupu", "date") }}
+        {{ m.price_fields(currencies, "Cena nákupu") }}
+        <div class="field">
+            <label for="f-expense_vehicle_id">Zapsat jako výdaj k vozidlu</label>
+            <select id="f-expense_vehicle_id" name="expense_vehicle_id">
+                <option value="">– nezapisovat –</option>
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('expense_vehicle_id') == v.id|string %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+            </select>
+            <small class="help">Výdaj „Pneumatiky“ se založí a s cenou upraví.</small>
+        </div>
+    </div>
+    {{ m.textarea("note", "Poznámka") }}
+    <details class="form-after"{% if m.val('retired_date') %} open{% endif %}>
+        <summary>Vyřazení</summary>
+        <div class="form-grid" style="margin-top: 10px">
+            {{ m.field("retired_date", "Vyřazeno dne", "date") }}
+            {{ m.field("retired_reason", "Důvod", maxlength=200, placeholder="např. sjeté, stáří, prodáno", autocomplete="off") }}
+        </div>
+    </details>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a class="btn" href="/tires">Zrušit</a>
+    </div>
+</form>
+
+{% if tire %}
+<div class="card">
+    <h2>Historie nasazení</h2>
+    {% if tire.mounts %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Vozidlo</th><th>Pozice</th><th>Nasazeno</th><th>Sundáno</th><th class="num">Najeto</th><th class="num">Dezén při sundání</th></tr></thead>
+        <tbody>
+        {% for mnt in tire.mounts|reverse %}
+        <tr>
+            <td>{{ m.color_dot(mnt.vehicle) }} {{ mnt.vehicle.display_name }}</td>
+            <td>{{ mnt.position_label }}</td>
+            <td class="nowrap">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
+            <td class="nowrap">{% if mnt.removed_date %}{{ mnt.removed_date|date }}<div class="small muted">{{ mnt.removed_km|km }}</div>{% else %}<span class="badge badge-ok">na voze</span>{% endif %}</td>
+            <td class="num">{{ ((mnt.removed_km - mnt.mounted_km)|km) if mnt.removed_km is not none else "–" }}</td>
+            <td class="num">{{ (mnt.removed_tread_mm|num(1) ~ " mm") if mnt.removed_tread_mm is not none else "–" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty small">Zatím nenasazeno. <a href="/tire-swaps/add?tire_id={{ tire.id }}">Nasadit na vozidlo</a></div>{% endif %}
+</div>
+
+{% if defects %}
+<div class="card">
+    <h2>Poškození</h2>
+    <ul class="alert-list">
+        {% for d in defects %}
+        <li><span class="what"><strong>{{ d.description }}</strong> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}</span></span>
+            <span class="small">{{ d.expense.price_local|czk(0) if d.expense else "" }}</span>
+            <span class="actions"><a class="btn btn-sm" href="/tire-defects/{{ d.id }}/edit">Upravit</a></span></li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<details class="danger-zone">
+    <summary>Smazání pneumatiky</summary>
+    <p class="small muted">Smaže pneumatiku včetně historie nasazení a poškození, výdaje za nákup a opravy a přezutí,
+        ve kterých nic jiného nebylo. Opotřebenou pneumatiku raději vyřaďte – historie zůstane.</p>
+    {{ m.delete_button("/tires/%d/delete"|format(tire.id), "Opravdu smazat pneumatiku " ~ tire.label ~ "?", "Smazat pneumatiku") }}
+</details>
+{% endif %}
+{% endblock %}

@@ -1,52 +1,51 @@
-"""Pneumatiky: sady, přezutí (doma / v servisu), poškození, životnost a upozornění."""
+"""Pneumatiky: evidence gum / párů / sad, přezutí na vozidla a pozice, poškození, životnost, upozornění.
+
+Pneumatika patří uživateli a během života může být na různých vozidlech. Každé nasazení
+(TireMount) je období na konkrétním vozidle a pozici; přezutí (TireSwap) nasazení otevírá
+a zavírá. Nasazením na obsazenou pozici se původní pneumatika sundá - když se mění jen přední,
+zůstane zbytek sady na zadní nápravě.
+"""
 from datetime import date, datetime
 from decimal import Decimal
 
-from models import Expense, ServiceRecord, TireChange, TireDamage, TireSet
-from models.tire import (
-    TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_RIMS, TIRE_SEASONS, TIRE_SERVICE_TYPE,
-)
-from services.errors import ValidationError, NotFoundError
-from services.maintenance_service import (
-    DueStatus, ExpenseService, ServiceRecordService, LEVEL_OVERDUE, LEVEL_WARNING, _RecordServiceBase,
-    _clean_str, _ensure_vehicle, _positive_int, check_odometer_order,
-)
-from services.pricing import to_decimal
+from sqlalchemy.orm import joinedload
 
-PRICE_KEYS = ("price_paid", "currency_code", "manual_rate")
+from models import Tire, TireDefect, TireMount, TireSwap
+from models.tire import (
+    TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
+    TIRE_SERVICE_TYPE, slots_position,
+)
+from services.errors import NotFoundError, ValidationError
+from services.maintenance_service import (
+    DueStatus, ExpenseService, ServiceRecordService, LEVEL_OVERDUE, LEVEL_WARNING,
+    _clean_str, _positive_int, check_odometer_order,
+)
+from services.pricing import convert_price, to_decimal
+
 TREAD_MAX = Decimal("20")
 
 
-def _pop_price(data):
-    price = {key: data.pop(key, None) for key in PRICE_KEYS}
-    has_price = price["price_paid"] not in (None, "")
-    return price if has_price else None
-
-
-def _tread(value, label):
+def _tread(value, label="Hloubka dezénu"):
     value = to_decimal(value, Decimal("0.1"))
     if value is not None and not (0 <= value <= TREAD_MAX):
         raise ValidationError(f"{label} musí být 0–20 mm.")
     return value
 
 
-def _get_set(session, tire_set_id, vehicle_id):
-    tire_set = session.get(TireSet, tire_set_id) if tire_set_id else None
-    if tire_set is None or tire_set.vehicle_id != vehicle_id:
-        raise ValidationError("Vyberte sadu pneumatik tohoto vozidla.")
-    return tire_set
+def _has_price(price):
+    return bool(price) and price.get("price_paid") not in (None, "")
 
 
-def _sync_expense(session, owner, price, expense_date, description, odometer=None):
-    """Výdaj navázaný na sadu / poškození: založí, upraví, nebo (bez ceny) smaže."""
+def _sync_expense(session, owner, price, vehicle_id, expense_date, description, odometer=None):
+    """Výdaj navázaný na pneumatiku / poškození: založí, upraví, nebo (bez ceny či vozidla) smaže."""
     expenses = ExpenseService(session)
-    if price is None:
+    if not _has_price(price) or not vehicle_id:
         if owner.expense is not None:
             expense = owner.expense
-            owner.expense_id = None
+            owner.expense = None
             expenses.delete(expense)
         return
-    data = {"vehicle_id": owner.vehicle_id, "expense_date": expense_date, "category": TIRE_EXPENSE_CATEGORY,
+    data = {"vehicle_id": vehicle_id, "expense_date": expense_date, "category": TIRE_EXPENSE_CATEGORY,
             "description": description[:200], "odometer": odometer, **price}
     if owner.expense is not None:
         expenses.update(owner.expense, data)
@@ -56,43 +55,64 @@ def _sync_expense(session, owner, price, expense_date, description, odometer=Non
 
 
 # ----------------------------------------------------------------------
-# Sady pneumatik
+# Pneumatiky
 # ----------------------------------------------------------------------
 
-class TireSetService(_RecordServiceBase):
-    model = TireSet
-    date_column = "purchase_date"
+class TireService:
+    def __init__(self, session):
+        self.session = session
 
-    def create(self, **data):
-        price = _pop_price(data)
-        record = super().create(**data)
-        self._sync(record, price)
-        return record
+    def list_for_user(self, user, include_retired=True):
+        query = (self.session.query(Tire).options(joinedload(Tire.mounts), joinedload(Tire.expense))
+                 .filter(Tire.owner_id == user.id))
+        if not include_retired:
+            query = query.filter(Tire.retired_date.is_(None))
+        return sorted(query.all(), key=lambda t: (t.retired_date is not None, t.season, t.manufacturer, t.id))
 
-    def update(self, record, data):
-        data = dict(data)
-        price = _pop_price(data)
-        record = super().update(record, data)
-        self._sync(record, price)
-        return record
+    def get_for_user(self, user, tire_id):
+        tire = self.session.get(Tire, tire_id) if tire_id else None
+        if tire is None or tire.owner_id != user.id:
+            raise NotFoundError("Pneumatika nenalezena.")
+        return tire
 
-    def _sync(self, record, price):
-        description = f"Nákup pneumatik: {record.full_label}"
-        _sync_expense(self.session, record, price, record.purchase_date or date.today(), description)
+    def create(self, user, data):
+        price, expense_vehicle_id = data.pop("price", None), data.pop("expense_vehicle_id", None)
+        tire = Tire(owner_id=user.id, **self._validate(data, price))
+        self.session.add(tire)
+        self.session.commit()
+        self._sync(tire, price, expense_vehicle_id)
+        return tire
 
-    def delete(self, record):
-        """Smaže sadu včetně přezutí a poškození i výdajů a servisů, které k nim aplikace založila."""
-        linked = [record.expense] + [d.expense for d in record.damages] \
-            + [c.service_record for c in record.changes]
-        self.session.delete(record)
+    def update(self, tire, data):
+        price, expense_vehicle_id = data.pop("price", None), data.pop("expense_vehicle_id", None)
+        for key, value in self._validate(data, price).items():
+            setattr(tire, key, value)
+        self.session.commit()
+        self._sync(tire, price, expense_vehicle_id)
+        return tire
+
+    def _sync(self, tire, price, vehicle_id):
+        _sync_expense(self.session, tire, price, vehicle_id, tire.purchase_date or date.today(),
+                      f"Nákup pneumatik: {tire.full_label}")
+
+    def delete(self, tire):
+        """Smaže pneumatiku i s nasazeními a poškozeními, výdaji za nákup a opravy a přezutími,
+        ve kterých nic jiného nezůstalo."""
+        linked = [tire.expense] + [d.expense for d in tire.defects]
+        swaps = {m.swap for m in tire.mounts}
+        self.session.delete(tire)
         self.session.flush()
+        for swap in swaps:
+            self.session.refresh(swap)
+            if not swap.mounted:
+                linked.append(swap.service_record)
+                self.session.delete(swap)
         for item in linked:
             if item is not None:
                 self.session.delete(item)
         self.session.commit()
 
-    def _validate(self, data):
-        _ensure_vehicle(self.session, data.get("vehicle_id"))
+    def _validate(self, data, price):
         season = data.get("season")
         if season not in TIRE_SEASONS:
             raise ValidationError("Vyberte typ pneumatik (letní, zimní, univerzální).")
@@ -102,14 +122,18 @@ class TireSetService(_RecordServiceBase):
         year = data.get("production_year")
         if year not in (None, "") and not (1990 <= int(year) <= date.today().year + 1):
             raise ValidationError("Neplatný rok výroby pneumatik.")
-        quantity = _positive_int(data.get("quantity"), "Počet kusů") or 4
-        if not 1 <= quantity <= 20:
-            raise ValidationError("Počet kusů musí být 1–20.")
+        quantity = _positive_int(data.get("quantity"), "Počet kusů") or 2
+        if not 1 <= quantity <= 8:
+            raise ValidationError("Počet kusů musí být 1–8.")
         retired = data.get("retired_date")
         if retired and data.get("purchase_date") and retired < data["purchase_date"]:
             raise ValidationError("Vyřazení nemůže být před nákupem.")
+        currency, price_paid, price_local = "CZK", None, None
+        if _has_price(price):
+            currency, price_paid, price_local = convert_price(
+                price["price_paid"], price.get("currency_code"), data.get("purchase_date") or date.today(),
+                price.get("manual_rate"))
         return {
-            "vehicle_id": data["vehicle_id"],
             "season": season,
             "manufacturer": _clean_str(data.get("manufacturer"), 50, "Výrobce", required=True),
             "model": _clean_str(data.get("model"), 50, "Model"),
@@ -118,221 +142,304 @@ class TireSetService(_RecordServiceBase):
             "dot": _clean_str(data.get("dot"), 10, "DOT"),
             "quantity": quantity,
             "rim": rim,
-            "new_tread_mm": _tread(data.get("new_tread_mm"), "Hloubka dezénu"),
+            "new_tread_mm": _tread(data.get("new_tread_mm")),
             "purchase_date": data.get("purchase_date"),
+            "price_paid": price_paid,
+            "currency_code": currency,
+            "price_local": price_local,
             "storage_location": _clean_str(data.get("storage_location"), 100, "Místo uložení"),
             "retired_date": retired,
             "retired_reason": _clean_str(data.get("retired_reason"), 200, "Důvod vyřazení") if retired else None,
             "note": _clean_str(data.get("note")),
         }
 
-    def list_for_vehicles(self, vehicle_ids, include_retired=True):
-        if not vehicle_ids:
-            return []
-        query = self.session.query(TireSet).filter(TireSet.vehicle_id.in_(vehicle_ids))
-        if not include_retired:
-            query = query.filter(TireSet.retired_date.is_(None))
-        return query.order_by(TireSet.retired_date.isnot(None), TireSet.season, TireSet.id).all()
-
 
 # ----------------------------------------------------------------------
 # Přezutí
 # ----------------------------------------------------------------------
 
-class TireChangeService(_RecordServiceBase):
-    model = TireChange
-    date_column = "change_date"
+def open_mounts(session, vehicle_id):
+    """Pneumatiky právě nasazené na vozidle."""
+    mounts = (session.query(TireMount).options(joinedload(TireMount.tire))
+              .filter(TireMount.vehicle_id == vehicle_id, TireMount.removed_date.is_(None)).all())
+    order = list(TIRE_POSITIONS)
+    return sorted(mounts, key=lambda m: (order.index(m.position) if m.position in order else 99, m.id))
 
-    def create(self, **data):
-        price = _pop_price(data)
-        service_place = data.pop("service_place", None)
-        record = super().create(**data)
-        self._sync_service(record, price, service_place)
-        return record
 
-    def update(self, record, data):
-        data = {**data, "id": record.id}
-        price = _pop_price(data)
-        service_place = data.pop("service_place", None)
-        record = super().update(record, data)
-        self._sync_service(record, price, service_place)
-        return record
+class TireSwapService:
+    def __init__(self, session):
+        self.session = session
 
-    def delete(self, record):
-        service_record = record.service_record
-        self.session.delete(record)
+    def get(self, swap_id):
+        return self.session.get(TireSwap, swap_id)
+
+    def for_vehicles(self, vehicle_ids, limit=None):
+        if not vehicle_ids:
+            return []
+        query = (self.session.query(TireSwap).filter(TireSwap.vehicle_id.in_(vehicle_ids))
+                 .order_by(TireSwap.swap_date.desc(), TireSwap.id.desc()))
+        return query.limit(limit).all() if limit else query.all()
+
+    def _check_common(self, vehicle_id, swap_date, odometer, place, exclude_id=None):
+        if not swap_date:
+            raise ValidationError("Datum přezutí je povinné.")
+        if swap_date > date.today():
+            raise ValidationError("Datum přezutí nemůže být v budoucnosti.")
+        odometer = _positive_int(odometer, "Stav tachometru", allow_none=False)
+        if place not in TIRE_PLACES:
+            raise ValidationError("Neplatné místo přezutí.")
+        check_odometer_order(self.session, vehicle_id, datetime.combine(swap_date, datetime.min.time()), odometer,
+                             has_time=False, exclude=("tire_swap", exclude_id))
+        return odometer
+
+    def create(self, vehicle, swap_date, odometer, place="home", service_place=None, price=None, note=None,
+               new_mounts=(), remove_ids=(), treads=None):
+        """new_mounts = [(Tire, pozice)], remove_ids = id nasazení k sundání bez náhrady,
+        treads = {id nasazení: naměřený dezén při sundání}."""
+        treads = treads or {}
+        odometer = self._check_common(vehicle.id, swap_date, odometer, place)
+        last = (self.session.query(TireSwap.swap_date).filter(TireSwap.vehicle_id == vehicle.id)
+                .order_by(TireSwap.swap_date.desc()).first())
+        if last and swap_date < last[0]:
+            raise ValidationError(f"Na vozidle je novější přezutí ({last[0]:%d.%m.%Y}) – starší přezutí "
+                                  "lze zapsat jen po smazání novějšího.")
+        current = open_mounts(self.session, vehicle.id)
+        remove_ids = {i for i in remove_ids if i in {m.id for m in current}}
+        if not new_mounts and not remove_ids:
+            raise ValidationError("Vyberte pneumatiky k nasazení nebo sundání.")
+        new_slots, seen = set(), set()
+        for tire, position in new_mounts:
+            if position not in TIRE_POSITIONS:
+                raise ValidationError("Vyberte pozici pneumatiky.")
+            if tire.id in seen:
+                raise ValidationError(f"Pneumatika {tire.label} je vybraná dvakrát.")
+            if tire.retired_date:
+                raise ValidationError(f"Pneumatika {tire.label} je vyřazená.")
+            slots = TIRE_POSITIONS[position][1]
+            if slots & new_slots:
+                raise ValidationError("Dvě pneumatiky nemohou být na stejné pozici.")
+            last_mount = max((m.mounted_date for m in tire.mounts), default=None)
+            if last_mount and last_mount > swap_date:
+                raise ValidationError(f"Pneumatika {tire.label} byla nasazena až {last_mount:%d.%m.%Y}.")
+            seen.add(tire.id)
+            new_slots |= slots
+
+        swap = TireSwap(vehicle_id=vehicle.id, swap_date=swap_date, odometer=odometer, place=place,
+                        note=_clean_str(note))
+        self.session.add(swap)
+        self.session.flush()
+
+        for mount in current:
+            explicit = mount.id in remove_ids
+            moving = mount.tire_id in seen
+            overlap = mount.slots & new_slots
+            if not (explicit or moving or overlap):
+                continue
+            self._close(mount, swap, odometer, _tread(treads.get(mount.id)))
+            rest = mount.slots - new_slots
+            if overlap and rest and not explicit and not moving:
+                # vyměněna jen část (např. přední) - zbytek zůstává na voze
+                rest_position = slots_position(frozenset(rest))
+                if rest_position:
+                    self.session.add(TireMount(tire_id=mount.tire_id, vehicle_id=vehicle.id, position=rest_position,
+                                               swap=swap, mounted_date=swap_date, mounted_km=odometer))
+
+        from services.vehicle_service import VehicleService
+        vehicles = VehicleService(self.session)
+        for tire, position in new_mounts:
+            for other in (self.session.query(TireMount)
+                          .filter(TireMount.tire_id == tire.id, TireMount.removed_date.is_(None))):
+                # pneumatika přechází z jiného vozidla - tam se sundá k aktuálnímu stavu tachometru
+                km = vehicles.get_current_odometer(other.vehicle_id) or other.mounted_km
+                self._close(other, swap, max(km, other.mounted_km), None)
+            self.session.add(TireMount(tire_id=tire.id, vehicle_id=vehicle.id, position=position, swap=swap,
+                                       mounted_date=swap_date, mounted_km=odometer))
+        self.session.flush()
+        self._sync_service(swap, price, service_place)
+        self.session.commit()
+        return swap
+
+    @staticmethod
+    def _close(mount, swap, km, tread):
+        mount.removed_swap = swap
+        mount.removed_date = swap.swap_date
+        mount.removed_km = km
+        mount.removed_tread_mm = tread
+
+    def update(self, swap, swap_date, odometer, place="home", service_place=None, price=None, note=None,
+               treads=None):
+        """Úprava data, km, místa a ceny; nasazené pneumatiky se nemění (na to je nové přezutí)."""
+        odometer = self._check_common(swap.vehicle_id, swap_date, odometer, place, exclude_id=swap.id)
+        for mount in swap.removed:
+            if mount.mounted_date > swap_date or (mount.vehicle_id == swap.vehicle_id and mount.mounted_km > odometer):
+                raise ValidationError("Přezutí nemůže být dřív než nasazení pneumatik, které se při něm sundaly.")
+        for mount in swap.mounted:
+            if mount.removed_date and mount.removed_date < swap_date:
+                raise ValidationError("Přezutí nemůže být později než sundání pneumatik, které se při něm nasadily.")
+        swap.swap_date, swap.odometer, swap.place, swap.note = swap_date, odometer, place, _clean_str(note)
+        for mount in swap.mounted:
+            mount.mounted_date, mount.mounted_km = swap_date, odometer
+        for mount in swap.removed:
+            mount.removed_date = swap_date
+            if mount.vehicle_id == swap.vehicle_id:
+                mount.removed_km = odometer
+            if treads is not None and mount.id in treads:
+                mount.removed_tread_mm = _tread(treads[mount.id])
+        self.session.flush()
+        self._sync_service(swap, price, service_place)
+        self.session.commit()
+        return swap
+
+    @staticmethod
+    def can_delete(swap):
+        """Smazat lze jen přezutí, jehož nasazené pneumatiky ještě nikdo nesundal."""
+        return all(m.removed_date is None for m in swap.mounted)
+
+    def delete(self, swap):
+        if not self.can_delete(swap):
+            raise ValidationError("Pneumatiky z tohoto přezutí už byly později sundány – nejdřív smažte novější přezutí.")
+        for mount in list(swap.removed):
+            mount.removed_swap = None
+            mount.removed_date = mount.removed_km = mount.removed_tread_mm = None
+        service_record = swap.service_record
+        self.session.delete(swap)
         if service_record is not None:
             self.session.delete(service_record)
         self.session.commit()
 
-    def _sync_service(self, record, price, service_place):
-        """Přezutí v servisu = servisní záznam (náklady, servisní historie); doma žádný."""
+    def _sync_service(self, swap, price, service_place):
+        """Přezutí v servisu = servisní záznam (náklady, historie servisu); doma žádný."""
         services = ServiceRecordService(self.session)
-        if record.place != "service":
-            if record.service_record is not None:
-                service_record = record.service_record
-                record.service_record_id = None
-                services.delete(service_record)
+        if swap.place != "service":
+            if swap.service_record is not None:
+                record = swap.service_record
+                swap.service_record = None
+                services.delete(record)
             return
-        data = {"vehicle_id": record.vehicle_id, "service_date": record.change_date, "odometer": record.odometer,
-                "service_type": TIRE_SERVICE_TYPE, "place": service_place,
-                "note": f"Nasazeno: {record.tire_set.full_label}",
-                **(price or {"price_paid": None, "currency_code": "CZK", "manual_rate": None})}
-        if record.service_record is not None:
-            services.update(record.service_record, data)
+        mounted = ", ".join(f"{m.tire.label} ({m.position_label.lower()})" for m in swap.mounted)
+        data = {"vehicle_id": swap.vehicle_id, "service_date": swap.swap_date, "odometer": swap.odometer,
+                "service_type": TIRE_SERVICE_TYPE, "place": _clean_str(service_place, 100, "Servis"),
+                "note": f"Nasazeno: {mounted}" if mounted else "Sundání pneumatik",
+                **(price if _has_price(price) else {"price_paid": None, "currency_code": "CZK", "manual_rate": None})}
+        if swap.service_record is not None:
+            services.update(swap.service_record, data)
         else:
-            record.service_record = services.create(**data)
-            self.session.commit()
-
-    def _validate(self, data):
-        _ensure_vehicle(self.session, data.get("vehicle_id"))
-        if not data.get("change_date"):
-            raise ValidationError("Datum přezutí je povinné.")
-        odometer = _positive_int(data.get("odometer"), "Stav tachometru", allow_none=False)
-        tire_set = _get_set(self.session, data.get("tire_set_id"), data["vehicle_id"])
-        place = data.get("place") or "home"
-        if place not in TIRE_PLACES:
-            raise ValidationError("Neplatné místo přezutí.")
-        check_odometer_order(self.session, data["vehicle_id"], datetime.combine(data["change_date"], datetime.min.time()),
-                             odometer, has_time=False, exclude=("tire_change", data.get("id")))
-        return {
-            "vehicle_id": data["vehicle_id"],
-            "change_date": data["change_date"],
-            "odometer": odometer,
-            "tire_set_id": tire_set.id,
-            "place": place,
-            "removed_tread_mm": _tread(data.get("removed_tread_mm"), "Hloubka dezénu"),
-            "note": _clean_str(data.get("note")),
-        }
-
-    def for_vehicle(self, vehicle_id):
-        return (self.session.query(TireChange).filter(TireChange.vehicle_id == vehicle_id)
-                .order_by(TireChange.change_date, TireChange.odometer, TireChange.id).all())
-
-    def mounted_set(self, vehicle_id, on_date=None):
-        """Sada nasazená k danému dni (podle posledního přezutí), jinak None."""
-        query = self.session.query(TireChange).filter(TireChange.vehicle_id == vehicle_id)
-        if on_date:
-            query = query.filter(TireChange.change_date <= on_date)
-        last = query.order_by(TireChange.change_date.desc(), TireChange.odometer.desc(),
-                              TireChange.id.desc()).first()
-        return last.tire_set if last else None
+            swap.service_record = services.create(**data)
 
 
 # ----------------------------------------------------------------------
 # Poškození
 # ----------------------------------------------------------------------
 
-class TireDamageService(_RecordServiceBase):
-    model = TireDamage
-    date_column = "damage_date"
+class TireDefectService:
+    def __init__(self, session):
+        self.session = session
 
-    def create(self, **data):
-        price = _pop_price(data)
-        record = super().create(**data)
-        self._sync(record, price)
-        return record
+    def get(self, defect_id):
+        return self.session.get(TireDefect, defect_id)
 
-    def update(self, record, data):
-        data = dict(data)
-        price = _pop_price(data)
-        record = super().update(record, data)
-        self._sync(record, price)
-        return record
+    def for_tires(self, tire_ids):
+        if not tire_ids:
+            return []
+        return (self.session.query(TireDefect).filter(TireDefect.tire_id.in_(tire_ids))
+                .order_by(TireDefect.defect_date.desc(), TireDefect.id.desc()).all())
 
-    def _sync(self, record, price):
-        _sync_expense(self.session, record, price, record.damage_date,
-                      f"Oprava pneumatiky: {record.description}", record.odometer)
+    @staticmethod
+    def vehicle_on(tire, on_date):
+        """Vozidlo, na kterém byla pneumatika k danému dni."""
+        for m in reversed(tire.mounts):
+            if m.mounted_date <= on_date and (m.removed_date is None or m.removed_date >= on_date):
+                return m.vehicle_id
+        return None
 
-    def delete(self, record):
-        expense = record.expense
-        self.session.delete(record)
-        if expense is not None:
-            self.session.delete(expense)
-        self.session.commit()
-
-    def _validate(self, data):
-        _ensure_vehicle(self.session, data.get("vehicle_id"))
-        if not data.get("damage_date"):
+    def save(self, defect, tire, data, price, vehicle_id):
+        if not data.get("defect_date"):
             raise ValidationError("Datum poškození je povinné.")
-        tire_set = _get_set(self.session, data.get("tire_set_id"), data["vehicle_id"])
-        return {
-            "vehicle_id": data["vehicle_id"],
-            "tire_set_id": tire_set.id,
-            "damage_date": data["damage_date"],
+        vehicle_id = vehicle_id or self.vehicle_on(tire, data["defect_date"])
+        if _has_price(price) and not vehicle_id:
+            raise ValidationError("Pro zápis ceny opravy vyberte vozidlo (výdaj patří k vozidlu).")
+        values = {
+            "tire_id": tire.id, "vehicle_id": vehicle_id, "defect_date": data["defect_date"],
             "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
             "position": _clean_str(data.get("position"), 20, "Pozice"),
             "description": _clean_str(data.get("description"), 200, "Popis", required=True),
         }
+        if defect is None:
+            defect = TireDefect(**values)
+            self.session.add(defect)
+        else:
+            for key, value in values.items():
+                setattr(defect, key, value)
+        self.session.commit()
+        _sync_expense(self.session, defect, price, vehicle_id, defect.defect_date,
+                      f"Oprava pneumatiky: {defect.description}", defect.odometer)
+        self.session.commit()
+        return defect
+
+    def delete(self, defect):
+        expense = defect.expense
+        self.session.delete(defect)
+        if expense is not None:
+            self.session.delete(expense)
+        self.session.commit()
 
 
 # ----------------------------------------------------------------------
 # Životnost a upozornění
 # ----------------------------------------------------------------------
 
-def tire_overview(session, vehicle, current_odometer=None, today=None):
-    """Sady vozidla se statistikou: najeto, sezóny, dny na voze, dezén, opotřebení, náklady."""
+def tire_stats(session, tires, today=None):
+    """Statistika pneumatik: najeto, nasazení, vozidla, dezén, opotřebení, náklady, varování."""
+    from services.vehicle_service import VehicleService
     today = today or date.today()
-    sets = TireSetService(session).list_for_vehicles([vehicle.id])
-    changes = TireChangeService(session).for_vehicle(vehicle.id)
-    stats = {s.id: {"km": 0, "days": 0, "seasons": 0, "measurements": [], "first_mounted": None,
-                    "last_removed": None} for s in sets}
+    vehicles = VehicleService(session)
+    odometers = {}
 
-    # období na voze: od přezutí do dalšího přezutí (poslední až do dneška / aktuálního stavu)
-    for i, change in enumerate(changes):
-        nxt = changes[i + 1] if i + 1 < len(changes) else None
-        end_date = nxt.change_date if nxt else today
-        end_km = nxt.odometer if nxt else current_odometer
-        s = stats.get(change.tire_set_id)
-        if s is None:
-            continue
-        s["seasons"] += 1
-        s["days"] += max((end_date - change.change_date).days, 0)
-        s["first_mounted"] = s["first_mounted"] or change.change_date
-        if end_km is not None and end_km >= change.odometer:
-            s["km"] += end_km - change.odometer
-        if nxt is not None:
-            s["last_removed"] = nxt.change_date
-            if nxt.removed_tread_mm is not None:  # měření sundané sady
-                s["measurements"].append((s["km"], nxt.removed_tread_mm, nxt.change_date))
+    def odometer(vehicle_id):
+        if vehicle_id not in odometers:
+            odometers[vehicle_id] = vehicles.get_current_odometer(vehicle_id)
+        return odometers[vehicle_id]
 
-    mounted = changes[-1].tire_set_id if changes else None
     result = []
-    for tire_set in sets:
-        s = stats[tire_set.id]
-        first = tire_set.new_tread_mm
-        last = s["measurements"][-1] if s["measurements"] else None
-        wear = None   # mm na 1000 km
-        remaining_km = None
+    for tire in tires:
+        km, days, measurements, vehicle_names = 0, 0, [], []
+        for m in tire.mounts:
+            end_km = m.removed_km if m.removed_date else odometer(m.vehicle_id)
+            if end_km is not None and end_km >= m.mounted_km:
+                km += end_km - m.mounted_km
+            days += max(((m.removed_date or today) - m.mounted_date).days, 0)
+            if m.removed_tread_mm is not None:
+                measurements.append((km, m.removed_tread_mm, m.removed_date))
+            if m.vehicle.display_name not in vehicle_names:
+                vehicle_names.append(m.vehicle.display_name)
+        first = tire.new_tread_mm
+        last = measurements[-1] if measurements else None
+        wear = remaining_km = None
         if first is not None and last is not None and last[0] > 0 and first > last[1]:
-            wear = (first - last[1]) / Decimal(last[0]) * 1000
-            above = last[1] - Decimal(str(tire_set.legal_min_tread))
+            wear = (first - last[1]) / Decimal(last[0]) * 1000  # mm na 1000 km
+            above = last[1] - Decimal(str(tire.legal_min_tread))
             remaining_km = int(above / wear * 1000) if above > 0 else 0
-        cost = Decimal("0")
-        if tire_set.expense is not None and tire_set.expense.price_local is not None:
-            cost += tire_set.expense.price_local
-        damage_cost = sum((d.expense.price_local or 0 for d in tire_set.damages if d.expense), Decimal("0"))
-        status = "retired" if tire_set.retired_date else ("mounted" if tire_set.id == mounted else "stored")
-        warnings = []
+        cost = (tire.price_local or Decimal("0")) + sum(
+            (d.expense.price_local or 0 for d in tire.defects if d.expense), Decimal("0"))
+        mount = tire.open_mount
+        status = "retired" if tire.retired_date else ("mounted" if mount else "stored")
         tread = last[1] if last else first
-        if tread is not None and status != "retired":
-            minimum = Decimal(str(tire_set.legal_min_tread))
-            if tread <= minimum:
-                warnings.append(("danger", f"dezén {tread} mm – pod zákonným minimem {tire_set.legal_min_tread} mm"))
-            elif tread <= minimum + 1:
-                warnings.append(("warning", f"dezén {tread} mm – blíží se minimum {tire_set.legal_min_tread} mm"))
-        if tire_set.age_years is not None and tire_set.age_years >= TIRE_MAX_AGE_YEARS and status != "retired":
-            warnings.append(("warning", f"stáří {tire_set.age_years} let – doporučená výměna"))
+        warnings = []
+        if status != "retired":
+            if tread is not None:
+                minimum = Decimal(str(tire.legal_min_tread))
+                if tread <= minimum:
+                    warnings.append(("danger", f"dezén {tread} mm – pod zákonným minimem {tire.legal_min_tread} mm"))
+                elif tread <= minimum + 1:
+                    warnings.append(("warning", f"dezén {tread} mm – blíží se minimum {tire.legal_min_tread} mm"))
+            if tire.age_years is not None and tire.age_years >= TIRE_MAX_AGE_YEARS:
+                warnings.append(("warning", f"stáří {tire.age_years} let – doporučená výměna"))
         result.append({
-            "set": tire_set, "status": status, "km": s["km"], "days": s["days"], "seasons": s["seasons"],
-            "tread": tread, "measurements": s["measurements"], "wear": wear, "remaining_km": remaining_km,
-            "cost": cost + damage_cost, "damage_cost": damage_cost,
-            "cost_per_1000": ((cost + damage_cost) / s["km"] * 1000) if s["km"] and cost + damage_cost else None,
-            "used_years": round(s["days"] / 365.25, 1) if s["days"] else 0,
-            "first_mounted": s["first_mounted"], "warnings": warnings,
+            "tire": tire, "status": status, "mount": mount, "km": km, "days": days,
+            "used_years": round(days / 365.25, 1) if days else 0, "mounts": len(tire.mounts),
+            "vehicles": vehicle_names, "tread": tread, "wear": wear, "remaining_km": remaining_km,
+            "cost": cost, "cost_per_1000": (cost / km * 1000) if km and cost else None, "warnings": warnings,
         })
-    order = {"mounted": 0, "stored": 1, "retired": 2}
-    result.sort(key=lambda r: (order[r["status"]], r["set"].season, r["set"].id))
     return result
 
 
@@ -352,16 +459,15 @@ def winter_tire_status(today=None):
 
 
 def tire_alerts(session, vehicles, today=None):
-    """[(vozidlo, sada, DueStatus)] - aktivní vozidla, která mají v zimním období nasazené letní pneu."""
+    """[(vozidlo, pneumatika, DueStatus)] - aktivní vozidla s nasazenými letními pneu v zimním období."""
     status = winter_tire_status(today)
     if status is None:
         return []
-    service = TireChangeService(session)
     result = []
     for vehicle in vehicles:
         if not vehicle.is_active:
             continue
-        mounted = service.mounted_set(vehicle.id, today)
-        if mounted is not None and mounted.season == "Letní":
-            result.append((vehicle, mounted, status))
+        summer = [m for m in open_mounts(session, vehicle.id) if m.tire.season == "Letní" and m.position != "spare"]
+        if summer:
+            result.append((vehicle, summer[0].tire, status))
     return result

@@ -5,4 +5,4 @@ from .fuel_record import FuelRecord
 from .maintenance import ServiceRecord, ServiceInterval, Reminder, Expense
 from .fuel_type import FuelType
 from .vehicle_note import VehicleNote
-from .tire import TireSet, TireChange, TireDamage
+from .tire import Tire, TireSwap, TireMount, TireDefect

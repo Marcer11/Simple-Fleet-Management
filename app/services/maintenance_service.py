@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
 
-from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireChange
+from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap
 from models.vehicle_note import NOTE_CATEGORIES
 from models.maintenance import REPEAT_OPTIONS, REPEAT_NONE, VIGNETTE_VARIANTS
 from services.errors import ValidationError, NotFoundError
@@ -540,7 +540,7 @@ def check_odometer_order(session, vehicle_id, when, odometer, has_time=True, exc
 
     Stejný stav v různé dny je v pořádku (motorka přes zimu v garáži). Záznamy jen s datem
     (servis, výdaje, přezutí) se se záznamem ze stejného dne neporovnávají.
-    exclude = ("note" | "tire_change", id) - upravovaný záznam se neporovnává sám se sebou.
+    exclude = ("note" | "tire_swap", id) - upravovaný záznam se neporovnává sám se sebou.
     """
     kind, exclude_id = exclude
     readings = []  # (čas, km, popis, má čas)
@@ -551,9 +551,9 @@ def check_odometer_order(session, vehicle_id, when, odometer, has_time=True, exc
                         .filter(VehicleNote.vehicle_id == vehicle_id, VehicleNote.odometer.isnot(None))):
         if not (kind == "note" and rid == exclude_id):
             readings.append((at, km, "poznámky", True))
-    for d, km, rid in (session.query(TireChange.change_date, TireChange.odometer, TireChange.id)
-                       .filter(TireChange.vehicle_id == vehicle_id)):
-        if not (kind == "tire_change" and rid == exclude_id):
+    for d, km, rid in (session.query(TireSwap.swap_date, TireSwap.odometer, TireSwap.id)
+                       .filter(TireSwap.vehicle_id == vehicle_id)):
+        if not (kind == "tire_swap" and rid == exclude_id):
             readings.append((datetime.combine(d, datetime.min.time()), km, "přezutí", False))
     for model, column, label in ((ServiceRecord, ServiceRecord.service_date, "servisu"),
                                  (Expense, Expense.expense_date, "výdaje")):

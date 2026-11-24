@@ -272,6 +272,15 @@
         filterSets();
     }
 
+    // Formulář závislý na vozidle (přezutí): po výběru vozidla načíst stránku znovu
+    document.querySelectorAll("select[data-reload]").forEach(function (select) {
+        select.addEventListener("change", function () {
+            const params = new URLSearchParams(window.location.search);
+            params.set(select.name, select.value);
+            window.location.search = params.toString();
+        });
+    });
+
     // Přezutí: pole servisu a ceny jen při přezutí v servisu
     const placeSelect = document.querySelector("select[data-toggle-service]");
     if (placeSelect) {

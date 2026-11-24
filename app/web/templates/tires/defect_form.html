@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ "Upravit poškození" if defect else "Poškození pneumatiky" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ "Upravit poškození" if defect else "Poškození pneumatiky" }}</h1></div>
+
+{% if not tires %}
+<div class="card empty"><p>Nemáte žádné pneumatiky.</p><a class="btn btn-primary" href="/tires/add">Přidat pneumatiku</a></div>
+{% else %}
+<form method="post" class="card">
+    {{ m.csrf() }}
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-tire_id">Pneumatika <span class="req">*</span></label>
+            <select id="f-tire_id" name="tire_id" required>
+                <option value="">– vyberte –</option>
+                {% for t in tires %}<option value="{{ t.id }}"{% if m.val('tire_id') == t.id|string %} selected{% endif %}>{{ t.full_label }}{% if t.retired_date %} (vyřazeno){% endif %}</option>{% endfor %}
+            </select>
+        </div>
+        {{ m.field("defect_date", "Datum", "date", required=true) }}
+        {{ m.field("odometer", "Stav tachometru (km)", "number", min=0, step=1, inputmode="numeric") }}
+        <div class="field">
+            <label for="f-position">Pozice</label>
+            <input id="f-position" name="position" type="text" maxlength="20" list="tire-positions" value="{{ m.val('position') }}" autocomplete="off">
+            {{ m.datalist("tire-positions", positions) }}
+        </div>
+        {{ m.field("description", "Co se stalo", required=true, maxlength=200, placeholder="např. hřebík – zalepeno, boule na boku", wide=true, autocomplete="off") }}
+        {{ m.price_fields(currencies, "Cena opravy") }}
+        <div class="field">
+            <label for="f-vehicle_id">Vozidlo</label>
+            <select id="f-vehicle_id" name="vehicle_id">
+                <option value="">podle nasazení k datu</option>
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('vehicle_id') == v.id|string %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+            </select>
+            <small class="help">Cena opravy se zapíše jako výdaj „Pneumatiky“ k tomuto vozidlu.</small>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a class="btn" href="/tires">Zrušit</a>
+    </div>
+</form>
+{% if defect %}
+<div class="card">{{ m.delete_button("/tire-defects/%d/delete"|format(defect.id), "Smazat záznam o poškození?", "Smazat", small=false) }}</div>
+{% endif %}
+{% endif %}
+{% endblock %}

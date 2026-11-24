@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ "Upravit přezutí" if swap else "Přezutí pneumatik" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ "Upravit přezutí" if swap else "Přezutí pneumatik" }}</h1>
+        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
+    </div>
+</div>
+
+{% if not vehicles %}
+<div class="card empty"><p>Nemáte žádné vozidlo, do kterého můžete zapisovat.</p></div>
+{% else %}
+<form method="{{ 'post' if vehicle else 'get' }}" class="card">
+    {% if vehicle %}{{ m.csrf() }}{% endif %}
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-vehicle_id">Vozidlo <span class="req">*</span></label>
+            {% if swap %}
+            <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+            <input id="f-vehicle_id" type="text" value="{{ vehicle.display_name }}" disabled>
+            {% else %}
+            <select id="f-vehicle_id" name="vehicle_id" required data-reload>
+                <option value="">– vyberte –</option>
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if vehicle and vehicle.id == v.id %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+            </select>
+            {% endif %}
+        </div>
+        {% if vehicle %}
+        {{ m.field("swap_date", "Datum", "date", required=true, max=today.isoformat()) }}
+        {{ m.field("odometer", "Stav tachometru (km)", "number", required=true, min=0, step=1, inputmode="numeric", placeholder=(odometer or "")) }}
+        <div class="field">
+            <label for="f-place">Kde</label>
+            <select id="f-place" name="place" data-toggle-service>
+                {% for value, label in places.items() %}<option value="{{ value }}"{% if m.val('place') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field" data-service-only>
+            <label for="f-service_place">Servis</label>
+            <input id="f-service_place" name="service_place" type="text" maxlength="100" value="{{ m.val('service_place') }}" autocomplete="off" placeholder="např. Pneuservis Novák">
+        </div>
+        {{ m.price_fields(currencies, "Cena přezutí") }}
+        {% endif %}
+    </div>
+    {% if not vehicle %}
+    <noscript><div class="form-actions"><button class="btn" type="submit">Pokračovat</button></div></noscript>
+    {% else %}
+
+    {% if swap %}
+    {% set removed_here = swap.removed|selectattr("vehicle_id", "equalto", vehicle.id)|list %}
+    {% if removed_here %}
+    <h3 class="form-section">Sundané pneumatiky – naměřený dezén</h3>
+    <div class="form-grid">
+        {% for mnt in removed_here %}
+        {{ m.field("tread_%d"|format(mnt.id), mnt.tire.label ~ " (" ~ mnt.position_label|lower ~ "), mm", inputmode="decimal", placeholder="např. 5,5", autocomplete="off") }}
+        {% endfor %}
+    </div>
+    {% endif %}
+    <p class="help">Nasazené pneumatiky se úpravou nemění – při chybě přezutí smažte a zapište znovu.
+        Nasazeno: {% for mnt in swap.mounted %}{{ mnt.tire.label }} ({{ mnt.position_label|lower }}){% if not loop.last %}, {% endif %}{% else %}nic{% endfor %}.</p>
+    {% else %}
+
+    <h3 class="form-section">Teď na voze</h3>
+    {% if current %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Pneumatika</th><th>Pozice</th><th class="num">Nasazeno</th><th>Dezén při sundání (mm)</th><th>Sundat bez náhrady</th></tr></thead>
+        <tbody>
+        {% for mnt in current %}
+        <tr>
+            <td>{{ mnt.tire.label }}<div class="small muted">{{ mnt.tire.quantity_label }}{% if mnt.tire.size %} · {{ mnt.tire.size }}{% endif %}</div></td>
+            <td>{{ mnt.position_label }}</td>
+            <td class="num">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
+            <td><input type="text" name="tread_{{ mnt.id }}" value="{{ m.val('tread_%d'|format(mnt.id)) }}" inputmode="decimal" placeholder="volitelné" aria-label="Dezén {{ mnt.tire.label }}" style="max-width: 120px"></td>
+            <td><label class="check"><input type="checkbox" name="remove_{{ mnt.id }}" value="1"{% if m.val('remove_%d'|format(mnt.id)) %} checked{% endif %}> sundat</label></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <p class="help">Pneumatika nasazená na obsazenou pozici tu původní sundá automaticky. Když vyměníte jen přední,
+        zbytek sady zůstane na zadní nápravě. Dezén zapište u pneumatik, které sundáváte.</p>
+    {% else %}
+    <p class="muted small">Na voze zatím není zapsaná žádná pneumatika.</p>
+    {% endif %}
+
+    <h3 class="form-section">Nasadit</h3>
+    {% if tire_options %}
+    {% for i in mount_rows %}
+    <div class="form-grid mount-row">
+        <div class="field">
+            <label for="f-mount_tire_{{ i }}">Pneumatika</label>
+            <select id="f-mount_tire_{{ i }}" name="mount_tire_{{ i }}">
+                <option value="">– nic –</option>
+                {% for t, where in tire_options %}<option value="{{ t.id }}"{% if m.val('mount_tire_%d'|format(i)) == t.id|string %} selected{% endif %}>{{ t.full_label }} ({{ where }})</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label for="f-mount_pos_{{ i }}">Pozice</label>
+            <select id="f-mount_pos_{{ i }}" name="mount_pos_{{ i }}">
+                {% for key, label in positions.items() %}<option value="{{ key }}"{% if (m.val('mount_pos_%d'|format(i)) or ('all' if i == 0 else 'front' if i == 1 else 'rear')) == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+    {% endfor %}
+    <p class="help">Pneumatika nasazená na jiném voze se tam automaticky sundá. <a href="/tires/add?vehicle_id={{ vehicle.id }}">+ Nová pneumatika</a></p>
+    {% else %}
+    <p class="muted small">Nemáte žádné pneumatiky. <a href="/tires/add?vehicle_id={{ vehicle.id }}">Přidejte první</a> a pak je nasaďte.</p>
+    {% endif %}
+    {% endif %}
+
+    {{ m.textarea("note", "Poznámka") }}
+    <p class="help">Přezutí v servisu se zapíše i jako servis „Přezutí pneumatik“ (s cenou, pokud ji vyplníte).</p>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a class="btn" href="/vehicles/{{ vehicle.id }}">Zrušit</a>
+    </div>
+    {% endif %}
+</form>
+
+{% if swap %}
+<div class="card">
+    {% if can_delete %}
+    {{ m.delete_button("/tire-swaps/%d/delete"|format(swap.id), "Smazat přezutí? Pneumatiky se vrátí, jak byly před ním.", "Smazat přezutí", small=false) }}
+    {% else %}
+    <p class="small muted">Přezutí nejde smazat – pneumatiky z něj už byly později sundány. Nejdřív smažte novější přezutí.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

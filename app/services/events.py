@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
 
-from models import Expense, FuelRecord, ServiceRecord, TireChange, TireDamage, Vehicle, VehicleNote
+from models import Expense, FuelRecord, ServiceRecord, TireDefect, TireSwap, Vehicle, VehicleNote
 
 KIND_FUEL = "fuel"
 KIND_SERVICE = "service"
@@ -84,31 +84,41 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                                 r.odometer, r.price_local, f"/fuel-records/{r.id}/edit"))
 
     # servis / výdaj založený přezutím nebo poškozením pneu se ukáže jen jako událost pneumatik
-    tire_service_ids = {i for (i,) in session.query(TireChange.service_record_id)
-                        .filter(TireChange.vehicle_id.in_(ids), TireChange.service_record_id.isnot(None))}
-    tire_expense_ids = {i for (i,) in session.query(TireDamage.expense_id)
-                        .filter(TireDamage.vehicle_id.in_(ids), TireDamage.expense_id.isnot(None))}
+    tire_service_ids = {i for (i,) in session.query(TireSwap.service_record_id)
+                        .filter(TireSwap.vehicle_id.in_(ids), TireSwap.service_record_id.isnot(None))}
+    tire_expense_ids = {i for (i,) in session.query(TireDefect.expense_id)
+                        .filter(TireDefect.vehicle_id.in_(ids), TireDefect.expense_id.isnot(None))}
 
     if KIND_TIRES in kinds:
-        query = (session.query(TireChange).options(joinedload(TireChange.tire_set), joinedload(TireChange.service_record))
-                 .filter(TireChange.vehicle_id.in_(ids)))
-        for c in dated(query, TireChange.change_date, False):
-            parts = [c.place_label + (f" – {c.service_record.place}" if c.service_record and c.service_record.place else "")]
-            if c.removed_tread_mm is not None:
-                parts.append(f"dezén sundané sady {_qty(c.removed_tread_mm)} mm")
-            if c.note:
-                parts.append(c.note.strip())
-            amount = c.service_record.price_local if c.service_record else None
-            events.append(Event(KIND_TIRES, _day(c.change_date), False, by_id[c.vehicle_id],
-                                f"Přezutí: {c.tire_set.label}", " · ".join(parts), c.odometer, amount,
-                                f"/tire-changes/{c.id}/edit"))
-        query = (session.query(TireDamage).options(joinedload(TireDamage.tire_set), joinedload(TireDamage.expense))
-                 .filter(TireDamage.vehicle_id.in_(ids)))
-        for d in dated(query, TireDamage.damage_date, False):
-            detail = " · ".join(x for x in (d.tire_set.label, d.position) if x)
-            events.append(Event(KIND_TIRES, _day(d.damage_date), False, by_id[d.vehicle_id],
+        query = (session.query(TireSwap).options(joinedload(TireSwap.service_record))
+                 .filter(TireSwap.vehicle_id.in_(ids)))
+        for s in dated(query, TireSwap.swap_date, False):
+            mounted = [m for m in s.mounted]
+            new = [m for m in mounted if not any(r.tire_id == m.tire_id for r in s.removed)]
+            parts = []
+            if new:
+                parts.append("nasazeno: " + ", ".join(f"{m.tire.label} ({m.position_label.lower()})" for m in new))
+            removed = [m for m in s.removed if m.vehicle_id == s.vehicle_id
+                       and not any(n.tire_id == m.tire_id for n in mounted)]
+            if removed:
+                parts.append("sundáno: " + ", ".join(
+                    m.tire.label + (f" – dezén {_qty(m.removed_tread_mm)} mm" if m.removed_tread_mm is not None else "")
+                    for m in removed))
+            where = s.place_label + (f" – {s.service_record.place}" if s.service_record and s.service_record.place else "")
+            parts.append(where)
+            if s.note:
+                parts.append(s.note.strip())
+            events.append(Event(KIND_TIRES, _day(s.swap_date), False, by_id[s.vehicle_id], "Přezutí pneumatik",
+                                "\n".join(parts), s.odometer,
+                                s.service_record.price_local if s.service_record else None,
+                                f"/tire-swaps/{s.id}/edit"))
+        query = (session.query(TireDefect).options(joinedload(TireDefect.tire), joinedload(TireDefect.expense))
+                 .filter(TireDefect.vehicle_id.in_(ids)))
+        for d in dated(query, TireDefect.defect_date, False):
+            detail = " · ".join(x for x in (d.tire.label, d.position) if x)
+            events.append(Event(KIND_TIRES, _day(d.defect_date), False, by_id[d.vehicle_id],
                                 f"Poškození pneu: {d.description}", detail, d.odometer,
-                                d.expense.price_local if d.expense else None, f"/tire-damages/{d.id}/edit"))
+                                d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}/edit"))
 
     if KIND_SERVICE in kinds:
         query = session.query(ServiceRecord).filter(ServiceRecord.vehicle_id.in_(ids))

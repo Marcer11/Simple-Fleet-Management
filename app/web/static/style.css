@@ -396,3 +396,13 @@ tr.child-row td:first-child { padding-left: 28px; }
 tr.muted-row td { color: var(--muted); }
 table.tires .badge { margin-top: 4px; }
 .tl-tires .tl-dot { background: var(--series-5, #e87ba4); }
+
+/* Pneumatiky - přehled na vozidlech a formulář přezutí */
+.form-section { font-size: 1rem; margin: 22px 0 10px; }
+.tire-cars { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tire-car { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.tire-car-head { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 6px; }
+.tire-car-head .btn { margin-left: auto; }
+.tire-car ul { list-style: none; margin: 0; padding: 0; }
+.tire-car li { padding: 3px 0; }
+.mount-row { margin-bottom: 4px; }

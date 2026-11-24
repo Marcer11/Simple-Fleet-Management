@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
 from services.errors import ValidationError
 from services.events import collect_events
-from services.tire_service import tire_overview
+from services.tire_service import open_mounts
 from services.fuel_record_service import FuelRecordService
 from services.maintenance_service import (
     ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
@@ -114,7 +114,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         profile=StatsService(db).usage_profile(vehicle.id),
         breakdown=StatsService(db).fuel_breakdown(vehicle.id),
         events=collect_events(db, [vehicle], limit=8),
-        tires=[r for r in tire_overview(db, vehicle, odometer) if r["status"] != "retired"],
+        mounted_tires=open_mounts(db, vehicle.id),
         editable_ids={vehicle.id} if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set(),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
         owner=vehicle.owner,

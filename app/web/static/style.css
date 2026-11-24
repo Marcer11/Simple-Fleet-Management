@@ -415,6 +415,11 @@ tr.child-row td:first-child { padding-left: 28px; }
     .tl-meta { flex-basis: 100%; order: 3; }
 }
 .contents { display: contents; }
+.insurance-toggle { justify-content: flex-end; }
+.insurance-toggle .check { color: var(--muted); font-size: .85rem; }
+.insurance-fields[hidden] { display: none; }
+.insurance-fields { margin-top: 14px; }
+.text-ok { color: var(--ok, #1baf7a); }
 .contents[hidden] { display: none; }
 /* Výběr více značek pump u paliva */
 .brand-cell { min-width: 200px; }

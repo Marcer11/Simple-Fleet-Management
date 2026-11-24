@@ -79,8 +79,8 @@ class StatsService:
 
         # --- náklady ---
         fuel_cost = sum((f.price_local or ZERO for f in fuel), ZERO)
-        service_cost = sum((s.price_local or ZERO for s in services), ZERO)
-        expense_cost = sum((e.price_local or ZERO for e in expenses), ZERO)
+        service_cost = sum((s.own_cost or ZERO for s in services), ZERO)
+        expense_cost = sum((e.own_cost or ZERO for e in expenses), ZERO)
         rental_cost = sum((r.price_local or ZERO for r in rentals), ZERO)
         total_cost = fuel_cost + service_cost + expense_cost + rental_cost
 
@@ -96,7 +96,7 @@ class StatsService:
 
         expense_by_category = defaultdict(lambda: ZERO)
         for e in expenses:
-            expense_by_category[e.category] += e.price_local or ZERO
+            expense_by_category[e.category] += e.own_cost or ZERO
 
         return {
             "fuel_count": len(fuel),
@@ -238,11 +238,11 @@ class StatsService:
             for s in services:
                 key = _month_key(s.service_date)
                 if key in monthly:
-                    monthly[key]["service"] += float(s.price_local or 0)
+                    monthly[key]["service"] += float(s.own_cost or 0)
             for e in expenses:
                 key = _month_key(e.expense_date)
                 if key in monthly:
-                    monthly[key]["expense"] += float(e.price_local or 0)
+                    monthly[key]["expense"] += float(e.own_cost or 0)
             for r in rentals:
                 key = _month_key(r.date_from)
                 if key in monthly:
@@ -266,7 +266,7 @@ class StatsService:
             return totals
         _, fuel, services, expenses = self._load(vehicle_ids, start, end)
         for item in fuel + services + expenses + self._load_rentals(vehicle_ids, start, end):
-            totals[item.vehicle_id] += item.price_local or ZERO
+            totals[item.vehicle_id] += getattr(item, "own_cost", item.price_local) or ZERO
         return totals
 
     def avg_consumption(self, vehicle_id):

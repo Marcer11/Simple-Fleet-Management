@@ -58,15 +58,15 @@ def test_sold_vehicle_is_not_active(app, db):
     sold = add_vehicle(client, model="Fabia", sale_date=(date.today() - timedelta(days=3)).isoformat())
     car = add_vehicle(client, model="Octavia")
     assert db.get(Vehicle, sold).is_active is False
-    page = client.get("/vehicles").text
+    page = client.get("/vehicles?show=active").text
     assert "Octavia" in page and "Fabia" not in page
-    assert "Prodáno" in client.get("/vehicles?show=all").text
+    assert "Prodáno" in client.get("/vehicles").text
     # zapsaný prodej u existujícího vozidla ho vyřadí
     r = post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia",
                                                "sale_date": date.today().isoformat()})
     assert r.status_code == 303
     db.expire_all()
-    assert db.get(Vehicle, car).is_active is False and "Octavia" not in client.get("/vehicles").text
+    assert db.get(Vehicle, car).is_active is False and "Octavia" not in client.get("/vehicles?show=active").text
 
 
 def test_vehicle_list_without_owner_column(app):

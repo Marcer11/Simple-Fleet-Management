@@ -52,7 +52,25 @@ VIGNETTE_VARIANTS = {
 }
 
 
-class ServiceRecord(Base):
+class InsuranceMixin:
+    """Pojistné plnění: náklad (servis po nehodě, výdaj) zcela nebo zčásti uhradila pojišťovna."""
+    insurance_claim = Column(Boolean, nullable=False, default=False, server_default="0")
+    insurer = Column(String(100), nullable=True)            # pojišťovna
+    policy_number = Column(String(50), nullable=True)       # číslo pojistky
+    claim_number = Column(String(50), nullable=True)        # číslo pojistné události
+    insurance_paid = Column(DECIMAL(12, 3), nullable=True)  # Kč uhrazené pojišťovnou
+
+    @property
+    def own_cost(self):
+        """Náklad, který zůstal na majiteli (cena v Kč minus plnění pojišťovny)."""
+        if self.price_local is None:
+            return None
+        if self.insurance_claim and self.insurance_paid is not None:
+            return max(self.price_local - self.insurance_paid, 0)
+        return self.price_local
+
+
+class ServiceRecord(InsuranceMixin, Base):
     """Záznam o provedeném servisu."""
     __tablename__ = "service_records"
 
@@ -169,7 +187,7 @@ class Reminder(Base):
     vehicle = relationship("Vehicle", back_populates="reminders")
 
 
-class Expense(Base):
+class Expense(InsuranceMixin, Base):
     """Ostatní výdaje (dálniční známka, pojištění, mytí, ...)."""
     __tablename__ = "expenses"
 

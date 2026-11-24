@@ -63,9 +63,12 @@ def _read_vehicle_form(form):
 # ----------------------------------------------------------------------
 
 @router.get("")
-async def list_vehicles(request: Request, show: str = "active", user=Depends(get_current_user), db=Depends(get_db)):
+async def list_vehicles(request: Request, show: str = "all", user=Depends(get_current_user), db=Depends(get_db)):
+    """Výchozí jsou všechna vozidla seřazená podle posledního záznamu (nejnovější nahoře)."""
     service = VehicleService(db)
-    vehicles = service.get_vehicles_for_user(user, only_active=(show != "all"))
+    vehicles = service.get_vehicles_for_user(user, only_active=(show == "active"))
+    last_dates = service.last_record_dates(vehicles)
+    vehicles.sort(key=lambda v: (last_dates[v.id] is not None, last_dates[v.id] or date.min), reverse=True)
     roles = service.get_roles_for_user(user)
     odometers = {v.id: service.get_current_odometer(v.id) for v in vehicles}
     stats = StatsService(db)
@@ -73,7 +76,7 @@ async def list_vehicles(request: Request, show: str = "active", user=Depends(get
     year_costs = stats.year_costs([v.id for v in vehicles], date.today().year)
     inactive_count = len(service.get_vehicles_for_user(user)) - len(service.get_vehicles_for_user(user, True))
     return render(request, "vehicles/list.html", vehicles=vehicles, roles=roles, odometers=odometers,
-                  consumption=consumption, year_costs=year_costs,
+                  consumption=consumption, year_costs=year_costs, last_dates=last_dates,
                   show=show, inactive_count=inactive_count, tires=mounted_seasons(db, [v.id for v in vehicles]))
 
 

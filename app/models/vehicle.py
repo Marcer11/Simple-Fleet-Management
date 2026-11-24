@@ -67,9 +67,19 @@ class Vehicle(Base):
         return self.sale_date is not None and self.sale_date <= date.today()
 
     @property
+    def last_rental(self):
+        return max(self.rentals, key=lambda r: (r.date_from, r.id or 0)) if self.rentals else None
+
+    @property
+    def is_returned(self):
+        """Půjčené vozidlo, jehož poslední půjčení už skončilo (vráceno)."""
+        last = self.last_rental if self.is_rental else None
+        return last is not None and last.date_to is not None and last.date_to <= date.today()
+
+    @property
     def in_use(self):
-        """Aktivní a neprodané vozidlo."""
-        return bool(self.is_active) and not self.is_sold
+        """Aktivní, neprodané a nevrácené vozidlo."""
+        return bool(self.is_active) and not self.is_sold and not self.is_returned
 
     @property
     def is_moto(self):

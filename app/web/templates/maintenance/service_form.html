@@ -17,5 +17,7 @@
     <input id="f-service_type_other" name="service_type_other" type="text" maxlength="200" value="{{ m.val('service_type_other') }}" autocomplete="off" aria-label="Jiné položky servisu">
 </fieldset>
 {{ m.price_fields(currencies, "Cena") }}
+{{ m.insurance_toggle() }}
 {{ m.textarea("note", "Poznámka / provedené práce") }}
 {% endblock %}
+{% block extra %}{{ m.insurance_fields() }}{% endblock %}

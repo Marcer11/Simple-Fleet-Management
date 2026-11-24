@@ -662,11 +662,13 @@
         });
     });
 
-    // Skrytí polí podle zaškrtávátka: <div data-hide-when="id-checkboxu"> (např. nákup/prodej u půjčeného vozidla)
-    document.querySelectorAll("[data-hide-when]").forEach(function (block) {
-        const box = document.getElementById(block.getAttribute("data-hide-when"));
+    // Skrytí / zobrazení polí podle zaškrtávátka: data-hide-when="id" (nákup a prodej u půjčeného vozidla),
+    // data-show-when="id" (pojistné plnění u servisu a výdaje)
+    document.querySelectorAll("[data-hide-when], [data-show-when]").forEach(function (block) {
+        const show = block.hasAttribute("data-show-when");
+        const box = document.getElementById(block.getAttribute(show ? "data-show-when" : "data-hide-when"));
         if (!box) return;
-        const sync = function () { block.hidden = box.checked; };
+        const sync = function () { block.hidden = show ? !box.checked : box.checked; };
         box.addEventListener("change", sync);
         sync();
     });

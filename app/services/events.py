@@ -68,6 +68,15 @@ def _service_icon(types):
     return "service"
 
 
+def _insurance_text(r):
+    if not r.insurance_claim:
+        return ""
+    text = "pojistná událost"
+    if r.insurance_paid is not None:
+        text = f"pojišťovna uhradila {int(round(r.insurance_paid)):,} Kč".replace(",", " ")
+    return text + (f" ({r.insurer})" if r.insurer else "")
+
+
 def _qty(value):
     value = Decimal(str(value)).normalize()
     text = f"{value:f}" if value != value.to_integral() else str(int(value))
@@ -163,9 +172,9 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         if tire_service_ids:
             query = query.filter(ServiceRecord.id.notin_(tire_service_ids))
         for r in dated(query, ServiceRecord.service_date, False):
-            detail = " · ".join(x for x in (r.place, (r.note or "").strip()) if x)
+            detail = " · ".join(x for x in (r.place, _insurance_text(r), (r.note or "").strip()) if x)
             events.append(Event(KIND_SERVICE, _day(r.service_date), False, by_id[r.vehicle_id], r.service_type,
-                                detail, r.odometer, r.price_local, f"/services/{r.id}/edit",
+                                detail, r.odometer, r.own_cost, f"/services/{r.id}/edit",
                                 icon=_service_icon(r.types)))
 
     if KIND_EXPENSE in kinds:
@@ -176,25 +185,34 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             parts = [r.description] if getattr(r, "description", None) else []
             if r.valid_until:
                 parts.append(f"platí do {r.valid_until.day}. {r.valid_until.month}. {r.valid_until.year}")
+            if r.insurance_claim:
+                parts.append(_insurance_text(r))
             if r.note:
                 parts.append(r.note.strip())
             events.append(Event(KIND_EXPENSE, _day(r.expense_date), False, by_id[r.vehicle_id], r.category,
-                                " · ".join(parts), r.odometer, r.price_local, f"/expenses/{r.id}/edit",
+                                " · ".join(parts), r.odometer, r.own_cost, f"/expenses/{r.id}/edit",
                                 icon=EXPENSE_ICONS.get(r.category.lower(), "expense")))
 
     if KIND_RENTAL in kinds:
         query = session.query(VehicleRental).filter(VehicleRental.vehicle_id.in_(ids))
-        for r in dated(query, VehicleRental.date_from, False):
-            parts = []
-            if r.date_to:
-                parts.append(f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}"
-                             + (f" ({r.days} dní)" if r.days and r.days > 1 else ""))
-            if r.distance is not None:
-                parts.append(f"najeto {r.distance:,} km".replace(",", " "))
-            if r.note:
-                parts.append(r.note.strip())
-            events.append(Event(KIND_RENTAL, _day(r.date_from), False, by_id[r.vehicle_id], f"Půjčení – {r.provider}",
-                                " · ".join(parts), r.odometer_from, r.price_local, f"/rentals/{r.id}/edit"))
+        # půjčení a vrácení jsou dvě události (vrácení jen se zapsaným koncem půjčení)
+        for r in query.all():
+            url = f"/rentals/{r.id}/edit"
+            if in_range(_day(r.date_from)):
+                parts = [f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}" if r.date_to else "zatím nevráceno"]
+                if r.note:
+                    parts.append(r.note.strip())
+                events.append(Event(KIND_RENTAL, _day(r.date_from), False, by_id[r.vehicle_id],
+                                    f"Půjčení – {r.provider}", " · ".join(parts), r.odometer_from, r.price_local, url))
+            if r.date_to and in_range(_day(r.date_to)):
+                parts = []
+                if r.days:
+                    parts.append(f"{r.days} {'den' if r.days == 1 else ('dny' if r.days < 5 else 'dní')}")
+                if r.distance is not None:
+                    parts.append(f"najeto {r.distance:,} km".replace(",", " "))
+                events.append(Event(KIND_RENTAL, _day(r.date_to), False, by_id[r.vehicle_id],
+                                    f"Vrácení – {r.provider}", " · ".join(parts), r.odometer_to, None, url,
+                                    icon="return"))
 
     if KIND_NOTE in kinds:
         query = (session.query(VehicleNote).options(joinedload(VehicleNote.created_by))

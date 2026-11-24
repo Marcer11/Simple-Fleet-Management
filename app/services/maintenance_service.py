@@ -104,6 +104,26 @@ def _positive_int(value, label, allow_none=True):
     return value
 
 
+def _insurance(data, price_local):
+    """Pole pojistného plnění; bez zaškrtnutí se vymažou. Plnění je v Kč a nemůže převýšit cenu."""
+    from services.pricing import to_decimal, Q3
+    if not data.get("insurance_claim"):
+        return {"insurance_claim": False, "insurer": None, "policy_number": None, "claim_number": None,
+                "insurance_paid": None}
+    paid = to_decimal(data.get("insurance_paid"), Q3)
+    if paid is not None and paid < 0:
+        raise ValidationError("Plnění pojišťovny nemůže být záporné.")
+    if paid is not None and price_local is not None and paid > price_local:
+        raise ValidationError("Plnění pojišťovny nemůže být vyšší než cena.")
+    return {
+        "insurance_claim": True,
+        "insurer": _clean_str(data.get("insurer"), 100, "Pojišťovna"),
+        "policy_number": _clean_str(data.get("policy_number"), 50, "Číslo pojistky"),
+        "claim_number": _clean_str(data.get("claim_number"), 50, "Číslo pojistné události"),
+        "insurance_paid": paid,
+    }
+
+
 def _ensure_vehicle(session, vehicle_id):
     if not vehicle_id or session.get(Vehicle, vehicle_id) is None:
         raise NotFoundError("Vozidlo nenalezeno.")
@@ -181,6 +201,7 @@ class ServiceRecordService(_RecordServiceBase):
             "currency_code": currency,
             "price_local": price_local,
             "note": _clean_str(data.get("note")),
+            **_insurance(data, price_local),
         }
 
     def search(self, vehicle_ids, date_from=None, date_to=None, service_type=None, **filters):
@@ -335,6 +356,7 @@ class ExpenseService(_RecordServiceBase):
             "currency_code": currency,
             "price_local": price_local,
             "note": _clean_str(data.get("note")),
+            **_insurance(data, price_local),
         }
 
 

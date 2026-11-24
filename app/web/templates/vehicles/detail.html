@@ -11,6 +11,7 @@
         <div class="sub plate-line">
             {{ m.vehicle_icon(vehicle) }} {{ vehicle.license_plate or "bez SPZ" }} {{ m.tire_icons(tire_seasons) }}
             {% if vehicle.is_rental %}<span class="badge badge-info">Půjčené</span>{% endif %}
+            {% if vehicle.is_returned %}<span class="badge">Vráceno {{ vehicle.last_rental.date_to|date }}</span>{% endif %}
             {% if vehicle.is_sold %}<span class="badge">Prodáno {{ vehicle.sale_date|date }}</span>
             {% elif not vehicle.is_active %}<span class="badge">Neaktivní</span>{% endif %}
             {{ m.role_badge(role) }}

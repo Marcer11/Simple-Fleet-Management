@@ -71,10 +71,21 @@ def _read_service(form):
         "currency_code": form.str("currency_code", "Měna") or "CZK",
         "manual_rate": form.decimal("manual_rate", "Kurz", positive=True),
         "note": form.str("note", "Poznámka"),
+        "insurance_claim": form.bool("insurance_claim"),
+        "insurer": form.str("insurer", "Pojišťovna", max_len=100),
+        "policy_number": form.str("policy_number", "Číslo pojistky", max_len=50),
+        "claim_number": form.str("claim_number", "Číslo pojistné události", max_len=50),
+        "insurance_paid": form.decimal("insurance_paid", "Uhradila pojišťovna", min_value=0),
     }
     form.check()
     _check_not_future(data["service_date"], "Datum servisu")
     return data
+
+
+def _insurance_values(r):
+    return {"insurance_claim": "on" if r.insurance_claim else "", "insurer": r.insurer or "",
+            "policy_number": r.policy_number or "", "claim_number": r.claim_number or "",
+            "insurance_paid": iso(r.insurance_paid)}
 
 
 def _service_values(r):
@@ -82,6 +93,7 @@ def _service_values(r):
         "vehicle_id": str(r.vehicle_id), "service_date": iso(r.service_date), "odometer": iso(r.odometer),
         "place": r.place or "", "price_paid": iso(r.price_paid),
         "currency_code": r.currency_code, "manual_rate": rate_from_record(r), "note": r.note or "",
+        **_insurance_values(r),
     }
     for t in split_service_types(r.service_type):
         values[TYPE_PREFIX + t] = "on"
@@ -123,7 +135,7 @@ async def list_services(request: Request, user=Depends(get_current_user), db=Dep
 
     return render(request, "maintenance/service_list.html", vehicles=vehicles, records=records,
                   intervals=intervals, filters=filters,
-                  total=sum((r.price_local or 0 for r in records), 0),
+                  total=sum((r.own_cost or 0 for r in records), 0),
                   service_types=ServiceRecordService(db).get_service_types(ids),
                   editable_ids=set(vehicle_service.get_accessible_ids(user, ROLE_EDITOR)))
 
@@ -133,9 +145,10 @@ async def export_services(request: Request, user=Depends(get_current_user), db=D
     _, ids, date_from, date_to, filters = _list_filters(request, db, user)
     records = ServiceRecordService(db).search(ids, date_from, date_to, service_type=filters["service_type"])
     rows = [(r.vehicle.display_name, r.service_date, r.odometer, r.service_type, r.place,
-             decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local), r.note) for r in records]
+             decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local),
+             decimal_csv(r.insurance_paid), r.insurer, r.note) for r in records]
     return csv_response("servis.csv", ["Vozidlo", "Datum", "Tachometr", "Typ", "Místo", "Cena", "Měna",
-                                       "Cena CZK", "Poznámka"], rows)
+                                       "Cena CZK", "Uhradila pojišťovna", "Pojišťovna", "Poznámka"], rows)
 
 
 # ======================================================================
@@ -410,6 +423,11 @@ def _read_expense(form):
         "valid_from": form.date("valid_from", "Platnost od"),
         "valid_until": form.date("valid_until", "Platnost do"),
         "remind": form.bool("remind"),
+        "insurance_claim": form.bool("insurance_claim"),
+        "insurer": form.str("insurer", "Pojišťovna", max_len=100),
+        "policy_number": form.str("policy_number", "Číslo pojistky", max_len=50),
+        "claim_number": form.str("claim_number", "Číslo pojistné události", max_len=50),
+        "insurance_paid": form.decimal("insurance_paid", "Uhradila pojišťovna", min_value=0),
     }
     if data["category"] == VIGNETTE_CATEGORY:
         data["vignette_variant"] = form.choice("vignette_variant", "Typ známky", VIGNETTE_VARIANTS)
@@ -424,6 +442,7 @@ def _expense_values(e):
         "currency_code": e.currency_code, "manual_rate": rate_from_record(e), "note": e.note or "",
         "valid_from": iso(e.valid_from), "valid_until": iso(e.valid_until),
         "remind": "on" if e.reminder_id else "", "vignette_variant": _guess_variant(e),
+        **_insurance_values(e),
     }
 
 
@@ -464,7 +483,7 @@ async def list_expenses(request: Request, user=Depends(get_current_user), db=Dep
     records = ExpenseService(db).search(ids, date_from, date_to, category=filters["category"])
     by_category = {}
     for r in records:
-        by_category[r.category] = by_category.get(r.category, 0) + (r.price_local or 0)
+        by_category[r.category] = by_category.get(r.category, 0) + (r.own_cost or 0)
     return render(request, "maintenance/expense_list.html", vehicles=vehicles, records=records, filters=filters,
                   total=sum(by_category.values(), 0),
                   by_category=sorted(by_category.items(), key=lambda kv: -kv[1]),
@@ -477,9 +496,10 @@ async def export_expenses(request: Request, user=Depends(get_current_user), db=D
     _, ids, date_from, date_to, filters = _list_filters(request, db, user)
     records = ExpenseService(db).search(ids, date_from, date_to, category=filters["category"])
     rows = [(r.vehicle.display_name, r.expense_date, r.category, r.description, r.odometer,
-             decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local), r.note) for r in records]
+             decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local),
+             decimal_csv(r.insurance_paid), r.insurer, r.note) for r in records]
     return csv_response("vydaje.csv", ["Vozidlo", "Datum", "Kategorie", "Popis", "Tachometr", "Částka", "Měna",
-                                       "Částka CZK", "Poznámka"], rows)
+                                       "Částka CZK", "Uhradila pojišťovna", "Pojišťovna", "Poznámka"], rows)
 
 
 # ======================================================================

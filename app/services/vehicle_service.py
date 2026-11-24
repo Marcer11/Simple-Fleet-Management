@@ -226,7 +226,10 @@ class VehicleService:
         if only_active:
             query = query.filter(Vehicle.is_active.is_(True),
                                  or_(Vehicle.sale_date.is_(None), Vehicle.sale_date > date.today()))
-        return query.order_by(Vehicle.is_active.desc(), Vehicle.brand, Vehicle.model).all()
+        vehicles = query.order_by(Vehicle.is_active.desc(), Vehicle.brand, Vehicle.model).all()
+        if only_active:  # vrácené půjčené vozidlo není aktivní
+            vehicles = [v for v in vehicles if not v.is_returned]
+        return vehicles
 
     def get_roles_for_user(self, user):
         """{vehicle_id: role} pro všechna vozidla dostupná uživateli."""
@@ -339,6 +342,49 @@ class VehicleService:
             values += [vehicle.purchase_odometer, vehicle.sale_odometer]
         values = [v for v in values if v is not None]
         return max(values) if values else None
+
+    def last_record_dates(self, vehicles):
+        """Datum posledního záznamu u každého vozidla: {vehicle_id: date | None}.
+
+        Bere tankování, servis, výdaje, poznámky, přezutí, kontroly dezénu, půjčení / vrácení
+        a nákup / prodej vozidla (jen do dneška - budoucí termíny se nepočítají).
+        """
+        from datetime import datetime
+        from models import TireSwap, TireTreadCheck, VehicleRental
+        ids = [v.id for v in vehicles]
+        result = {vid: None for vid in ids}
+        if not ids:
+            return result
+        today = date.today()
+
+        def add(vid, value):
+            if value is None:
+                return
+            if isinstance(value, datetime):
+                value = value.date()
+            if value <= today and (result[vid] is None or value > result[vid]):
+                result[vid] = value
+
+        q = self.session.query
+        end_of_day = datetime.combine(today, datetime.max.time())
+        for model, column, limit in ((FuelRecord, FuelRecord.refuel_datetime, end_of_day),
+                                     (VehicleNote, VehicleNote.note_datetime, end_of_day),
+                                     (ServiceRecord, ServiceRecord.service_date, today),
+                                     (Expense, Expense.expense_date, today),
+                                     (TireSwap, TireSwap.swap_date, today),
+                                     (TireTreadCheck, TireTreadCheck.check_date, today)):
+            rows = (q(model.vehicle_id, func.max(column))
+                    .filter(model.vehicle_id.in_(ids), column <= limit).group_by(model.vehicle_id))
+            for vid, value in rows:
+                add(vid, value)
+        for vid, d_from, d_to in q(VehicleRental.vehicle_id, VehicleRental.date_from, VehicleRental.date_to) \
+                .filter(VehicleRental.vehicle_id.in_(ids)):
+            add(vid, d_from)
+            add(vid, d_to)
+        for v in vehicles:
+            add(v.id, v.purchase_date)
+            add(v.id, v.sale_date)
+        return result
 
     def get_orphan_vehicles(self):
         return self.session.query(Vehicle).filter(Vehicle.owner_id.is_(None)).all()

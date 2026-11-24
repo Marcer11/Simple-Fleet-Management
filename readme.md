@@ -42,7 +42,9 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 Druh (auto / motorka), značka, model, rok výroby, barva (+ barva pro zobrazení), SPZ, VIN, poznámka, datum, cena a stav
 tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP (jen údaj
 u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezobrazuje (zapsáním prodeje se deaktivuje).
-Seznam vozidel ukazuje tachometr, spotřebu, náklady za rok a typ pneumatik; vlastník je až v detailu vozidla.
+Seznam vozidel ve výchozím stavu ukazuje všechna vozidla seřazená podle posledního záznamu (sloupec „Poslední
+záznam“, záložka „Jen aktivní“), dále tachometr, spotřebu, náklady za rok, typ pneumatik a stav (aktivní /
+neaktivní / prodáno / vráceno); vlastník je až v detailu vozidla.
 Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Půjčená vozidla
@@ -50,7 +52,9 @@ Smazání vozidla je schované dole ve formuláři úprav.
   nabídne zápis půjčení)
 - **půjčení** (opakovaně u stejného vozidla): půjčovna / od koho, půjčeno od – do, kilometry při půjčení
   a vrácení (najeto), půjčovné v libovolné měně (převod kurzem ČNB), poznámka; 0 km je platný stav
-- půjčení je na časové ose a v detailu vozidla (sekce „Půjčení“, tlačítko „Půjčení“)
+- půjčení a vrácení jsou na časové ose jako dvě události (vrácení s počtem dní a najetými km); v detailu
+  vozidla je sekce „Půjčení“ a tlačítko „Půjčení“
+- **vrácené vozidlo je neaktivní** (poslední půjčení skončilo); novým půjčením je znovu aktivní
 - **půjčovné je v nákladech** – přehled (náklady za rok), seznam vozidel, statistiky vozidla i všech vozidel
   (samostatný sloupec a řada v grafu měsíčních nákladů); tankování půjčeného auta je ve spotřebě, nákladech
   i v grafu cen paliva jako u ostatních vozidel
@@ -92,6 +96,9 @@ Smazání vozidla je schované dole ve formuláři úprav.
   jednou z více
 - **pravidelný servis** – časový a/nebo kilometrový interval od posledního servisu daného typu;
   upozornění, když zbývá méně než 10 % intervalu, nebo po termínu
+- **pojistné plnění** u servisu i výdaje: nenápadné zaškrtávátko „Uplatněna pojistka“ u ceny zobrazí pole
+  pojišťovna, číslo pojistky, číslo pojistné události a částka uhrazená pojišťovnou (celá cena nebo jen část);
+  do nákladů ve statistikách, přehledech a na časové ose se počítá jen to, co zůstalo na majiteli
 - **univerzální servisní intervaly** (`/service-intervals`, Servis → Servisní intervaly) – platí pro všechna
   vozidla uživatele (volitelně jen auta nebo motorky), pokud u vozidla není interval stejného typu
   nastaven jinak; vypnutý interval vozidla univerzální interval u vozidla vypne; nabídnou se doporučené

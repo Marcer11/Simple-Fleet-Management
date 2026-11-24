@@ -13,10 +13,12 @@
 {{ m.field("description", "Popis", maxlength=200) }}
 {{ m.field("odometer", "Stav tachometru (km)", "number", min=0, step=1) }}
 {{ m.price_fields(currencies, "Částka", required=true) }}
+{{ m.insurance_toggle() }}
 {{ m.textarea("note", "Poznámka") }}
 {% endblock %}
 
 {% block extra %}
+{{ m.insurance_fields() }}
 <fieldset class="validity" id="validity"
           data-categories='{{ validity_categories|tojson }}' data-vignette="{{ vignette_category }}"
           data-days='{{ vignette_days|tojson }}'>

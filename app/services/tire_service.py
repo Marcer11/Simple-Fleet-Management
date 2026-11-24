@@ -10,10 +10,10 @@ from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
 
-from models import Tire, TireDefect, TireMount, TireSwap
+from models import Tire, TireDefect, TireMount, TireSwap, TireTreadCheck, TireTreadReading
 from models.tire import (
     TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
-    TIRE_SERVICE_TYPE, MOTO_POSITIONS, format_treads, slots_position,
+    TIRE_SERVICE_TYPE, CAR_WHEELS, MOTO_POSITIONS, MOTO_WHEELS, format_treads, slots_position,
 )
 from services.errors import NotFoundError, ValidationError
 from services.maintenance_service import (
@@ -130,8 +130,13 @@ class TireService:
         ve kterých nic jiného nezůstalo."""
         linked = [tire.expense] + [d.expense for d in tire.defects]
         swaps = {m.swap for m in tire.mounts}
+        checks = {r.check for r in tire.tread_readings}
         self.session.delete(tire)
         self.session.flush()
+        for check in checks:
+            self.session.refresh(check)
+            if not check.readings:
+                self.session.delete(check)
         for swap in swaps:
             self.session.refresh(swap)
             if not swap.mounted:
@@ -417,62 +422,199 @@ class TireDefectService:
 
 
 # ----------------------------------------------------------------------
+# Průběžné kontroly dezénu
+# ----------------------------------------------------------------------
+
+def mounts_on(session, vehicle_id, day):
+    """Pneumatiky na vozidle k danému dni (v den přezutí už ty nové)."""
+    mounts = (session.query(TireMount).options(joinedload(TireMount.tire))
+              .filter(TireMount.vehicle_id == vehicle_id, TireMount.mounted_date <= day)
+              .filter((TireMount.removed_date.is_(None)) | (TireMount.removed_date > day)).all())
+    order = list(TIRE_POSITIONS)
+    return sorted(mounts, key=lambda m: (order.index(m.position) if m.position in order else 99, m.id))
+
+
+def wheel_layout(vehicle, mounts):
+    """Kola vozidla pro nákres: [{"key", "short", "label", "mount"}] (mount None = prázdné kolo)."""
+    result = []
+    if vehicle.kind == "moto":
+        for key, short, label in MOTO_WHEELS:
+            slot = "fl" if key == "f" else "rl"
+            result.append({"key": key, "short": short, "label": f"{label} kolo",
+                           "mount": next((m for m in mounts if slot in m.slots), None)})
+    else:
+        for key, short, label in CAR_WHEELS:
+            result.append({"key": key, "short": short, "label": label,
+                           "mount": next((m for m in mounts if key in m.slots), None)})
+    return result
+
+
+def last_readings(session, mount_ids, before_check_id=None):
+    """Poslední naměřený dezén pro každé kolo: {(id nasazení, kolo): (mm, datum)}."""
+    if not mount_ids:
+        return {}
+    query = (session.query(TireTreadReading, TireTreadCheck.check_date).join(TireTreadReading.check)
+             .filter(TireTreadReading.mount_id.in_(mount_ids)))
+    if before_check_id:
+        query = query.filter(TireTreadCheck.id != before_check_id)
+    result = {}
+    for reading, day in query.order_by(TireTreadCheck.check_date, TireTreadCheck.id):
+        result[(reading.mount_id, reading.wheel)] = (reading.tread_mm, day)
+    return result
+
+
+class TireTreadCheckService:
+    def __init__(self, session):
+        self.session = session
+
+    def get(self, check_id):
+        return self.session.get(TireTreadCheck, check_id)
+
+    def for_vehicles(self, vehicle_ids, limit=None):
+        if not vehicle_ids:
+            return []
+        query = (self.session.query(TireTreadCheck).filter(TireTreadCheck.vehicle_id.in_(vehicle_ids))
+                 .order_by(TireTreadCheck.check_date.desc(), TireTreadCheck.id.desc()))
+        return query.limit(limit).all() if limit else query.all()
+
+    def save(self, check, vehicle, check_date, odometer, note, values, user=None):
+        """values = {(id nasazení, kolo): mm}; prázdné hodnoty se ignorují."""
+        if not check_date:
+            raise ValidationError("Datum kontroly je povinné.")
+        if check_date > date.today():
+            raise ValidationError("Datum kontroly nemůže být v budoucnosti.")
+        odometer = _positive_int(odometer, "Stav tachometru", allow_none=False)
+        check_odometer_order(self.session, vehicle.id, datetime.combine(check_date, datetime.min.time()), odometer,
+                             has_time=False, exclude=("tread_check", check.id if check else None))
+        mounts = {m.id: m for m in mounts_on(self.session, vehicle.id, check_date)}
+        if check is not None:  # při úpravě i pneumatiky z původní kontroly
+            mounts.update({r.mount.id: r.mount for r in check.readings if r.mount is not None})
+        readings = []
+        for (mount_id, wheel), mm in values.items():
+            mm = _tread(mm)
+            if mm is None:
+                continue
+            mount = mounts.get(mount_id)
+            if mount is None:
+                raise ValidationError("K tomuto datu byly na voze jiné pneumatiky – zkontrolujte datum kontroly.")
+            if wheel not in [w[0] for w in mount.wheels]:
+                raise ValidationError("Neplatné kolo.")
+            if odometer < mount.mounted_km:
+                raise ValidationError(f"Pneumatika {mount.tire.label} byla nasazena až při {mount.mounted_km} km.")
+            readings.append(TireTreadReading(tire_id=mount.tire_id, mount_id=mount.id, wheel=wheel, tread_mm=mm))
+        if not readings:
+            raise ValidationError("Zapište hloubku dezénu alespoň u jednoho kola.")
+        if check is None:
+            check = TireTreadCheck(vehicle_id=vehicle.id, created_by_id=user.id if user else None)
+            self.session.add(check)
+        check.check_date, check.odometer, check.note = check_date, odometer, _clean_str(note)
+        check.readings = readings
+        self.session.commit()
+        return check
+
+    def delete(self, check):
+        self.session.delete(check)
+        self.session.commit()
+
+
+# ----------------------------------------------------------------------
 # Životnost a upozornění
 # ----------------------------------------------------------------------
 
+TREAD_WARN_KM = 5000  # upozornit, když do zákonného minima zbývá méně km
+WEAR_MIN_KM = 3000    # opotřebení počítat až z delšího úseku - z pár set km je odhad nesmyslný
+
 def tire_stats(session, tires, today=None):
-    """Statistika pneumatik: najeto, nasazení, vozidla, dezén, opotřebení, náklady, varování."""
+    """Statistika pneumatik: najeto, nasazení, vozidla, dezén, opotřebení, odhad konce vzorku, náklady, varování.
+
+    Dezén se bere z kontrol dezénu i z měření při sundání (vždy nejmenší hodnota z kol). Opotřebení
+    se počítá od dezénu při nákupu (případně od prvního měření) k poslednímu měření.
+    """
+    from services.stats_service import StatsService
     from services.vehicle_service import VehicleService
     today = today or date.today()
     vehicles = VehicleService(session)
-    odometers = {}
+    odometers, yearly = {}, {}
 
     def odometer(vehicle_id):
         if vehicle_id not in odometers:
             odometers[vehicle_id] = vehicles.get_current_odometer(vehicle_id)
         return odometers[vehicle_id]
 
+    def km_per_year(vehicle_id):
+        if vehicle_id not in yearly:
+            yearly[vehicle_id] = StatsService(session).usage_profile(vehicle_id).get("km_per_year")
+        return yearly[vehicle_id]
+
     result = []
     for tire in tires:
         km, days, measurements, vehicle_names = 0, 0, [], []
+        checks = {}  # id nasazení -> {kontrola: nejmenší dezén}
+        for r in tire.tread_readings:
+            if r.mount_id is not None:
+                per_mount = checks.setdefault(r.mount_id, {})
+                per_mount[r.check] = min(per_mount.get(r.check, r.tread_mm), r.tread_mm)
         for m in tire.mounts:
+            for check, mm in checks.get(m.id, {}).items():
+                measurements.append((check.check_date, km + max(check.odometer - m.mounted_km, 0), mm))
             end_km = m.removed_km if m.removed_date else odometer(m.vehicle_id)
             if end_km is not None and end_km >= m.mounted_km:
                 km += end_km - m.mounted_km
             days += max(((m.removed_date or today) - m.mounted_date).days, 0)
             if m.removed_tread_mm is not None:
-                measurements.append((km, m.removed_tread_mm, m.removed_date))
+                measurements.append((m.removed_date, km, m.removed_tread_mm))
             if m.vehicle.display_name not in vehicle_names:
                 vehicle_names.append(m.vehicle.display_name)
-        first = tire.new_tread_mm
+        measurements.sort(key=lambda x: (x[0], x[1]))
         last = measurements[-1] if measurements else None
-        wear = remaining_km = None
-        if first is not None and last is not None and last[0] > 0 and first > last[1]:
-            wear = (first - last[1]) / Decimal(last[0]) * 1000  # mm na 1000 km
-            above = last[1] - Decimal(str(tire.legal_min_tread))
-            remaining_km = int(above / wear * 1000) if above > 0 else 0
+        if tire.new_tread_mm is not None:
+            base = (tire.purchase_date, 0, tire.new_tread_mm)
+        else:
+            base = measurements[0] if len(measurements) > 1 else None
+        minimum = Decimal(str(tire.legal_min_tread))
+        wear = remaining_km = remaining_months = None
+        if base is not None and last is not None and last[1] - base[1] >= WEAR_MIN_KM and base[2] > last[2]:
+            wear = (base[2] - last[2]) / Decimal(last[1] - base[1]) * 1000  # mm na 1000 km
+            above = last[2] - minimum
+            # odhad od posledního měření, ponížený o km najeté od té doby
+            remaining_km = max(int(above / wear * 1000) - (km - last[1]), 0) if above > 0 else 0
         cost = (tire.price_local or Decimal("0")) + sum(
             (d.expense.price_local or 0 for d in tire.defects if d.expense), Decimal("0"))
         mount = tire.open_mount
         status = "retired" if tire.retired_date else ("mounted" if mount else "stored")
-        tread = last[1] if last else first
+        if mount and remaining_km and km_per_year(mount.vehicle_id):
+            remaining_months = remaining_km / km_per_year(mount.vehicle_id) * 12
+        tread = last[2] if last else tire.new_tread_mm
         warnings = []
         if status != "retired":
-            if tread is not None:
-                minimum = Decimal(str(tire.legal_min_tread))
-                if tread <= minimum:
-                    warnings.append(("danger", f"dezén {tread} mm – pod zákonným minimem {tire.legal_min_tread} mm"))
-                elif tread <= minimum + 1:
-                    warnings.append(("warning", f"dezén {tread} mm – blíží se minimum {tire.legal_min_tread} mm"))
+            when = f" (≈ {_months_text(remaining_months)})" if remaining_months is not None else ""
+            if tread is not None and tread <= minimum:
+                warnings.append(("danger", f"dezén {tread} mm – pod zákonným minimem {tire.legal_min_tread} mm"))
+            elif remaining_km == 0:
+                warnings.append(("danger", "podle opotřebení už je vzorek na minimu – změřte dezén"))
+            elif remaining_km is not None and remaining_km < TREAD_WARN_KM:
+                warnings.append(("warning", f"vzorek dojde za ≈ {remaining_km:,} km{when}".replace(",", " ")))
+            elif tread is not None and tread <= minimum + 1:
+                warnings.append(("warning", f"dezén {tread} mm – blíží se minimum {tire.legal_min_tread} mm"))
             if tire.age_years is not None and tire.age_years >= TIRE_MAX_AGE_YEARS:
                 warnings.append(("warning", f"stáří {tire.age_years} let – doporučená výměna"))
         result.append({
             "tire": tire, "status": status, "mount": mount, "km": km, "days": days,
             "used_years": round(days / 365.25, 1) if days else 0, "mounts": len(tire.mounts),
-            "vehicles": vehicle_names, "tread": tread, "wear": wear, "remaining_km": remaining_km,
+            "vehicles": vehicle_names, "tread": tread, "tread_date": last[0] if last else None,
+            "measurements": len(measurements), "wear": wear, "remaining_km": remaining_km,
+            "remaining_months": remaining_months,
             "cost": cost, "cost_per_1000": (cost / km * 1000) if km and cost else None, "warnings": warnings,
         })
     return result
+
+
+def _months_text(months):
+    if months < 1.5:
+        return "měsíc"
+    if months < 18:
+        return f"{round(months)} měs."
+    return f"{months / 12:.1f} roku".replace(".", ",")
 
 
 def winter_tire_status(today=None):

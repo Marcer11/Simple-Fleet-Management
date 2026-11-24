@@ -11,7 +11,9 @@ from models.tire import (
 from models.vehicle import ROLE_EDITOR
 from services.errors import NotFoundError, ValidationError
 from services.tire_service import (
-    TireDefectService, TireService, TireSwapService, open_mounts, tire_stats,
+    TireDefectService, TireService, TireSwapService, TireTreadCheckService, last_readings, mounts_on,
+    open_mounts,
+    tire_stats, wheel_layout,
 )
 from services.vehicle_service import VehicleService
 from web.common import COMMON_CURRENCIES, check_record_access, editable_vehicles, visible_vehicles
@@ -78,7 +80,9 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
     swaps = swap_service.for_vehicles(vehicle_ids, limit=50)
     defects = TireDefectService(db).for_tires([r["tire"].id for r in rows])
     mounted = {v.id: open_mounts(db, v.id) for v in vehicles if vehicle_id in (None, v.id)}
+    checks = TireTreadCheckService(db).for_vehicles(vehicle_ids, limit=30)
     return render(request, "tires/list.html", rows=rows, vehicles=vehicles, swaps=swaps, defects=defects,
+                  checks=checks,
                   mounted=mounted, statuses=STATUSES, seasons=TIRE_SEASONS,
                   filters={"status": status, "season": season, "vehicle_id": vehicle_id},
                   can_delete_swap={s.id: swap_service.can_delete(s) for s in swaps},
@@ -422,3 +426,111 @@ async def defect_delete(request: Request, defect_id: int, user=Depends(get_curre
     TireDefectService(db).delete(_owned_defect(db, user, defect_id))
     flash(request, "Poškození bylo smazáno.")
     return RedirectResponse("/tires", status_code=303)
+
+
+# ----------------------------------------------------------------------
+# Kontrola dezénu (průběžné měření po kolech)
+# ----------------------------------------------------------------------
+
+def _check_context(db, user, vehicle, check=None, check_date=None):
+    context = {"vehicle": vehicle, "check": check, "vehicles": editable_vehicles(db, user), "wheels": [],
+               "last": {}, "odometer": None}
+    if vehicle is None:
+        return context
+    day = check_date or (check.check_date if check else date.today())
+    mounts = mounts_on(db, vehicle.id, day)
+    if check is not None:
+        known = {m.id for m in mounts}
+        mounts += [r.mount for r in check.readings if r.mount is not None and r.mount.id not in known]
+    context.update(
+        wheels=wheel_layout(vehicle, mounts),
+        last=last_readings(db, [m.id for m in mounts], before_check_id=check.id if check else None),
+        odometer=VehicleService(db).get_current_odometer(vehicle.id),
+    )
+    return context
+
+
+def _read_check(form):
+    data = {
+        "check_date": form.date("check_date", "Datum", required=True),
+        "odometer": form.int("odometer", "Stav tachometru", required=True, min_value=0),
+        "note": form.str("note", "Poznámka"),
+    }
+    values = {}
+    for key in list(form.raw.keys()):
+        mount_id, _, wheel = key[6:].partition("_")
+        if key.startswith("tread_") and mount_id.isdigit() and wheel:
+            values[(int(mount_id), wheel)] = form.decimal(key, "Dezén", min_value=0)
+    form.check()
+    data["values"] = values
+    return data
+
+
+async def _save_check(request, db, user, vehicle, check):
+    form = FormReader(await request.form())
+    try:
+        data = _read_check(form)
+        check = TireTreadCheckService(db).save(check, vehicle, data["check_date"], data["odometer"], data["note"],
+                                               data["values"], user)
+    except (ValidationError, NotFoundError) as e:
+        db.rollback()
+        return render(request, "tires/check_form.html", status_code=400, values=form.values, error=str(e),
+                      **_check_context(db, user, vehicle, check, _safe_date(form.raw.get("check_date"))))
+    flash(request, "Kontrola dezénu byla uložena.")
+    return RedirectResponse(f"/tires?vehicle_id={vehicle.id}", status_code=303)
+
+
+def _safe_date(value):
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+@router.get("/tire-checks/add")
+async def check_add_form(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    vehicles = editable_vehicles(db, user)
+    vehicle_id = parse_filter_int(request.query_params.get("vehicle_id"))
+    if vehicle_id is None and len(vehicles) == 1:
+        vehicle_id = vehicles[0].id
+    vehicle = _editable_vehicle(db, user, vehicle_id) if vehicle_id else None
+    return render(request, "tires/check_form.html", values={"check_date": date.today().isoformat()},
+                  **_check_context(db, user, vehicle))
+
+
+@router.post("/tire-checks/add")
+async def check_add(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    form = await request.form()
+    vehicle_id = parse_filter_int(form.get("vehicle_id"))
+    if not vehicle_id:
+        return RedirectResponse("/tire-checks/add", status_code=303)
+    return await _save_check(request, db, user, _editable_vehicle(db, user, vehicle_id), None)
+
+
+@router.get("/tire-checks/{check_id}/edit")
+async def check_edit_form(request: Request, check_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    check = TireTreadCheckService(db).get(check_id)
+    vehicle = check_record_access(db, user, check, ROLE_EDITOR)
+    values = {"vehicle_id": str(vehicle.id), "check_date": iso(check.check_date), "odometer": str(check.odometer),
+              "note": check.note or ""}
+    for r in check.readings:
+        if r.mount_id:
+            values[f"tread_{r.mount_id}_{r.wheel}"] = iso(r.tread_mm)
+    return render(request, "tires/check_form.html", values=values, **_check_context(db, user, vehicle, check))
+
+
+@router.post("/tire-checks/{check_id}/edit")
+async def check_edit(request: Request, check_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    check = TireTreadCheckService(db).get(check_id)
+    vehicle = check_record_access(db, user, check, ROLE_EDITOR)
+    return await _save_check(request, db, user, vehicle, check)
+
+
+@router.post("/tire-checks/{check_id}/delete")
+async def check_delete(request: Request, check_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    service = TireTreadCheckService(db)
+    check = service.get(check_id)
+    vehicle = check_record_access(db, user, check, ROLE_EDITOR)
+    service.delete(check)
+    flash(request, "Kontrola dezénu byla smazána.")
+    return RedirectResponse(f"/tires?vehicle_id={vehicle.id}", status_code=303)

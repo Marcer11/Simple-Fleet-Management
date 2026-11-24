@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ "Upravit kontrolu dezénu" if check else "Kontrola dezénu" }}{% endblock %}
+
+{# Kolo v nákresu: barva podle typu pneumatiky #}
+{% macro wheel_shape(w, x, y, wd=28, ht=62) -%}
+{%- set season = {"Letní": "summer", "Zimní": "winter", "Univerzální": "allseason"}.get(w.mount.tire.season, "other") if w.mount else "empty" %}
+<g class="wheel wheel-{{ season }}"><title>{{ w.label }}{% if w.mount %} – {{ w.mount.tire.label }}{% endif %}</title>
+    <rect x="{{ x }}" y="{{ y }}" width="{{ wd }}" height="{{ ht }}" rx="8" class="wheel-tire"/>
+    {% for ty in range(y + 9, y + ht - 4, 9) %}<line x1="{{ x + 5 }}" x2="{{ x + wd - 5 }}" y1="{{ ty }}" y2="{{ ty }}" class="wheel-tread"/>{% endfor %}
+    <text x="{{ x + wd / 2 }}" y="{{ y + ht + 14 }}" text-anchor="middle" class="wheel-name">{{ w.short }}</text>
+</g>
+{%- endmacro %}
+
+{# Pole pro hloubku dezénu jednoho kola #}
+{% macro wheel_input(w) -%}
+<div class="wheel-cell wheel-cell-{{ w.key }}">
+    <div class="wheel-cell-head"><strong>{{ w.short }}</strong> <span class="small muted">{{ w.label }}</span></div>
+    {% if w.mount %}
+    {% set name = "tread_%d_%s"|format(w.mount.id, w.key) %}
+    {% set prev = last.get((w.mount.id, w.key)) %}
+    <div class="small">{{ m.season_icon(w.mount.tire.season) }} {{ w.mount.tire.label }}</div>
+    <label class="tread-input">
+        <input type="text" name="{{ name }}" value="{{ m.val(name) }}" inputmode="decimal" autocomplete="off"
+               placeholder="0,0" aria-label="Dezén {{ w.label }} (mm)">
+        <span>mm</span>
+    </label>
+    <div class="small muted">{% if prev %}naposledy {{ prev[0]|num(1) }} mm ({{ prev[1]|date }}){% elif w.mount.tire.new_tread_mm is not none %}nová {{ w.mount.tire.new_tread_mm|num(1) }} mm{% endif %}</div>
+    {% else %}
+    <div class="small muted">bez pneumatiky</div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ "Upravit kontrolu dezénu" if check else "Kontrola dezénu" }}</h1>
+        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
+    </div>
+</div>
+
+{% if not vehicles %}
+<div class="card empty"><p>Nemáte žádné vozidlo, do kterého můžete zapisovat.</p></div>
+{% else %}
+<form method="{{ 'post' if vehicle else 'get' }}" class="card">
+    {% if vehicle %}{{ m.csrf() }}{% endif %}
+    <div class="form-grid">
+        <div class="field">
+            <label for="f-vehicle_id">Vozidlo <span class="req">*</span></label>
+            {% if check %}
+            <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+            <input id="f-vehicle_id" type="text" value="{{ vehicle.display_name }}" disabled>
+            {% else %}
+            <select id="f-vehicle_id" name="vehicle_id" required data-reload>
+                <option value="">– vyberte –</option>
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if vehicle and vehicle.id == v.id %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+            </select>
+            {% endif %}
+        </div>
+        {% if vehicle %}
+        {{ m.field("check_date", "Datum", "date", required=true, max=today.isoformat()) }}
+        {{ m.field("odometer", "Stav tachometru (km)", "number", required=true, min=0, step=1, inputmode="numeric", placeholder=(odometer or "")) }}
+        {% endif %}
+    </div>
+    {% if not vehicle %}
+    <noscript><div class="form-actions"><button class="btn" type="submit">Pokračovat</button></div></noscript>
+    {% else %}
+
+    {% set by_key = {} %}{% for w in wheels %}{% set _ = by_key.update({w.key: w}) %}{% endfor %}
+    {% if not wheels|selectattr("mount")|list %}
+    <p class="muted">Na voze nejsou k tomuto datu zapsané žádné pneumatiky. Nejdřív zapište
+        <a href="/tire-swaps/add?vehicle_id={{ vehicle.id }}">přezutí</a>.</p>
+    {% elif vehicle.kind == "moto" %}
+    <div class="check-board is-moto">
+        {{ wheel_input(by_key["f"]) }}
+        <svg class="veh-svg check-figure" viewBox="0 0 120 344" role="img" aria-label="Nákres motorky">
+            <rect x="48" y="104" width="24" height="150" rx="12" class="veh-body"/>
+            <rect x="42" y="158" width="36" height="80" rx="16" class="veh-seat"/>
+            <path d="M4 122 Q60 102 116 122" class="veh-bar"/>
+            {{ wheel_shape(by_key["f"], 42, 20, 36, 80) }}
+            {{ wheel_shape(by_key["r"], 40, 240, 40, 82) }}
+        </svg>
+        {{ wheel_input(by_key["r"]) }}
+    </div>
+    {% else %}
+    <div class="check-board">
+        {{ wheel_input(by_key["fl"]) }}
+        <svg class="veh-svg check-figure" viewBox="0 0 160 330" role="img" aria-label="Nákres auta">
+            <defs><linearGradient id="sfm-allseason" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0" class="stop-winter"/><stop offset=".5" class="stop-winter"/>
+                <stop offset=".5" class="stop-summer"/><stop offset="1" class="stop-summer"/></linearGradient></defs>
+            <text x="80" y="12" text-anchor="middle" class="veh-front">▲ předek</text>
+            <rect x="22" y="22" width="116" height="292" rx="44" class="veh-body"/>
+            <path d="M38 112 Q80 94 122 112 L114 146 Q80 136 46 146 Z" class="veh-glass"/>
+            <path d="M46 226 Q80 234 114 226 L120 248 Q80 258 40 248 Z" class="veh-glass"/>
+            <rect x="44" y="150" width="72" height="72" rx="10" class="veh-roof"/>
+            {{ wheel_shape(by_key["fl"], 2, 56) }}
+            {{ wheel_shape(by_key["fr"], 130, 56) }}
+            {{ wheel_shape(by_key["rl"], 2, 216) }}
+            {{ wheel_shape(by_key["rr"], 130, 216) }}
+        </svg>
+        {{ wheel_input(by_key["fr"]) }}
+        {{ wheel_input(by_key["rl"]) }}
+        {{ wheel_input(by_key["rr"]) }}
+        {% if by_key["spare"].mount %}{{ wheel_input(by_key["spare"]) }}{% endif %}
+    </div>
+    {% endif %}
+    <p class="help">Hloubku měřte v hlavních drážkách, zapisujte v mm (např. 5,5). Prázdná kola se neukládají.
+        Zákonné minimum: letní 1,6 mm, zimní a univerzální v zimním období 4 mm.</p>
+
+    {{ m.textarea("note", "Poznámka") }}
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a class="btn" href="/tires?vehicle_id={{ vehicle.id }}">Zrušit</a>
+    </div>
+    {% endif %}
+</form>
+
+{% if check %}
+<div class="card">
+    {{ m.delete_button("/tire-checks/%d/delete"|format(check.id), "Smazat kontrolu dezénu?", "Smazat kontrolu", small=false) }}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
 
-from models import Expense, FuelRecord, ServiceRecord, TireDefect, TireSwap, Vehicle, VehicleNote
+from models import Expense, FuelRecord, ServiceRecord, TireDefect, TireSwap, TireTreadCheck, Vehicle, VehicleNote
 
 KIND_FUEL = "fuel"
 KIND_SERVICE = "service"
@@ -119,6 +119,16 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             events.append(Event(KIND_TIRES, _day(d.defect_date), False, by_id[d.vehicle_id],
                                 f"Poškození pneu: {d.description}", detail, d.odometer,
                                 d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}/edit"))
+        query = (session.query(TireTreadCheck).options(joinedload(TireTreadCheck.readings))
+                 .filter(TireTreadCheck.vehicle_id.in_(ids)))
+        for c in dated(query, TireTreadCheck.check_date, False):
+            lines = [f"{tire.label}: " + " · ".join(r.text for r in readings) + " mm"
+                     for tire, readings in c.by_tire()]
+            if c.note:
+                lines.append(c.note.strip())
+            detail = "\n".join(lines)
+            events.append(Event(KIND_TIRES, _day(c.check_date), False, by_id[c.vehicle_id], "Kontrola dezénu",
+                                detail, c.odometer, None, f"/tire-checks/{c.id}/edit"))
 
     if KIND_SERVICE in kinds:
         query = session.query(ServiceRecord).filter(ServiceRecord.vehicle_id.in_(ids))

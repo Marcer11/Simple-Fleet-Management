@@ -91,10 +91,16 @@ Smazání vozidla je schované dole ve formuláři úprav.
   u SPZ (letní ☀, zimní ❄, univerzální = napůl vločka a slunce)
 - **rozměry pneumatik dle technického průkazu** u vozidla – nabízí se při zápisu nové pneumatiky; při
   přezutí aplikace upozorní na pneumatiku jiného rozměru
+- **kontrola dezénu** – průběžné měření během roku na obrazovce s nákresem vozidla, kde se ke každému
+  kolu zapíše hloubka (u kola je vidět i poslední naměřená hodnota); kontroly jsou na časové ose
 - **poškození** (pozice, popis, cena opravy jako výdaj k vozidlu, na kterém pneumatika byla)
 - **životnost**: najeto (i přes více vozidel), počet nasazení a doba na voze, stáří, dezén,
   opotřebení na 1000 km a odhad km do zákonného minima (letní 1,6 mm, zimní a univerzální 4 mm),
-  náklady na 1000 km; upozornění na stáří ≥ 6 let a dezén u minima
+  náklady na 1000 km; opotřebení se počítá z dezénu při nákupu a posledního měření (kontrola nebo sundání,
+  nejmenší hodnota z kol, nejméně 3 000 km mezi měřeními)
+- **upozornění v přehledu pneumatik** („Pozor na“): dezén pod zákonným minimem, blížící se konec vzorku
+  (méně než 5 000 km, i s odhadem v měsících podle průměrného nájezdu vozidla), stáří ≥ 6 let;
+  typ pneumatik je všude jen jako ikona
 - **upozornění na zimní pneumatiky**: od 15. 10. a v období 1. 11. – 31. 3. u aktivních aut,
   která mají nasazené letní pneu
 - přezutí a poškození jsou i na časové ose

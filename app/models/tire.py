@@ -130,6 +130,7 @@ class Tire(Base):
     mounts = relationship("TireMount", back_populates="tire", cascade="all, delete-orphan",
                           order_by="TireMount.mounted_date, TireMount.id")
     defects = relationship("TireDefect", back_populates="tire", cascade="all, delete-orphan")
+    tread_readings = relationship("TireTreadReading", back_populates="tire", cascade="all, delete-orphan")
 
     @property
     def label(self):
@@ -261,3 +262,62 @@ class TireDefect(Base):
     tire = relationship("Tire", back_populates="defects")
     vehicle = relationship("Vehicle")
     expense = relationship("Expense")
+
+
+WHEEL_LABELS = {w[0]: (w[1], w[2]) for w in CAR_WHEELS + MOTO_WHEELS}
+
+
+class TireTreadCheck(Base):
+    """Průběžná kontrola hloubky dezénu na vozidle (každé kolo zvlášť)."""
+    __tablename__ = "tire_tread_checks"
+    __table_args__ = (Index("ix_tire_tread_checks_vehicle_date", "vehicle_id", "check_date"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
+    check_date = Column(Date, nullable=False)
+    odometer = Column(Integer, nullable=False)
+    note = Column(Text, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    vehicle = relationship("Vehicle")
+    created_by = relationship("User")
+    readings = relationship("TireTreadReading", back_populates="check", cascade="all, delete-orphan",
+                            order_by="TireTreadReading.id")
+
+    def by_tire(self):
+        """[(pneumatika, [měření])] v pořadí kol."""
+        order = [w[0] for w in CAR_WHEELS + MOTO_WHEELS]
+        result = {}
+        for r in sorted(self.readings, key=lambda r: order.index(r.wheel) if r.wheel in order else 99):
+            result.setdefault(r.tire, []).append(r)
+        return list(result.items())
+
+    @property
+    def summary(self):
+        """"Letní Michelin: LP 6,0 · PP 6,1; Zimní Nokian: LZ 7,0"."""
+        return "; ".join(f"{tire.label}: " + " · ".join(r.text for r in readings)
+                         for tire, readings in self.by_tire())
+
+
+class TireTreadReading(Base):
+    """Naměřená hloubka dezénu jednoho kola při kontrole."""
+    __tablename__ = "tire_tread_readings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    check_id = Column(Integer, ForeignKey("tire_tread_checks.id", ondelete="CASCADE"), nullable=False, index=True)
+    tire_id = Column(Integer, ForeignKey("tires.id", ondelete="CASCADE"), nullable=False, index=True)
+    mount_id = Column(Integer, ForeignKey("tire_mounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    wheel = Column(String(5), nullable=False)
+    tread_mm = Column(DECIMAL(3, 1), nullable=False)
+
+    check = relationship("TireTreadCheck", back_populates="readings")
+    tire = relationship("Tire", back_populates="tread_readings")
+    mount = relationship("TireMount")
+
+    @property
+    def wheel_short(self):
+        return WHEEL_LABELS.get(self.wheel, (self.wheel, self.wheel))[0]
+
+    @property
+    def text(self):
+        return f"{self.wheel_short} {self.tread_mm}".replace(".", ",")

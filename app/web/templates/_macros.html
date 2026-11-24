@@ -93,17 +93,20 @@
 {%- endif %}
 {%- endmacro %}
 
-{# Ikony typu nasazených pneumatik: entries = [(typ, [popisky])] z tire_service.mounted_seasons #}
-{% macro tire_icons(entries) -%}
-{% if entries %}<span class="tire-icons">{% for season, labels in entries %}
+{# Ikona typu pneumatik (letní / zimní / univerzální); text = popisek pro čtečky a tooltip #}
+{% macro season_icon(season, text=none) -%}
 {%- set cls = {"Letní": "summer", "Zimní": "winter", "Univerzální": "allseason"}.get(season, "other") %}
-{%- set text = season ~ " pneumatiky: " ~ labels|join(", ") %}
+{%- set text = text or (season ~ " pneumatiky") %}
 <svg class="icon season-{{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" role="img" aria-label="{{ text }}"><title>{{ text }}</title>
 {%- if cls == "summer" %}<circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>
 {%- elif cls == "winter" %}<path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 3.5 12 5.5l3-2M9 20.5l3-2 3 2M3.6 10.6 6.8 9 6.5 5.4M20.4 13.4 17.2 15l.3 3.6M3.6 13.4 6.8 15l-.3 3.6M20.4 10.6 17.2 9l.3-3.6"/>
 {%- elif cls == "allseason" %}{# svisle rozdělená: vlevo půl vločky, vpravo půl slunce #}<g class="season-winter"><path d="M11 12H2.2M11 12 6.2 3.8M11 12 6.2 20.2M2.9 10.4 4.5 12l-1.6 1.6M8.3 4.2l-.6 2.2-2.2-.6M8.3 19.8l-.6-2.2-2.2.6"/></g><path d="M12 2.5v19" stroke-width="1.2" opacity=".5"/><g class="season-summer"><path d="M13 8.2a3.8 3.8 0 0 1 0 7.6Z" fill="currentColor"/><path d="M18.3 12H21M16.8 8.2l1.9-1.9M16.8 15.8l1.9 1.9M13.9 6.8l.5-2.7M13.9 17.2l.5 2.7"/></g>
 {%- else %}<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>{% endif %}</svg>
-{%- endfor %}</span>{% endif %}
+{%- endmacro %}
+
+{# Ikony typu nasazených pneumatik: entries = [(typ, [popisky])] z tire_service.mounted_seasons #}
+{% macro tire_icons(entries) -%}
+{% if entries %}<span class="tire-icons">{% for season, labels in entries %}{{ season_icon(season, season ~ " pneumatiky: " ~ labels|join(", ")) }}{% endfor %}</span>{% endif %}
 {%- endmacro %}
 
 {% macro role_badge(role) -%}

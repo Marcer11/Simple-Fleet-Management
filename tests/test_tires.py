@@ -254,3 +254,77 @@ def test_vehicle_tire_sizes(app, db):
     swap(client, car, date.today(), 1000, [(allseason, "all")])
     dash = client.get("/").text
     assert "Univerzální pneumatiky:" in dash and 'class="season-winter"' in dash and 'class="season-summer"' in dash
+
+
+def test_tread_checks_and_wear_warning(app, db):
+    from models import TireTreadCheck
+    client = register(app, "tc@example.com")
+    car = add_vehicle(client, model="Octavia")
+    summer = add_tire(client, db, new_tread_mm="8", quantity="4")
+    d0 = date.today() - timedelta(days=300)
+    swap(client, car, d0, 10000, [(summer, "all")])
+    mount = db.query(TireMount).filter_by(tire_id=summer.id).one()
+    page = client.get(f"/tire-checks/add?vehicle_id={car}").text
+    assert f'name="tread_{mount.id}_fl"' in page and f'name="tread_{mount.id}_rr"' in page and "▲ předek" in page
+
+    def check(day, km, **treads):
+        payload = {"vehicle_id": car, "check_date": day.isoformat(), "odometer": km, "note": "pravidelná"}
+        payload.update({f"tread_{mount.id}_{w}": v for w, v in treads.items()})
+        return post(client, "/tire-checks/add", payload)
+
+    # bez hodnot nejde uložit, km musí sedět s ostatními záznamy
+    assert "alespoň u jednoho kola" in check(d0 + timedelta(days=10), 11000).text
+    assert check(d0 + timedelta(days=100), 5000, fl="7").status_code == 400
+    r = check(d0 + timedelta(days=100), 20000, fl="6,5", fr="6.6", rl="7", rr="7.1")
+    assert r.status_code == 303, r.text
+    add_fuel(client, car, date.today() - timedelta(days=1), 35000, "40")
+    db.expire_all()
+    stats = tire_stats(db, [db.get(Tire, summer.id)])[0]
+    # nejmenší hodnota z kol, opotřebení od nového dezénu: 1,5 mm na 10 000 km
+    assert float(stats["tread"]) == 6.5 and round(float(stats["wear"]), 3) == 0.15
+    # do 1,6 mm zbývá 4,9 mm ≈ 32 666 km od kontroly, od té doby najeto 15 000 km
+    assert stats["remaining_km"] == 32666 - 15000
+
+    # druhé měření - vzorek se blíží konci: upozornění v přehledu pneumatik
+    r = check(date.today(), 35000, fl="2.2", fr="2.3", rl="3", rr="3")
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    stats = tire_stats(db, [db.get(Tire, summer.id)])[0]
+    assert stats["remaining_km"] < 5000 and stats["warnings"][0][0] == "warning"
+    tires_page = client.get("/tires").text.replace("\xa0", " ")
+    assert "Pozor na" in tires_page and "vzorek dojde za" in tires_page
+    assert "Kontroly dezénu" in tires_page and "LP 2,2 · PP 2,3 · LZ 3,0 · PZ 3,0" in tires_page
+    assert 'aria-label="Letní pneumatiky"' in tires_page  # ikona místo nápisu
+    timeline = client.get("/timeline?all=1&kind=tires").text
+    assert "Kontrola dezénu" in timeline and "Letní Michelin Primacy 4: LP 2,2" in timeline
+
+    # úprava a smazání
+    c = db.query(TireTreadCheck).order_by(TireTreadCheck.id.desc()).first()
+    edit_page = client.get(f"/tire-checks/{c.id}/edit").text
+    assert 'value="2.2"' in edit_page and "naposledy 6,5 mm" in edit_page
+    r = post(client, f"/tire-checks/{c.id}/edit", {"vehicle_id": car, "check_date": c.check_date.isoformat(),
+                                                   "odometer": 35000, f"tread_{mount.id}_fl": "4"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    assert [float(x.tread_mm) for x in db.get(TireTreadCheck, c.id).readings] == [4.0]
+    post(client, f"/tire-checks/{c.id}/delete", {})
+    assert db.query(TireTreadCheck).count() == 1
+    # smazáním pneumatiky zmizí i její kontroly
+    post(client, f"/tires/{summer.id}/delete", {})
+    assert db.query(TireTreadCheck).count() == 0
+
+
+def test_tread_check_moto(app, db):
+    client = register(app, "tm@example.com")
+    moto = add_vehicle(client, brand="Honda", model="CBF", kind="moto")
+    front = add_tire(client, db, quantity="1")
+    rear = add_tire(client, db, quantity="1")
+    swap(client, moto, date.today() - timedelta(days=30), 1000, [(front, "front"), (rear, "rear")])
+    page = client.get(f"/tire-checks/add?vehicle_id={moto}").text
+    assert "Nákres motorky" in page and "Přední kolo" in page.replace("přední kolo", "Přední kolo")
+    fm = db.query(TireMount).filter_by(tire_id=front.id).one()
+    rm = db.query(TireMount).filter_by(tire_id=rear.id).one()
+    r = post(client, "/tire-checks/add", {"vehicle_id": moto, "check_date": date.today().isoformat(),
+                                          "odometer": 3000, f"tread_{fm.id}_f": "4", f"tread_{rm.id}_r": "3,5"})
+    assert r.status_code == 303, r.text
+    assert "P 4,0" in client.get("/tires").text

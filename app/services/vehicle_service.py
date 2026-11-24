@@ -316,6 +316,10 @@ class VehicleService:
             self.session.query(func.max(Expense.odometer)).filter(Expense.vehicle_id == vehicle_id).scalar(),
             self.session.query(func.max(VehicleNote.odometer)).filter(VehicleNote.vehicle_id == vehicle_id).scalar(),
         ]
+        from models import TireTreadCheck
+        values.append(self.session.query(func.max(TireTreadCheck.odometer))
+                      .filter(TireTreadCheck.vehicle_id == vehicle_id).scalar())
+        values = [v for v in values if v is not None]
         # u nově koupeného vozidla bez záznamů aspoň stav při nákupu, u prodaného stav při prodeji
         vehicle = self.session.get(Vehicle, vehicle_id)
         if vehicle is not None:

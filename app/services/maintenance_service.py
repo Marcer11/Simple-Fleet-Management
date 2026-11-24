@@ -4,7 +4,9 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
 
-from models import ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap
+from models import (
+    ServiceRecord, ServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap, TireTreadCheck,
+)
 from models.vehicle_note import NOTE_CATEGORIES
 from models.maintenance import (
     REPEAT_OPTIONS, REPEAT_NONE, VIGNETTE_VARIANTS, join_service_types, split_service_types,
@@ -559,7 +561,7 @@ def check_odometer_order(session, vehicle_id, when, odometer, has_time=True, exc
 
     Stejný stav v různé dny je v pořádku (motorka přes zimu v garáži). Záznamy jen s datem
     (servis, výdaje, přezutí) se se záznamem ze stejného dne neporovnávají.
-    exclude = ("note" | "tire_swap", id) - upravovaný záznam se neporovnává sám se sebou.
+    exclude = ("note" | "tire_swap" | "tread_check", id) - upravovaný záznam se neporovnává sám se sebou.
     """
     kind, exclude_id = exclude
     readings = []  # (čas, km, popis, má čas)
@@ -574,6 +576,10 @@ def check_odometer_order(session, vehicle_id, when, odometer, has_time=True, exc
                        .filter(TireSwap.vehicle_id == vehicle_id)):
         if not (kind == "tire_swap" and rid == exclude_id):
             readings.append((datetime.combine(d, datetime.min.time()), km, "přezutí", False))
+    for d, km, rid in (session.query(TireTreadCheck.check_date, TireTreadCheck.odometer, TireTreadCheck.id)
+                       .filter(TireTreadCheck.vehicle_id == vehicle_id)):
+        if not (kind == "tread_check" and rid == exclude_id):
+            readings.append((datetime.combine(d, datetime.min.time()), km, "kontroly dezénu", False))
     for model, column, label in ((ServiceRecord, ServiceRecord.service_date, "servisu"),
                                  (Expense, Expense.expense_date, "výdaje")):
         for d, km in (session.query(column, model.odometer)

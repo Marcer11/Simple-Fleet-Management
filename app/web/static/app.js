@@ -35,10 +35,18 @@
         const dateInputs = Array.from(form.querySelectorAll('input[type="date"]'));
         const initial = new Map(dateInputs.map(function (i) { return [i, i.value]; }));
 
+        // Filtr nahradí aktuální záznam v historii (tlačítko Zpět pak nevrací jednotlivé kroky
+        // filtrování, ale předchozí stránku); seřazení tabulky zůstane.
         function submit() {
             if (submitted) return;
             submitted = true;
-            form.submit();
+            const params = new URLSearchParams();
+            new FormData(form).forEach(function (value, key) { if (value !== "") params.append(key, value); });
+            const sort = new URLSearchParams(location.search).get("sort");
+            if (sort) params.set("sort", sort);
+            const action = form.getAttribute("action") || location.pathname;
+            const query = params.toString();
+            location.replace(action + (query ? "?" + query : "") + (form.getAttribute("data-hash") || ""));
         }
         function dateChanged() {
             return dateInputs.some(function (i) { return i.value !== initial.get(i); });
@@ -707,14 +715,14 @@
             num: n ? parseFloat(n[0].replace(/[\s ]/g, "").replace("−", "-").replace(",", ".")) : null,
         };
     }
-    function sortTable(table, index, th) {
+    function sortTable(table, index, th, direction) {
         const body = table.tBodies[0];
         const rows = Array.from(body.rows);
         const values = new Map(rows.map(function (r) { return [r, cellValue(r.cells[index])]; }));
         const filled = Array.from(values.values()).filter(function (v) { return !v.empty; });
         const type = filled.length && filled.every(function (v) { return v.date !== null; }) ? "date"
             : (filled.length && filled.every(function (v) { return v.num !== null; }) ? "num" : "text");
-        const asc = th.getAttribute("aria-sort") !== "ascending";
+        const asc = direction ? direction === "a" : th.getAttribute("aria-sort") !== "ascending";
         table.querySelectorAll("thead th[aria-sort]").forEach(function (o) { o.removeAttribute("aria-sort"); });
         th.setAttribute("aria-sort", asc ? "ascending" : "descending");
         rows.sort(function (a, b) {
@@ -727,11 +735,19 @@
             return asc ? c : -c;
         });
         rows.forEach(function (r) { body.appendChild(r); });
+        // zapamatovat v adrese - po návratu z úpravy záznamu (nebo obnovení stránky) zůstane seřazeno
+        if (!direction && window.history.replaceState) {
+            const url = new URL(location.href);
+            url.searchParams.set("sort", sortableTables.indexOf(table) + "." + index + "." + (asc ? "a" : "d"));
+            history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+        }
     }
+    const sortableTables = [];
     document.querySelectorAll("table").forEach(function (table) {
         if (table.hasAttribute("data-nosort") || !table.tHead || table.tBodies.length !== 1) return;
         const body = table.tBodies[0];
         if (body.rows.length < 2 || body.querySelector("[colspan], [rowspan], tr.group-row")) return;
+        sortableTables.push(table);
         const head = table.tHead.rows[table.tHead.rows.length - 1];
         Array.from(head.cells).forEach(function (th, index) {
             if (!th.textContent.trim() || th.colSpan > 1) return;
@@ -744,6 +760,56 @@
             });
         });
     });
+
+    (function restoreSort() {
+        const m = /^(\d+)\.(\d+)\.([ad])$/.exec(new URLSearchParams(location.search).get("sort") || "");
+        const table = m && sortableTables[+m[1]];
+        const th = table && table.tHead.rows[table.tHead.rows.length - 1].cells[+m[2]];
+        if (th && th.classList.contains("sortable")) sortTable(table, +m[2], th, m[3]);
+    })();
+
+    // ------------------------------------------------------------------
+    // Návrat po úpravě záznamu: odkaz na formulář (…/add, …/edit, import) dostane ?next=<tato stránka>,
+    // formulář pak po uložení, zrušení i smazání vrátí uživatele zpět (i se scrollem).
+    // ------------------------------------------------------------------
+    const FORM_LINK = /\/(add|edit|import)$/;
+    const here = function () { return location.pathname + location.search; };
+    document.addEventListener("click", function (event) {
+        const link = event.target.closest("a[href]");
+        if (!link || link.target || event.defaultPrevented) return;
+        const url = new URL(link.href, location.href);
+        if (url.origin !== location.origin || !FORM_LINK.test(url.pathname) || url.searchParams.has("next")) return;
+        if (url.pathname === location.pathname) return;  // odkaz v rámci téhož formuláře
+        const back = new URLSearchParams(location.search).get("next") && FORM_LINK.test(location.pathname)
+            ? new URLSearchParams(location.search).get("next") : here();
+        url.searchParams.set("next", back);
+        try { sessionStorage.setItem("sfm-scroll:" + back, String(window.scrollY)); } catch (e) { /* nevadí */ }
+        link.href = url.pathname + url.search + url.hash;
+    });
+    (function returnTarget() {
+        const next = new URLSearchParams(location.search).get("next");
+        if (!next || next.charAt(0) !== "/" || next.charAt(1) === "/") return;
+        document.querySelectorAll('form[method="post" i]').forEach(function (form) {
+            if (form.closest(".user-menu")) return;  // odhlášení
+            const action = new URL(form.getAttribute("action") || location.href, location.href);
+            if (!action.searchParams.has("next")) {
+                action.searchParams.set("next", next);
+                form.setAttribute("action", action.pathname + action.search);
+            }
+        });
+        document.querySelectorAll(".form-actions a.btn, a[data-cancel]").forEach(function (a) {
+            if (a.hasAttribute("data-cancel") || a.textContent.trim() === "Zrušit") a.href = next;
+        });
+    })();
+    (function restoreScroll() {
+        let y = null;
+        try {
+            const key = "sfm-scroll:" + here();
+            y = sessionStorage.getItem(key);
+            sessionStorage.removeItem(key);
+        } catch (e) { /* nevadí */ }
+        if (y !== null) window.addEventListener("load", function () { window.scrollTo(0, +y); });
+    })();
 
     // PWA - registrace service workeru
     if ("serviceWorker" in navigator && window.isSecureContext) {

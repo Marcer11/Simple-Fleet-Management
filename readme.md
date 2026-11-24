@@ -26,7 +26,11 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 - **detail vozidla**: nahoře tlačítka pro zápis k vozidlu (tankování, servis, výdaj, poznámka, přezutí,
   kontrola dezénu, upomínka), hlavní čísla a upozornění; údaje o vozidle, pneumatiky, pravidelný servis
   a upomínky a spotřeba jsou ve sbalovacích sekcích; pod nimi časová osa vozidla
-- **tabulky** lze řadit kliknutím na záhlaví sloupce (datum, číslo i text, prázdné hodnoty vždy na konci)
+- **tabulky** lze řadit kliknutím na záhlaví sloupce (datum, číslo i text, prázdné hodnoty vždy na konci); řazení se drží v adrese
+  stránky (`?sort=`)
+- **návrat po úpravě**: z formuláře (přidání, úprava, smazání i Zrušit) se aplikace vrátí na stránku, odkud
+  uživatel přišel – seznam zůstane vyfiltrovaný, seřazený a na stejném místě (`?next=`, jen adresy v aplikaci);
+  změna filtru nepřidává záznam do historie prohlížeče, takže tlačítko Zpět vede na předchozí stránku
 - formuláře jsou bez ukázkových textů a vysvětlivek u polí
 
 ### Uživatelé a sdílení

@@ -29,6 +29,36 @@ app.add_middleware(
 )
 
 
+def safe_next(url):
+    """Návratová adresa jen v rámci aplikace (žádné //jiny-web, žádné zpětné lomítko)."""
+    url = (url or "").strip()
+    if not url.startswith("/") or url.startswith("//") or "\\" in url or len(url) > 2000:
+        return None
+    return url
+
+
+@app.middleware("http")
+async def return_to_next(request: Request, call_next):
+    """Po uložení / smazání záznamu návrat tam, odkud uživatel přišel (?next= v adrese formuláře).
+
+    Seznam tak zůstane vyfiltrovaný a seřazený. Přesměrování na další formulář (".../add", např.
+    "Uložit a přidat další") si návratovou adresu ponese dál.
+    """
+    response = await call_next(request)
+    target = safe_next(request.query_params.get("next")) if request.method == "POST" else None
+    if target and response.status_code == 303:
+        location = response.headers.get("location", "")
+        path = location.split("?", 1)[0].split("#", 1)[0]
+        if location.startswith("/login"):
+            return response
+        if path.endswith("/add"):
+            separator = "&" if "?" in location else "?"
+            response.headers["location"] = f"{location}{separator}next={quote(target, safe='')}"
+        else:
+            response.headers["location"] = target
+    return response
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)

@@ -94,6 +94,36 @@ class ServiceInterval(Base):
     is_default = False  # univerzální interval je services.maintenance_service.EffectiveInterval
 
 
+class VehicleRental(Base):
+    """Půjčení vozidla (půjčovna nebo od koho, období, kilometry, půjčovné) - u jednoho vozidla opakovaně."""
+    __tablename__ = "vehicle_rentals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(100), nullable=False)
+    date_from = Column(Date, nullable=False)
+    date_to = Column(Date, nullable=True)
+    odometer_from = Column(Integer, nullable=True)
+    odometer_to = Column(Integer, nullable=True)
+    price_paid = Column(DECIMAL(12, 3), nullable=True)
+    currency_code = Column(CHAR(3), nullable=False, default="CZK")
+    price_local = Column(DECIMAL(12, 3), nullable=True)
+    note = Column(Text, nullable=True)
+
+    vehicle = relationship("Vehicle", back_populates="rentals")
+
+    @property
+    def distance(self):
+        """Najeto během půjčení (jen když známe oba stavy; 0 je platný stav)."""
+        if self.odometer_from is None or self.odometer_to is None:
+            return None
+        return self.odometer_to - self.odometer_from
+
+    @property
+    def days(self):
+        return (self.date_to - self.date_from).days + 1 if self.date_to else None
+
+
 class DefaultServiceInterval(Base):
     """Univerzální interval uživatele - platí pro jeho vozidla, pokud u vozidla není nastaven jinak."""
     __tablename__ = "default_service_intervals"

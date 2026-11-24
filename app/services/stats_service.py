@@ -2,7 +2,7 @@ from collections import defaultdict, OrderedDict
 from datetime import date
 from decimal import Decimal
 
-from models import FuelRecord, ServiceRecord, Expense, Vehicle, VehicleNote, TireSwap, TireTreadCheck
+from models import FuelRecord, ServiceRecord, Expense, VehicleRental, Vehicle, VehicleNote, TireSwap, TireTreadCheck
 from models.fuel_record import FUEL_CATEGORIES, fuel_unit
 from services.fuel_record_service import compute_consumption_segments
 from services.maintenance_service import add_months
@@ -44,9 +44,21 @@ class StatsService:
             [e for e in expenses if in_range(e.expense_date)],
         )
 
+    def _load_rentals(self, vehicle_ids, date_from=None, date_to=None):
+        """Půjčení vozidel začínající v období (půjčovné se počítá ke dni půjčení)."""
+        if not vehicle_ids:
+            return []
+        query = self.session.query(VehicleRental).filter(VehicleRental.vehicle_id.in_(vehicle_ids))
+        if date_from:
+            query = query.filter(VehicleRental.date_from >= date_from)
+        if date_to:
+            query = query.filter(VehicleRental.date_from <= date_to)
+        return query.all()
+
     def vehicle_summary(self, vehicle_id, date_from=None, date_to=None):
         """Souhrnné ukazatele + data pro grafy jednoho vozidla."""
         all_fuel, fuel, services, expenses = self._load([vehicle_id], date_from, date_to)
+        rentals = self._load_rentals([vehicle_id], date_from, date_to)
 
         # --- spotřeba (počítáno ze všech záznamů, filtrováno podle data) ---
         segments = [s for s in compute_consumption_segments(all_fuel)
@@ -69,11 +81,13 @@ class StatsService:
         fuel_cost = sum((f.price_local or ZERO for f in fuel), ZERO)
         service_cost = sum((s.price_local or ZERO for s in services), ZERO)
         expense_cost = sum((e.price_local or ZERO for e in expenses), ZERO)
-        total_cost = fuel_cost + service_cost + expense_cost
+        rental_cost = sum((r.price_local or ZERO for r in rentals), ZERO)
+        total_cost = fuel_cost + service_cost + expense_cost + rental_cost
 
         # --- ujetá vzdálenost v období ---
-        odometers = [f.odometer for f in fuel] + [s.odometer for s in services if s.odometer] \
-            + [e.odometer for e in expenses if e.odometer]
+        odometers = [f.odometer for f in fuel] + [s.odometer for s in services if s.odometer is not None] \
+            + [e.odometer for e in expenses if e.odometer is not None] \
+            + [km for r in rentals for km in (r.odometer_from, r.odometer_to) if km is not None]
         distance = (max(odometers) - min(odometers)) if len(odometers) >= 2 else None
 
         volume_by_type = defaultdict(lambda: ZERO)
@@ -89,6 +103,8 @@ class StatsService:
             "fuel_cost": fuel_cost,
             "service_cost": service_cost,
             "expense_cost": expense_cost,
+            "rental_cost": rental_cost,
+            "rental_count": len(rentals),
             "total_cost": total_cost,
             "distance": distance,
             "cost_per_km": (total_cost / distance) if distance else None,
@@ -96,7 +112,7 @@ class StatsService:
             "avg_consumption": avg_consumption,
             "volume_by_type": dict(volume_by_type),
             "expense_by_category": dict(sorted(expense_by_category.items(), key=lambda kv: -kv[1])),
-            "charts": {**self._charts(fuel, services, expenses, segments, date_from, date_to),
+            "charts": {**self._charts(fuel, services, expenses, segments, date_from, date_to, rentals),
                        **self.odometer_charts(vehicle_id, date_from, date_to)},
         }
 
@@ -112,6 +128,10 @@ class StatsService:
                                          (TireSwap.swap_date, TireSwap.odometer, TireSwap),
                                          (TireTreadCheck.check_date, TireTreadCheck.odometer, TireTreadCheck)):
             items += list(q(column, km_column).filter(model.vehicle_id == vehicle_id))
+        rentals = q(VehicleRental.date_from, VehicleRental.odometer_from, VehicleRental.date_to,
+                    VehicleRental.odometer_to).filter(VehicleRental.vehicle_id == vehicle_id)
+        for d_from, km_from, d_to, km_to in rentals:
+            items += [(d_from, km_from), (d_to, km_to)]
         vehicle = self.session.get(Vehicle, vehicle_id)
         if vehicle is not None:
             items += [(day, km) for day, (km, _) in self.odometer_marks(vehicle).items()]
@@ -183,7 +203,7 @@ class StatsService:
             prev = (d, km)
         return readings[-1][1]
 
-    def _charts(self, fuel, services, expenses, segments, date_from, date_to):
+    def _charts(self, fuel, services, expenses, segments, date_from, date_to, rentals=()):
         # Spotřeba v čase (body podle data tankování)
         consumption_series = defaultdict(list)
         for seg in sorted(segments, key=lambda s: s["record"].refuel_datetime):
@@ -199,7 +219,7 @@ class StatsService:
 
         # Měsíční náklady podle kategorie
         dates = [f.refuel_datetime.date() for f in fuel] + [s.service_date for s in services] \
-            + [e.expense_date for e in expenses]
+            + [e.expense_date for e in expenses] + [r.date_from for r in rentals]
         monthly = OrderedDict()
         if dates:
             start = date_from or min(dates)
@@ -210,7 +230,7 @@ class StatsService:
             if (end.year - start.year) * 12 + end.month - start.month > 36:
                 start = add_months(date(end.year, end.month, 1), -35)
             for key in _months_range(start, end):
-                monthly[key] = {"fuel": 0.0, "service": 0.0, "expense": 0.0}
+                monthly[key] = {"fuel": 0.0, "service": 0.0, "expense": 0.0, "rental": 0.0}
             for f in fuel:
                 key = _month_key(f.refuel_datetime)
                 if key in monthly:
@@ -223,6 +243,10 @@ class StatsService:
                 key = _month_key(e.expense_date)
                 if key in monthly:
                     monthly[key]["expense"] += float(e.price_local or 0)
+            for r in rentals:
+                key = _month_key(r.date_from)
+                if key in monthly:
+                    monthly[key]["rental"] += float(r.price_local or 0)
 
         return {
             "consumption": dict(consumption_series),
@@ -231,6 +255,7 @@ class StatsService:
             "monthly_fuel": [round(v["fuel"], 2) for v in monthly.values()],
             "monthly_service": [round(v["service"], 2) for v in monthly.values()],
             "monthly_expense": [round(v["expense"], 2) for v in monthly.values()],
+            "monthly_rental": [round(v["rental"], 2) for v in monthly.values()],
         }
 
     def year_costs(self, vehicle_ids, year):
@@ -240,7 +265,7 @@ class StatsService:
         if not vehicle_ids:
             return totals
         _, fuel, services, expenses = self._load(vehicle_ids, start, end)
-        for item in fuel + services + expenses:
+        for item in fuel + services + expenses + self._load_rentals(vehicle_ids, start, end):
             totals[item.vehicle_id] += item.price_local or ZERO
         return totals
 
@@ -316,10 +341,11 @@ class StatsService:
         """Souhrn za všechna zadaná vozidla: řádky po vozidlech, součty a data grafů."""
         vehicles = sorted(vehicles, key=lambda v: v.id)  # stálé pořadí = stálé barvy v grafech
         ids = [v.id for v in vehicles]
-        empty = {"rows": [], "fuel_cost": ZERO, "service_cost": ZERO, "expense_cost": ZERO,
+        empty = {"rows": [], "fuel_cost": ZERO, "service_cost": ZERO, "expense_cost": ZERO, "rental_cost": ZERO,
                  "total_cost": ZERO, "distance": 0, "cost_per_km": None, "fuel_count": 0,
                  "charts": {"monthly_labels": [], "monthly_fuel": [], "monthly_service": [],
-                            "monthly_expense": [], "unit_price": {}, "odometer": {}}}
+                            "monthly_expense": [], "monthly_rental": [], "unit_price": {}, "odometer": {},
+                            "odometer_rental": []}}
         if not ids:
             return empty
 
@@ -333,21 +359,28 @@ class StatsService:
         fuel_cost = sum((r["fuel_cost"] for r in rows), ZERO)
         service_cost = sum((r["service_cost"] for r in rows), ZERO)
         expense_cost = sum((r["expense_cost"] for r in rows), ZERO)
-        total_cost = fuel_cost + service_cost + expense_cost
+        rental_cost = sum((r["rental_cost"] for r in rows), ZERO)
+        total_cost = fuel_cost + service_cost + expense_cost + rental_cost
         distance = sum(r["distance"] or 0 for r in rows)
         # náklady na km jen z vozidel, u kterých známe ujetou vzdálenost
         cost_with_distance = sum((r["total_cost"] for r in rows if r["distance"]), ZERO)
 
-        charts = self._charts(fuel, services, expenses, [], date_from, date_to)
+        charts = self._charts(fuel, services, expenses, [], date_from, date_to,
+                              self._load_rentals(ids, date_from, date_to))
         charts.pop("consumption", None)
-        charts["unit_price"] = self._price_points(fuel, self._vehicle_names(vehicles))
+        names = self._vehicle_names(vehicles)
+        charts["unit_price"] = self._price_points(fuel, names)
         charts["odometer"] = self._distance_series(vehicles, date_from, date_to)
+        # řady půjčených vozidel - v grafu kilometrů je lze skrýt
+        charts["odometer_rental"] = [names[v.id] for v in vehicles
+                                     if v.is_rental and names[v.id] in charts["odometer"]]
         return {
             "rows": rows,
             "fuel_count": len(fuel),
             "fuel_cost": fuel_cost,
             "service_cost": service_cost,
             "expense_cost": expense_cost,
+            "rental_cost": rental_cost,
             "total_cost": total_cost,
             "distance": distance,
             "cost_per_km": (cost_with_distance / distance) if distance else None,

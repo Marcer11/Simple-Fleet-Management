@@ -18,7 +18,7 @@ VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
     "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
-    "tire_sizes", "purchase_odometer", "sale_odometer",
+    "tire_sizes", "purchase_odometer", "sale_odometer", "is_rental",
 )
 
 
@@ -112,6 +112,8 @@ class VehicleService:
             if key in data and isinstance(data[key], str):
                 data[key] = data[key].strip() or None
 
+        if "is_rental" in data:
+            data["is_rental"] = bool(data["is_rental"])
         if not data.get("brand") or not data.get("model"):
             errors.append("Značka a model jsou povinné.")
         if "kind" in data:
@@ -325,6 +327,11 @@ class VehicleService:
         from models import TireTreadCheck
         values.append(self.session.query(func.max(TireTreadCheck.odometer))
                       .filter(TireTreadCheck.vehicle_id == vehicle_id).scalar())
+        from models import VehicleRental
+        values.append(self.session.query(func.max(VehicleRental.odometer_from))
+                      .filter(VehicleRental.vehicle_id == vehicle_id).scalar())
+        values.append(self.session.query(func.max(VehicleRental.odometer_to))
+                      .filter(VehicleRental.vehicle_id == vehicle_id).scalar())
         values = [v for v in values if v is not None]
         # u nově koupeného vozidla bez záznamů aspoň stav při nákupu, u prodaného stav při prodeji
         vehicle = self.session.get(Vehicle, vehicle_id)

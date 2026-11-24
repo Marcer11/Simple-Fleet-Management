@@ -45,6 +45,17 @@ u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezo
 Seznam vozidel ukazuje tachometr, spotřebu, náklady za rok a typ pneumatik; vlastník je až v detailu vozidla.
 Smazání vozidla je schované dole ve formuláři úprav.
 
+### Půjčená vozidla
+- vozidlo lze označit jako **půjčené** (formulář vozidla skryje údaje o nákupu a prodeji a po založení rovnou
+  nabídne zápis půjčení)
+- **půjčení** (opakovaně u stejného vozidla): půjčovna / od koho, půjčeno od – do, kilometry při půjčení
+  a vrácení (najeto), půjčovné v libovolné měně (převod kurzem ČNB), poznámka; 0 km je platný stav
+- půjčení je na časové ose a v detailu vozidla (sekce „Půjčení“, tlačítko „Půjčení“)
+- **půjčovné je v nákladech** – přehled (náklady za rok), seznam vozidel, statistiky vozidla i všech vozidel
+  (samostatný sloupec a řada v grafu měsíčních nákladů); tankování půjčeného auta je ve spotřebě, nákladech
+  i v grafu cen paliva jako u ostatních vozidel
+- v grafu ujetých kilometrů všech vozidel lze půjčená auta skrýt / zobrazit (barvy ostatních vozidel se nemění)
+
 ### Poznámky a časová osa
 - **poznámky k vozidlu** s datem, časem a stavem tachometru (uloženo do garáže, půjčeno, nehoda…);
   stav tachometru se kontroluje proti ostatním záznamům v čase – stejný stav v různé dny je povolený

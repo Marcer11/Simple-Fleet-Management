@@ -25,6 +25,7 @@
     <div class="kpi"><div class="label">Palivo</div><div class="value">{{ summary.fuel_cost|czk(0) }}</div><div class="hint">{{ summary.fuel_count }} tankování</div></div>
     <div class="kpi"><div class="label">Servis</div><div class="value">{{ summary.service_cost|czk(0) }}</div></div>
     <div class="kpi"><div class="label">Ostatní výdaje</div><div class="value">{{ summary.expense_cost|czk(0) }}</div></div>
+    {% if summary.rental_cost %}<div class="kpi"><div class="label">Půjčovné</div><div class="value">{{ summary.rental_cost|czk(0) }}</div></div>{% endif %}
     <div class="kpi"><div class="label">Ujeto</div><div class="value">{{ summary.distance|km }}</div><div class="hint">{{ summary.rows|length }} vozid{{ "lo" if summary.rows|length == 1 else ("la" if summary.rows|length < 5 else "el") }}</div></div>
     <div class="kpi"><div class="label">Náklady na km</div><div class="value">{{ summary.cost_per_km|czk(2) if summary.cost_per_km else "–" }}</div></div>
 </div>
@@ -35,17 +36,18 @@
     <table>
         <thead><tr>
             <th>Vozidlo</th><th class="num">Ujeto</th><th class="num">Palivo</th><th class="num">Servis</th>
-            <th class="num">Výdaje</th><th class="num">Celkem</th><th class="num">Kč/km</th><th class="num">Spotřeba</th>
+            <th class="num">Výdaje</th>{% if summary.rental_cost %}<th class="num">Půjčovné</th>{% endif %}<th class="num">Celkem</th><th class="num">Kč/km</th><th class="num">Spotřeba</th>
             <th class="num" title="Průměr z celé historie vozidla">Km za rok</th><th class="num" title="Průměr z celé historie vozidla">Tankuje každých</th>
         </tr></thead>
         <tbody>
         {% for r in summary.rows %}
         <tr>
-            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}/stats?period={{ period }}">{{ r.vehicle.display_name }}</a></td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}/stats?period={{ period }}">{{ r.vehicle.display_name }}</a>{% if r.vehicle.is_rental %} <span class="badge badge-muted">půjčené</span>{% endif %}</td>
             <td class="num nowrap">{{ r.distance|km if r.distance else "–" }}</td>
             <td class="num nowrap">{{ r.fuel_cost|czk(0) }}</td>
             <td class="num nowrap">{{ r.service_cost|czk(0) }}</td>
             <td class="num nowrap">{{ r.expense_cost|czk(0) }}</td>
+            {% if summary.rental_cost %}<td class="num nowrap">{{ r.rental_cost|czk(0) if r.rental_cost else "–" }}</td>{% endif %}
             <td class="num nowrap"><strong>{{ r.total_cost|czk(0) }}</strong></td>
             <td class="num nowrap">{{ r.cost_per_km|num(2) if r.cost_per_km else "–" }}</td>
             <td class="num nowrap">
@@ -62,7 +64,7 @@
         <tfoot><tr>
             <td>Celkem</td><td class="num nowrap">{{ summary.distance|km }}</td>
             <td class="num nowrap">{{ summary.fuel_cost|czk(0) }}</td><td class="num nowrap">{{ summary.service_cost|czk(0) }}</td>
-            <td class="num nowrap">{{ summary.expense_cost|czk(0) }}</td><td class="num nowrap">{{ summary.total_cost|czk(0) }}</td>
+            <td class="num nowrap">{{ summary.expense_cost|czk(0) }}</td>{% if summary.rental_cost %}<td class="num nowrap">{{ summary.rental_cost|czk(0) }}</td>{% endif %}<td class="num nowrap">{{ summary.total_cost|czk(0) }}</td>
             <td class="num nowrap">{{ summary.cost_per_km|num(2) if summary.cost_per_km else "–" }}</td><td></td><td></td><td></td>
         </tr></tfoot>
         {% endif %}
@@ -79,12 +81,12 @@
         <summary class="small">Zobrazit jako tabulku</summary>
         <div class="table-wrap">
         <table>
-            <thead><tr><th>Měsíc</th><th class="num">Palivo</th><th class="num">Servis</th><th class="num">Výdaje</th><th class="num">Celkem</th></tr></thead>
+            <thead><tr><th>Měsíc</th><th class="num">Palivo</th><th class="num">Servis</th><th class="num">Výdaje</th>{% if summary.rental_cost %}<th class="num">Půjčovné</th>{% endif %}<th class="num">Celkem</th></tr></thead>
             <tbody>
             {% for label in summary.charts.monthly_labels %}
             {% set i = loop.index0 %}
-            {% set f, s, e = summary.charts.monthly_fuel[i], summary.charts.monthly_service[i], summary.charts.monthly_expense[i] %}
-            <tr><td>{{ label }}</td><td class="num">{{ f|num(0) }}</td><td class="num">{{ s|num(0) }}</td><td class="num">{{ e|num(0) }}</td><td class="num">{{ (f + s + e)|num(0) }}</td></tr>
+            {% set f, s, e, rr = summary.charts.monthly_fuel[i], summary.charts.monthly_service[i], summary.charts.monthly_expense[i], summary.charts.monthly_rental[i] %}
+            <tr><td>{{ label }}</td><td class="num">{{ f|num(0) }}</td><td class="num">{{ s|num(0) }}</td><td class="num">{{ e|num(0) }}</td>{% if summary.rental_cost %}<td class="num">{{ rr|num(0) }}</td>{% endif %}<td class="num">{{ (f + s + e + rr)|num(0) }}</td></tr>
             {% endfor %}
             </tbody>
         </table>
@@ -97,9 +99,13 @@
     <div class="card-head">
         <h2>Ujeté kilometry</h2>
         {% set mode = "zero" %}
-        {% if summary.charts.odometer %}<div class="seg" role="group" aria-label="Zobrazení kilometrů">
+        {% if summary.charts.odometer %}
+        <div class="actions">
+        {% if summary.charts.odometer_rental %}<label class="check small"><input type="checkbox" data-chart-optional="chart-odometer" checked> Půjčená auta</label>{% endif %}
+        <div class="seg" role="group" aria-label="Zobrazení kilometrů">
             <button type="button" class="btn btn-sm" data-chart-mode="chart-odometer" data-mode="zero" aria-pressed="{{ 'true' if mode == 'zero' else 'false' }}">Od nuly</button>
             <button type="button" class="btn btn-sm" data-chart-mode="chart-odometer" data-mode="actual" aria-pressed="{{ 'true' if mode == 'actual' else 'false' }}">Stav tachometru</button>
+        </div>
         </div>{% endif %}
     </div>
     {% if summary.charts.odometer %}
@@ -122,13 +128,13 @@
 {% block scripts %}
 {% if summary.rows %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=6"></script>
+<script src="/static/charts.js?v=7"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
     SfmCharts.monthlyCosts("chart-monthly", data);
-    SfmCharts.odometerChart("chart-odometer", data.odometer, "zero");
+    SfmCharts.odometerChart("chart-odometer", data.odometer, "zero", data.odometer_rental);
     SfmCharts.timeChart("chart-price", data.unit_price, {
         decimals: 2, unit: "Kč", thin: true, withTime: true, valueSuffix: (pt) => `Kč/${pt.unit}`,
         details: (pt) => [pt.vehicle, pt.station].filter(Boolean),

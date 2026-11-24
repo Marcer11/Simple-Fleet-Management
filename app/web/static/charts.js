@@ -124,7 +124,8 @@ window.SfmCharts = (function () {
         const total = names.reduce((n, name) => n + seriesByName[name].length, 0);
         const dense = total > 150;
         const datasets = names.map((name, i) => {
-            const color = p.series[i % p.series.length];
+            // barva patří řadě (vozidlu), ne pořadí - po skrytí řady se ostatní nepřebarví
+            const color = p.series[(o.colorIndex ? o.colorIndex(name, i) : i) % p.series.length];
             return {
                 label: name,
                 data: seriesByName[name].map((pt) => ({ x: toTime(pt.x), y: pt.y, meta: pt })),
@@ -192,7 +193,8 @@ window.SfmCharts = (function () {
                     mk("Palivo", data.monthly_fuel, p.series[0]),
                     mk("Servis", data.monthly_service, p.series[1]),
                     mk("Výdaje", data.monthly_expense, p.series[2]),
-                ],
+                ].concat((data.monthly_rental || []).some((v) => v)
+                    ? [mk("Půjčovné", data.monthly_rental, p.series[3])] : []),
             },
             options: {
                 maintainAspectRatio: false,
@@ -237,16 +239,21 @@ window.SfmCharts = (function () {
 
     // Vývoj kilometrů s přepínačem: "zero" = najeto od prvního bodu řady, "actual" = stav tachometru.
     // Body: {x, y, odo?} - odo je skutečný stav (když chybí, bere se y). Tlačítka: data-chart-mode="<id>" data-mode="…"
-    function odometerChart(id, seriesByName, startMode) {
+    // optional: názvy řad, které skryje zaškrtávátko data-chart-optional="<id>" (např. půjčená auta)
+    function odometerChart(id, seriesByName, startMode, optional) {
         const el = document.getElementById(id);
         if (!el || !window.Chart) return;
         const fmt = nf(0);
         const buttons = document.querySelectorAll('[data-chart-mode="' + id + '"]');
+        const toggle = document.querySelector('[data-chart-optional="' + id + '"]');
+        const hideable = new Set(optional || []);
         let chart = null;
+        let current = startMode || "zero";
         function draw(mode) {
+            current = mode;
             if (chart) chart.destroy();
             const series = {};
-            Object.keys(seriesByName).forEach((name) => {
+            Object.keys(seriesByName).filter((name) => !(toggle && !toggle.checked && hideable.has(name))).forEach((name) => {
                 const pts = seriesByName[name];
                 const base = pts.length ? (pts[0].odo != null ? pts[0].odo : pts[0].y) : 0;
                 series[name] = pts.map((pt) => {
@@ -254,15 +261,17 @@ window.SfmCharts = (function () {
                     return Object.assign({}, pt, { odo, y: mode === "zero" ? odo - base : odo });
                 });
             });
+            const allNames = Object.keys(seriesByName);
             chart = timeChart(id, series, {
-                unit: "km", beginAtZero: mode === "zero",
+                unit: "km", beginAtZero: mode === "zero", colorIndex: (name) => allNames.indexOf(name),
                 details: (pt) => [pt.label, mode === "zero" ? `Tachometr: ${fmt.format(pt.odo)} km` : null]
                     .filter(Boolean),
             });
             buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
         }
         buttons.forEach((b) => b.addEventListener("click", () => draw(b.dataset.mode)));
-        draw(startMode || "zero");
+        if (toggle) toggle.addEventListener("change", () => draw(current));
+        draw(current);
     }
 
     function unitOf(fuelName) {

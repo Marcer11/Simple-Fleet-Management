@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
 
-from models import Expense, FuelRecord, ServiceRecord, TireDefect, TireSwap, TireTreadCheck, Vehicle, VehicleNote
+from models import VehicleRental, Expense, FuelRecord, ServiceRecord, TireDefect, TireSwap, TireTreadCheck, Vehicle, VehicleNote
 
 KIND_FUEL = "fuel"
 KIND_SERVICE = "service"
@@ -13,10 +13,12 @@ KIND_EXPENSE = "expense"
 KIND_NOTE = "note"
 KIND_VEHICLE = "vehicle"
 KIND_TIRES = "tires"
+KIND_RENTAL = "rental"
 KINDS = {
     KIND_FUEL: "Tankování",
     KIND_SERVICE: "Servis",
     KIND_EXPENSE: "Výdaje",
+    KIND_RENTAL: "Půjčení",
     KIND_TIRES: "Pneumatiky",
     KIND_NOTE: "Poznámky",
     KIND_VEHICLE: "Nákup a prodej",
@@ -39,12 +41,13 @@ class Event:
     def __post_init__(self):
         if self.icon is None:
             self.icon = {KIND_FUEL: "fuel", KIND_SERVICE: "service", KIND_EXPENSE: "expense", KIND_NOTE: "note",
-                         KIND_VEHICLE: "car", KIND_TIRES: "tire"}[self.kind]
+                         KIND_VEHICLE: "car", KIND_TIRES: "tire", KIND_RENTAL: "key"}[self.kind]
 
     @property
     def kind_label(self):
         return {KIND_FUEL: "Tankování", KIND_SERVICE: "Servis", KIND_EXPENSE: "Výdaj",
-                KIND_NOTE: "Poznámka", KIND_VEHICLE: "Vozidlo", KIND_TIRES: "Pneumatiky"}[self.kind]
+                KIND_NOTE: "Poznámka", KIND_VEHICLE: "Vozidlo", KIND_TIRES: "Pneumatiky",
+                KIND_RENTAL: "Půjčení"}[self.kind]
 
 
 # Ikona podle typu poznámky / kategorie výdaje / položky servisu (porovnává se malými písmeny)
@@ -178,6 +181,20 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             events.append(Event(KIND_EXPENSE, _day(r.expense_date), False, by_id[r.vehicle_id], r.category,
                                 " · ".join(parts), r.odometer, r.price_local, f"/expenses/{r.id}/edit",
                                 icon=EXPENSE_ICONS.get(r.category.lower(), "expense")))
+
+    if KIND_RENTAL in kinds:
+        query = session.query(VehicleRental).filter(VehicleRental.vehicle_id.in_(ids))
+        for r in dated(query, VehicleRental.date_from, False):
+            parts = []
+            if r.date_to:
+                parts.append(f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}"
+                             + (f" ({r.days} dní)" if r.days and r.days > 1 else ""))
+            if r.distance is not None:
+                parts.append(f"najeto {r.distance:,} km".replace(",", " "))
+            if r.note:
+                parts.append(r.note.strip())
+            events.append(Event(KIND_RENTAL, _day(r.date_from), False, by_id[r.vehicle_id], f"Půjčení – {r.provider}",
+                                " · ".join(parts), r.odometer_from, r.price_local, f"/rentals/{r.id}/edit"))
 
     if KIND_NOTE in kinds:
         query = (session.query(VehicleNote).options(joinedload(VehicleNote.created_by))

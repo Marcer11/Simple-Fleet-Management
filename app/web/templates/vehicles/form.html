@@ -10,6 +10,7 @@
     {{ m.csrf() }}
     <div class="form-grid">
         {{ m.select("kind", "Druh vozidla", [("car", "Auto"), ("moto", "Motorka")]) }}
+        {{ m.checkbox("is_rental", "Půjčené vozidlo") }}
         {{ m.field("brand", "Značka", required=true, maxlength=50) }}
         {{ m.field("model", "Model", required=true, maxlength=50) }}
         {{ m.field("license_plate", "SPZ", maxlength=12, style="text-transform: uppercase") }}
@@ -23,12 +24,14 @@
                 <input type="text" id="f-color_hex" name="color_hex" value="{{ m.val('color_hex') or '#FFFFFF' }}" maxlength="7" pattern="#[0-9A-Fa-f]{6}">
             </div>
         </div>
+        <div class="contents" id="ownership-fields" data-hide-when="f-is_rental">
         {{ m.field("purchase_date", "Datum nákupu", "date") }}
         {{ m.field("purchase_price", "Pořizovací cena (Kč)", inputmode="decimal", autocomplete="off") }}
         {{ m.field("purchase_odometer", "Stav tachometru při nákupu (km)", "number", min=0, step=1, inputmode="numeric") }}
         {{ m.field("sale_date", "Datum prodeje", "date") }}
         {{ m.field("sale_price", "Prodejní cena (Kč)", inputmode="decimal", autocomplete="off") }}
         {{ m.field("sale_odometer", "Stav tachometru při prodeji (km)", "number", min=0, step=1, inputmode="numeric") }}
+        </div>
         <div class="field field-wide">
             <label for="f-tire_sizes">Rozměry pneumatik dle technického průkazu</label>
             <textarea id="f-tire_sizes" name="tire_sizes" rows="3" maxlength="500">{{ m.val('tire_sizes') }}</textarea>

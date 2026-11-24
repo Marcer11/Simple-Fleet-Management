@@ -9,7 +9,7 @@ from models.maintenance import (
 )
 from models.vehicle import ROLE_EDITOR
 from services.maintenance_service import (
-    DefaultIntervalService, ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
+    RentalService, DefaultIntervalService, ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
     collect_alerts,
 )
 from services.vehicle_service import VehicleService
@@ -176,6 +176,55 @@ register_crud(router, CrudConfig(
     extra_context=lambda db, user: {"service_types": SERVICE_TYPES},
     prefill_params=("service_type", "interval_months", "interval_km"),
     messages={"created": "Pravidelný servis byl nastaven.", "deleted": "Pravidelný servis byl odstraněn."},
+))
+
+
+# ----------------------------------------------------------------------
+# Půjčení vozidla (u vozidla označeného jako půjčené, opakovaně)
+# ----------------------------------------------------------------------
+
+def _read_rental(form):
+    data = {
+        "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
+        "provider": form.str("provider", "Půjčovna / od koho", required=True, max_len=100),
+        "date_from": form.date("date_from", "Půjčeno od", required=True),
+        "date_to": form.date("date_to", "Půjčeno do"),
+        "odometer_from": form.int("odometer_from", "Km při půjčení", min_value=0),
+        "odometer_to": form.int("odometer_to", "Km při vrácení", min_value=0),
+        "price_paid": form.decimal("price_paid", "Půjčovné", min_value=0),
+        "currency_code": form.str("currency_code", "Měna") or "CZK",
+        "manual_rate": form.decimal("manual_rate", "Kurz", positive=True),
+        "note": form.str("note", "Poznámka"),
+    }
+    form.check()
+    return data
+
+
+def _rental_values(r):
+    return {
+        "vehicle_id": str(r.vehicle_id), "provider": r.provider, "date_from": iso(r.date_from),
+        "date_to": iso(r.date_to), "odometer_from": iso(r.odometer_from), "odometer_to": iso(r.odometer_to),
+        "price_paid": iso(r.price_paid), "currency_code": r.currency_code, "manual_rate": rate_from_record(r),
+        "note": r.note or "",
+    }
+
+
+def _rental_context(db, user):
+    from web.common import editable_vehicles
+    vehicles = editable_vehicles(db, user)
+    providers = sorted({r.provider for v in vehicles if v.is_rental for r in v.rentals})
+    return {"vehicles": [v for v in vehicles if v.is_rental], "providers": providers}
+
+
+register_crud(router, CrudConfig(
+    prefix="/rentals",
+    service_cls=RentalService,
+    template="maintenance/rental_form.html",
+    read_form=_read_rental,
+    to_values=_rental_values,
+    default_values=lambda vid: {"date_from": date.today().isoformat(), "currency_code": "CZK"},
+    extra_context=_rental_context,
+    messages={"created": "Půjčení bylo uloženo.", "deleted": "Půjčení bylo smazáno."},
 ))
 
 

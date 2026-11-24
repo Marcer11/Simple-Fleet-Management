@@ -41,6 +41,8 @@ class Vehicle(Base):
     purchase_odometer = Column(Integer, nullable=True)      # km při nákupu
     sale_odometer = Column(Integer, nullable=True)          # km při prodeji
     is_active = Column(Boolean, nullable=False, default=True)
+    # Půjčené vozidlo (z půjčovny nebo od známých) - k němu se evidují jednotlivá půjčení
+    is_rental = Column(Boolean, nullable=False, default=False, server_default="0")
     # Povolené rozměry pneumatik dle technického průkazu - jeden na řádek ("205/55 R16 91V")
     tire_sizes = Column(String(500), nullable=True)
 
@@ -52,6 +54,8 @@ class Vehicle(Base):
     reminders = relationship("Reminder", back_populates="vehicle", cascade="all, delete-orphan")
     expenses = relationship("Expense", back_populates="vehicle", cascade="all, delete-orphan")
     notes = relationship("VehicleNote", back_populates="vehicle", cascade="all, delete-orphan")
+    rentals = relationship("VehicleRental", back_populates="vehicle", cascade="all, delete-orphan",
+                           order_by="VehicleRental.date_from.desc()")
 
     @property
     def display_name(self):

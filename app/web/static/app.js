@@ -662,6 +662,15 @@
         });
     });
 
+    // Skrytí polí podle zaškrtávátka: <div data-hide-when="id-checkboxu"> (např. nákup/prodej u půjčeného vozidla)
+    document.querySelectorAll("[data-hide-when]").forEach(function (block) {
+        const box = document.getElementById(block.getAttribute("data-hide-when"));
+        if (!box) return;
+        const sync = function () { block.hidden = box.checked; };
+        box.addEventListener("change", sync);
+        sync();
+    });
+
     // Detail události na časové ose: klik zobrazí celý text
     document.addEventListener("click", function (event) {
         const detail = event.target.closest(".tl-detail");

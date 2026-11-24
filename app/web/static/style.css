@@ -395,6 +395,7 @@ tr.child-row td:first-child { padding-left: 28px; }
 .tl-note .tl-icon { background: var(--series-7, #6250d6); }
 .tl-tires .tl-icon { background: var(--series-5, #e87ba4); }
 .tl-vehicle .tl-icon { background: var(--text, #222); }
+.tl-rental .tl-icon { background: var(--series-4, #eda100); }
 @media (prefers-color-scheme: dark) { .tl-icon { color: #0b1016; } }
 .tl-body { min-width: 0; padding-top: 4px; }
 .tl-line { display: flex; align-items: baseline; gap: 4px 10px; min-width: 0; }
@@ -413,6 +414,8 @@ tr.child-row td:first-child { padding-left: 28px; }
     .tl-line { flex-wrap: wrap; }
     .tl-meta { flex-basis: 100%; order: 3; }
 }
+.contents { display: contents; }
+.contents[hidden] { display: none; }
 /* Přepínač zobrazení grafu */
 .seg { display: inline-flex; }
 .seg .btn { border-radius: 0; margin-left: -1px; }

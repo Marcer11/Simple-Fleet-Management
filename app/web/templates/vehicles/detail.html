@@ -10,6 +10,7 @@
         <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }}</h1>
         <div class="sub plate-line">
             {{ m.vehicle_icon(vehicle) }} {{ vehicle.license_plate or "bez SPZ" }} {{ m.tire_icons(tire_seasons) }}
+            {% if vehicle.is_rental %}<span class="badge badge-info">Půjčené</span>{% endif %}
             {% if vehicle.is_sold %}<span class="badge">Prodáno {{ vehicle.sale_date|date }}</span>
             {% elif not vehicle.is_active %}<span class="badge">Neaktivní</span>{% endif %}
             {{ m.role_badge(role) }}
@@ -24,6 +25,7 @@
 {% if can_edit %}
 <nav class="quick-actions card" aria-label="Zapsat k vozidlu">
     <a class="btn btn-primary" href="/fuel-records/add?vehicle_id={{ vid }}">{{ m.icon("fuel") }} Tankování</a>
+    {% if vehicle.is_rental %}<a class="btn" href="/rentals/add?vehicle_id={{ vid }}">{{ m.icon("key") }} Půjčení</a>{% endif %}
     <a class="btn" href="/services/add?vehicle_id={{ vid }}">{{ m.icon("service") }} Servis</a>
     <a class="btn" href="/expenses/add?vehicle_id={{ vid }}">{{ m.icon("expense") }} Výdaj</a>
     <a class="btn" href="/notes/add?vehicle_id={{ vid }}">{{ m.icon("note") }} Poznámka</a>
@@ -53,6 +55,36 @@
 {% endif %}
 
 <div class="folds">
+{# ------------------------------------------------ půjčení (jen půjčené vozidlo) #}
+{% if vehicle.is_rental %}
+<details class="fold"{% if not rentals %} open{% endif %}>
+    <summary><span>Půjčení</span><span class="fold-hint">{% if rentals %}{{ rentals|length }}× · půjčovné celkem {{ rentals|map(attribute="price_local")|select|sum|czk(0) }}{% else %}zatím žádné{% endif %}</span></summary>
+    <div class="fold-body">
+        {% if rentals %}
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Od koho</th><th>Od</th><th>Do</th><th class="num">Km</th><th class="num">Najeto</th><th class="num">Půjčovné</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for r in rentals %}
+            <tr>
+                <td>{{ r.provider }}{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
+                <td class="nowrap">{{ r.date_from|date }}</td>
+                <td class="nowrap">{{ r.date_to|date or "–" }}</td>
+                <td class="num nowrap">{% if r.odometer_from is not none or r.odometer_to is not none %}{{ r.odometer_from|km }} → {{ r.odometer_to|km }}{% else %}–{% endif %}</td>
+                <td class="num nowrap">{{ r.distance|km if r.distance is not none else "–" }}</td>
+                <td class="num nowrap">{{ r.price_local|czk(0) }}{% if r.currency_code != "CZK" and r.price_paid is not none %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
+                {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/rentals/{{ r.id }}/edit">Upravit</a></td>{% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}<div class="empty small">Zatím žádné půjčení.</div>{% endif %}
+        {% if can_edit %}<div class="actions fold-actions"><a class="btn btn-sm" href="/rentals/add?vehicle_id={{ vid }}">+ Půjčení</a></div>{% endif %}
+    </div>
+</details>
+{% endif %}
+
 {# ------------------------------------------------ údaje o vozidle #}
 <details class="fold">
     <summary><span>Údaje o vozidle</span><span class="fold-hint">{{ vehicle.kind_label }}{% if vehicle.production_year %} · {{ vehicle.production_year }}{% endif %}{% if owner and not is_owner %} · vlastník {{ owner.name }}{% endif %}</span></summary>

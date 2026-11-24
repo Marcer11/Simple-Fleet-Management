@@ -1,0 +1,18 @@
+{% extends "maintenance/_record_form.html" %}
+{% import "_macros.html" as m with context %}
+{% set heading = "Upravit půjčení" if record else "Půjčení vozidla" %}
+{% set back_url = "/vehicles" %}
+{% set delete_url = "/rentals/%d/delete"|format(record.id) if record else "" %}
+{% block fields %}
+<div class="field">
+    <label for="f-provider">Půjčovna / od koho <span class="req">*</span></label>
+    <input id="f-provider" name="provider" type="text" required maxlength="100" list="providers" value="{{ m.val('provider') }}" autocomplete="off">
+    {{ m.datalist("providers", providers) }}
+</div>
+{{ m.field("date_from", "Půjčeno od", "date", required=true) }}
+{{ m.field("date_to", "Půjčeno do", "date") }}
+{{ m.field("odometer_from", "Km při půjčení", "number", min=0, step=1, inputmode="numeric") }}
+{{ m.field("odometer_to", "Km při vrácení", "number", min=0, step=1, inputmode="numeric") }}
+{{ m.price_fields(currencies, "Půjčovné") }}
+{{ m.textarea("note", "Poznámka") }}
+{% endblock %}

@@ -28,7 +28,7 @@ def _vehicle_values(vehicle):
         "purchase_date": iso(vehicle.purchase_date), "sale_date": iso(vehicle.sale_date),
         "note": vehicle.note or "", "is_active": "on" if vehicle.is_active else "",
         "purchase_price": iso(vehicle.purchase_price), "sale_price": iso(vehicle.sale_price),
-        "tire_sizes": vehicle.tire_sizes or "",
+        "tire_sizes": vehicle.tire_sizes or "", "is_rental": "on" if vehicle.is_rental else "",
         "purchase_odometer": iso(vehicle.purchase_odometer), "sale_odometer": iso(vehicle.sale_odometer),
     }
 
@@ -52,6 +52,7 @@ def _read_vehicle_form(form):
         "sale_odometer": form.int("sale_odometer", "Km při prodeji", min_value=0),
         "note": form.str("note", "Poznámka"),
         "tire_sizes": form.str("tire_sizes", "Rozměry pneumatik", max_len=500),
+        "is_rental": form.bool("is_rental"),
     }
     form.check()
     return data
@@ -90,6 +91,8 @@ async def add_vehicle_post(request: Request, user=Depends(get_current_user), db=
     except ValidationError as e:
         return render(request, "vehicles/form.html", status_code=400, vehicle=None, values=form.values, error=str(e))
     flash(request, f"Vozidlo {vehicle.display_name} bylo přidáno.")
+    if vehicle.is_rental:  # u půjčeného vozidla rovnou zápis půjčení
+        return RedirectResponse(f"/rentals/add?vehicle_id={vehicle.id}", status_code=303)
     return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
 
 
@@ -125,7 +128,7 @@ async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_cur
         tire_seasons=mounted_seasons(db, [vehicle.id]).get(vehicle.id),
         editable_ids={vehicle.id} if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set(),
         year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
-        owner=vehicle.owner,
+        owner=vehicle.owner, rentals=list(vehicle.rentals),
     )
 
 

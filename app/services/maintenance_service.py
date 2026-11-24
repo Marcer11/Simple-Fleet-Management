@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func
 
 from models import (
-    ServiceRecord, ServiceInterval, DefaultServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap, TireTreadCheck,
+    VehicleRental, ServiceRecord, ServiceInterval, DefaultServiceInterval, Reminder, Expense, Vehicle, VehicleNote, FuelRecord, TireSwap, TireTreadCheck,
 )
 from models.vehicle_note import NOTE_CATEGORIES
 from models.maintenance import (
@@ -331,6 +331,45 @@ class ExpenseService(_RecordServiceBase):
             "category": _clean_str(data.get("category"), 30, "Kategorie", required=True),
             "description": _clean_str(data.get("description"), 200, "Popis"),
             "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
+            "price_paid": price_paid,
+            "currency_code": currency,
+            "price_local": price_local,
+            "note": _clean_str(data.get("note")),
+        }
+
+
+# ----------------------------------------------------------------------
+# Půjčení vozidla
+# ----------------------------------------------------------------------
+
+class RentalService(_RecordServiceBase):
+    """Jednotlivá půjčení půjčeného vozidla (půjčovna / od koho, období, km, půjčovné)."""
+    model = VehicleRental
+    date_column = "date_from"
+
+    def _validate(self, data):
+        _ensure_vehicle(self.session, data.get("vehicle_id"))
+        if not self.session.get(Vehicle, data["vehicle_id"]).is_rental:
+            raise ValidationError("Vozidlo není označené jako půjčené.")
+        if not data.get("date_from"):
+            raise ValidationError("Datum půjčení je povinné.")
+        date_to = data.get("date_to") or None
+        if date_to and date_to < data["date_from"]:
+            raise ValidationError("Konec půjčení nemůže být před jeho začátkem.")
+        km_from = _positive_int(data.get("odometer_from"), "Kilometry při půjčení")
+        km_to = _positive_int(data.get("odometer_to"), "Kilometry při vrácení")
+        if km_from is not None and km_to is not None and km_to < km_from:
+            raise ValidationError("Kilometry při vrácení nemohou být menší než při půjčení.")
+        manual_rate = data.get("manual_rate")
+        currency, price_paid, price_local = convert_price(
+            data.get("price_paid"), data.get("currency_code"), data["date_from"], manual_rate)
+        return {
+            "vehicle_id": data["vehicle_id"],
+            "provider": _clean_str(data.get("provider"), 100, "Půjčovna / od koho", required=True),
+            "date_from": data["date_from"],
+            "date_to": date_to,
+            "odometer_from": km_from,
+            "odometer_to": km_to,
             "price_paid": price_paid,
             "currency_code": currency,
             "price_local": price_local,

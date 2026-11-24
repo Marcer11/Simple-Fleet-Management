@@ -367,7 +367,7 @@ footer.site { text-align: center; color: var(--muted); font-size: .8rem; padding
 
 /* Seznam paliv a přehled stanic */
 .inline-form { display: inline; margin: 0; }
-table.fuel-types input, table.fuel-types select { min-width: 140px; }
+table.fuel-types input:not([type="checkbox"]), table.fuel-types select { min-width: 140px; }
 tr.group-row td { font-weight: 600; background: var(--surface-2, transparent); border-top: 2px solid var(--border); }
 tr.child-row td:first-child { padding-left: 28px; }
 
@@ -416,6 +416,20 @@ tr.child-row td:first-child { padding-left: 28px; }
 }
 .contents { display: contents; }
 .contents[hidden] { display: none; }
+/* Výběr více značek pump u paliva */
+.brand-cell { min-width: 200px; }
+.brand-pick > summary { cursor: pointer; list-style: none; padding: 6px 10px; border: 1px solid var(--border);
+                        border-radius: 8px; background: var(--surface); white-space: nowrap; overflow: hidden;
+                        text-overflow: ellipsis; max-width: 320px; }
+.brand-pick > summary::-webkit-details-marker { display: none; }
+.brand-pick > summary::after { content: " ▾"; color: var(--muted); }
+.brand-pick[open] > summary { border-color: var(--primary); }
+.brand-pick-panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 12px;
+                    padding: 10px 2px 4px; max-width: 520px; }
+.brand-other { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.brand-pick-panel .check { white-space: nowrap; gap: 6px; }
+.brand-pick-panel .check input { flex: none; min-width: 0; }
+.label-like { font-weight: 600; font-size: .88rem; }
 /* Přepínač zobrazení grafu */
 .seg { display: inline-flex; }
 .seg .btn { border-radius: 0; margin-left: -1px; }

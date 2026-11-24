@@ -80,7 +80,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
   *druh* (benzín, nafta, LPG, CNG, elektřina), podle kterého se počítá spotřeba a určuje jednotka –
   Natural 95 i Verva 100 jsou benzín; přejmenování se promítne i do zapsaných tankování
 - palivo lze navázat na **značky pump** (Verva 100 → ORLEN, V-Power → Shell, i víc značek);
-  formulář tankování pak u dané pumpy nabízí jen její paliva a paliva bez omezení
+  (výběr zaškrtnutím z pump, kde se tankovalo, a známých značek, další lze dopsat); formulář tankování pak
+  u dané pumpy nabízí jen její paliva a paliva bez omezení a tankování paliva u jiné pumpy nejde uložit
 - **přehled čerpacích stanic** – značka (podle názvu stanice) → jednotlivé stanice podle adresy,
   počet tankování, množství, útrata, průměrná cena za litr
 - **API pro Timeline** – Timeline si načítá tankování vozidla podle SPZ do výdajů výletů

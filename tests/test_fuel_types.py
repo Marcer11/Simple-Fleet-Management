@@ -151,3 +151,34 @@ def test_recalculate_command(app, db, monkeypatch, capsys):
     assert "změněno tankování: 1" in capsys.readouterr().out
     db.expire_all()
     assert float(db.query(FuelRecord).filter_by(odometer=10500).one().consumption) == 7.0
+
+
+def test_fuel_type_multiple_brands_and_station_check(app, db):
+    client = register(app, "evo@example.com")
+    vid = add_vehicle(client)
+    # víc pump zaškrtnutím + další dopsaná
+    r = post(client, "/fuel-types/add", {"name": "EVO 100+", "category": "Benzín",
+                                         "station_brand": ["MOL", "OMV"], "station_brands": "km-prona"})
+    assert r.status_code == 303
+    evo = db.query(FuelType).filter_by(name="EVO 100+").one()
+    assert evo.brands == ["MOL", "OMV", "km-prona"]
+    page = client.get("/fuel-types").text
+    assert 'name="station_brand" value="MOL" checked' in page and 'name="station_brand" value="OMV" checked' in page
+    # úprava: jen MOL
+    r = post(client, f"/fuel-types/{evo.id}/edit", {"name": "EVO 100+", "category": "Benzín",
+                                                    "station_brand": ["MOL"]})
+    assert r.status_code == 303
+    db.expire_all()
+    assert db.get(FuelType, evo.id).brands == ["MOL"]
+
+    # tankování EVO 100+ na jiné pumpě nejde uložit
+    r = add_fuel(client, vid, date.today(), 1000, "40", fuel_type="EVO 100+", station_name="KM-PRONA Praha")
+    assert r.status_code == 400 and "jen pro pumpy MOL" in r.text
+    assert add_fuel(client, vid, date.today(), 1000, "40", fuel_type="EVO 100+", station_name="MOL Brno").status_code == 303
+    assert add_fuel(client, vid, date.today(), 1100, "40", fuel_type="EVO 100+").status_code == 303  # bez stanice
+    record = db.query(FuelRecord).filter_by(station_name="MOL Brno").one()
+    r = post(client, f"/fuel-records/{record.id}/edit", {
+        "vehicle_id": vid, "refuel_date": date.today().isoformat(), "refuel_time": "12:00", "odometer": 1000,
+        "fuel_type": "EVO 100+", "volume_liters": "40", "unit_price": "40", "currency_code": "CZK",
+        "full_tank": "on", "station_name": "KM-PRONA"})
+    assert r.status_code == 400 and "jen pro pumpy MOL" in r.text

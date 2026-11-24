@@ -71,6 +71,25 @@ class FuelTypeService:
             raise ValidationError("Seznam pump je příliš dlouhý.")
         return text or None
 
+    def check_station(self, user, fuel_name, station_name):
+        """Palivo omezené na značky pump nejde zapsat u jiné pumpy (prázdná stanice = bez kontroly)."""
+        if not (station_name or "").strip():
+            return
+        item = self._find(user, fuel_name)
+        if item is None or not item.brands:
+            return
+        brand = station_brand(station_name)
+        if brand.lower() not in {b.lower() for b in item.brands}:
+            raise ValidationError(
+                f"Palivo „{item.name}“ je nastavené jen pro pumpy {', '.join(item.brands)} – "
+                f"„{station_name.strip()}“ je {brand}. Zvolte jiné palivo nebo upravte nastavení paliv.")
+
+    @staticmethod
+    def brands_from_form(form_data):
+        """Zaškrtnuté značky (station_brand) + další dopsané (station_brands) -> text pro clean_brands."""
+        parts = list(form_data.getlist("station_brand")) + [form_data.get("station_brands") or ""]
+        return ",".join(p for p in parts if p and p.strip())
+
     def brand_suggestions(self, user):
         """Značky pump pro našeptávání: známé značky + značky stanic, kde uživatel tankoval."""
         ids = VehicleService(self.session).get_accessible_ids(user)

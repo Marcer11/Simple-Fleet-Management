@@ -196,7 +196,9 @@ async def add_post(request: Request, user=Depends(get_current_user), db=Depends(
     vehicle_service = VehicleService(db)
     try:
         data = _read_form(form)
-        data["fuel_type"], data["fuel_category"] = FuelTypeService(db).resolve(user, data["fuel_type"])
+        fuel_types = FuelTypeService(db)
+        data["fuel_type"], data["fuel_category"] = fuel_types.resolve(user, data["fuel_type"])
+        fuel_types.check_station(user, data["fuel_type"], data["station_name"])
         vehicle = vehicle_service.get_vehicle_for_user(data["vehicle_id"], user, ROLE_EDITOR)
         record = FuelRecordService(db).create_fuel_record(**data, created_by_id=user.id)
     except (ValidationError, NotFoundError) as e:
@@ -246,7 +248,11 @@ async def edit_post(request: Request, record_id: int, user=Depends(get_current_u
     form = FormReader(await request.form())
     try:
         data = _read_form(form)
-        data["fuel_type"], data["fuel_category"] = FuelTypeService(db).resolve(user, data["fuel_type"])
+        fuel_types = FuelTypeService(db)
+        data["fuel_type"], data["fuel_category"] = fuel_types.resolve(user, data["fuel_type"])
+        # starší záznam jde upravit i bez změny paliva a pumpy (nastavení paliv mohlo vzniknout později)
+        if (data["fuel_type"], data["station_name"] or "") != (record.fuel_type, record.station_name or ""):
+            fuel_types.check_station(user, data["fuel_type"], data["station_name"])
         # při přesunu na jiné vozidlo musí mít uživatel právo i k cílovému vozidlu
         vehicle = VehicleService(db).get_vehicle_for_user(data["vehicle_id"], user, ROLE_EDITOR)
         service.update_fuel_record(record, data)

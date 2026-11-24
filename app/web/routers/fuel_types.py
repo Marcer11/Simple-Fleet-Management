@@ -28,7 +28,8 @@ def _page(request, db, user, status_code=200, error=None, values=None):
     return render(request, "fuel_types/list.html", status_code=status_code, error=error,
                   items=items, usage={t.id: usage.get(t.name.lower(), 0) for t in items},
                   categories=[(c, fuel_unit(c)) for c in FUEL_CATEGORIES], values=values or {},
-                  brands=service.brand_suggestions(user))
+                  brands=sorted(set(service.brand_suggestions(user)) | {b for t in items for b in t.brands},
+                                key=str.lower))
 
 
 @router.get("")
@@ -38,13 +39,15 @@ async def list_fuel_types(request: Request, user=Depends(get_current_user), db=D
 
 @router.post("/add")
 async def add_fuel_type(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
-    form = FormReader(await request.form())
+    form_data = await request.form()
+    form = FormReader(form_data)
     try:
         item = FuelTypeService(db).create(user, form.raw.get("name"), form.raw.get("category"),
-                                          form.raw.get("station_brands"))
+                                          FuelTypeService.brands_from_form(form_data))
     except ValidationError as e:
         db.rollback()
-        return _page(request, db, user, 400, str(e), values=form.values)
+        return _page(request, db, user, 400, str(e),
+                     values={**form.values, "station_brands": FuelTypeService.brands_from_form(form_data)})
     flash(request, f"Palivo „{item.name}“ bylo přidáno.")
     return RedirectResponse("/fuel-types", status_code=303)
 
@@ -53,10 +56,11 @@ async def add_fuel_type(request: Request, user=Depends(get_current_user), db=Dep
 async def edit_fuel_type(request: Request, fuel_type_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     service = FuelTypeService(db)
     item = service.get(user, fuel_type_id)
-    form = FormReader(await request.form())
+    form_data = await request.form()
+    form = FormReader(form_data)
     try:
         changed = service.update(user, item, form.raw.get("name"), form.raw.get("category"),
-                                 form.raw.get("station_brands"))
+                                 FuelTypeService.brands_from_form(form_data))
     except ValidationError as e:
         db.rollback()
         return _page(request, db, user, 400, str(e))

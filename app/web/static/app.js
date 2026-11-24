@@ -671,6 +671,18 @@
         sync();
     });
 
+    // Výběr pump u paliva: souhrn vybraných značek v záhlaví
+    document.querySelectorAll(".brand-pick").forEach(function (pick) {
+        const summary = pick.querySelector("summary");
+        const sync = function () {
+            const chosen = Array.from(pick.querySelectorAll('input[type="checkbox"]:checked')).map(function (c) { return c.value; });
+            const extra = pick.querySelector('input[type="text"]').value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+            summary.textContent = chosen.concat(extra).join(", ") || summary.getAttribute("data-empty");
+        };
+        pick.addEventListener("change", sync);
+        pick.addEventListener("input", sync);
+    });
+
     // Detail události na časové ose: klik zobrazí celý text
     document.addEventListener("click", function (event) {
         const detail = event.target.closest(".tl-detail");

@@ -87,7 +87,7 @@ def test_fuel_station_brands(app, db):
     assert FuelTypeService.clean_brands("") is None
     page = client.get("/fuel-records/add").text
     assert '"brands": ["ORLEN", "Shell"]' in page and '"name": "Verva 100"' in page
-    assert 'list="brand-list"' in client.get("/fuel-types").text
+    assert 'name="station_brand" value="Shell" checked' in client.get("/fuel-types").text
 
 
 def test_note_odometer_order(app, db):

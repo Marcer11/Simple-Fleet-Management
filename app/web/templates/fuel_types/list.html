@@ -1,6 +1,23 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Paliva{% endblock %}
+{# Výběr více značek pump: zaškrtávátka + pole pro další značku. form_id = atribut form (řádek tabulky) #}
+{% macro brand_picker(selected, form_id=none, open=false) -%}
+{%- set chosen = selected|map("lower")|list %}
+{%- set fattr = (' form="' ~ form_id ~ '"')|safe if form_id else "" %}
+<details class="brand-pick"{% if open %} open{% endif %}>
+    <summary data-empty="všechny pumpy">{{ selected|join(", ") or "všechny pumpy" }}</summary>
+    <div class="brand-pick-panel">
+        {% for b in brands %}
+        <label class="check"><input type="checkbox"{{ fattr }} name="station_brand" value="{{ b }}"{% if b|lower in chosen %} checked{% endif %}> {{ b }}</label>
+        {% endfor %}
+        <label class="brand-other small">Další pumpa
+            <input type="text"{{ fattr }} name="station_brands" maxlength="100" autocomplete="off" title="Víc pump oddělte čárkou">
+        </label>
+    </div>
+</details>
+{%- endmacro %}
+
 {% block content %}
 <div class="page-head">
     <div>
@@ -11,7 +28,6 @@
 </div>
 
 <div class="card">
-    {{ m.datalist("brand-list", brands) }}
     <div class="table-wrap">
     <table class="fuel-types">
         <thead><tr><th>Název</th><th>Druh</th><th>Pumpy</th><th class="num">Tankování</th><th></th></tr></thead>
@@ -28,11 +44,7 @@
                     <option value=""{% if not t.category %} selected{% endif %}>Jiné – vlastní spotřeba</option>
                 </select>
             </td>
-            <td>
-                <input type="text" form="ft-{{ t.id }}" name="station_brands" value="{{ t.brands|join(', ') }}"
-                       maxlength="255" list="brand-list" autocomplete="off"
-                       aria-label="Pumpy pro {{ t.name }}">
-            </td>
+            <td class="brand-cell">{{ brand_picker(t.brands, "ft-%d"|format(t.id)) }}</td>
             <td class="num">{{ usage[t.id] or "–" }}</td>
             <td class="actions-cell">
                 <form id="ft-{{ t.id }}" method="post" action="/fuel-types/{{ t.id }}/edit" class="inline-form">
@@ -63,7 +75,10 @@
                     <option value=""{% if values.get('category') == '' %} selected{% endif %}>Jiné – vlastní spotřeba</option>
                 </select>
             </div>
-            {{ m.field("station_brands", "Pumpy", maxlength=255, list="brand-list", autocomplete="off") }}
+            <div class="field field-wide">
+                <span class="label-like">Pumpy</span>
+                {{ brand_picker(values.get("station_brands", "").split(",")|select|list) }}
+            </div>
         </div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Přidat</button></div>
     </form>

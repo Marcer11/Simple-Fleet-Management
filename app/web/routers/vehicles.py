@@ -32,6 +32,8 @@ def _vehicle_values(vehicle):
         "tire_sizes": vehicle.tire_sizes or "", "is_rental": "on" if vehicle.is_rental else "",
         "lender": vehicle.lender or "",
         "fuel": vehicle.fuel or "", "alt_fuel": vehicle.alt_fuel or "",
+        "out_of_order": "on" if vehicle.out_of_order else "",
+        "out_of_order_since": iso(vehicle.out_of_order_since), "out_of_order_reason": vehicle.out_of_order_reason or "",
         "purchase_odometer": iso(vehicle.purchase_odometer), "sale_odometer": iso(vehicle.sale_odometer),
     }
 
@@ -62,6 +64,11 @@ def _read_vehicle_form(form):
         "fuel": form.str("fuel", "Palivo"),
         "alt_fuel": form.str("alt_fuel", "Alternativní palivo"),
     }
+    out_of_order = form.bool("out_of_order")
+    since = form.date("out_of_order_since", "Nepojízdné od")
+    reason = form.str("out_of_order_reason", "Důvod nepojízdnosti", max_len=200)
+    data["out_of_order_since"] = (since or date.today()) if out_of_order else None
+    data["out_of_order_reason"] = reason if out_of_order else None
     form.check()
     return data
 

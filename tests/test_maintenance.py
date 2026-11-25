@@ -93,3 +93,39 @@ def test_vehicle_list_status_icons(app, db):
     db.expire_all()
     assert not db.get(ServiceRecord, record.id).in_progress and db.get(Vehicle, car).active_service is None
     assert 'class="in-service"' not in client.get("/vehicles").text
+
+
+def test_vehicle_out_of_order(app, db):
+    from datetime import date as _date
+    from models import Vehicle
+    from test_api import new_key, vehicles_api
+    client = register(app, "ooo@example.com")
+    car = add_vehicle(client, license_plate="9OO0001", out_of_order="on", out_of_order_reason="nestartuje")
+    v = db.get(Vehicle, car)
+    assert v.out_of_order_since == _date.today() and v.out_of_order_reason == "nestartuje"
+    html = client.get("/vehicles").text
+    assert ">Nepojízdné</span>" in html and "nestartuje" in html
+    assert "Nepojízdné od" in client.get(f"/vehicles/{car}").text
+    assert 'id="f-out_of_order" name="out_of_order" value="on" checked' in client.get(f"/vehicles/{car}/edit").text
+    item = vehicles_api(app, new_key(client)).json()["vehicles"][0]
+    assert item["out_of_order"] == {"since": _date.today().isoformat(), "reason": "nestartuje"}
+
+    # zrušení zaškrtnutím v úpravě vozidla smaže i důvod
+    r = post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia", "out_of_order_reason": "x"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    assert (v.out_of_order_since, v.out_of_order_reason) == (None, None)
+
+    # vyzvednutím ze servisu je zase pojízdné (předání do servisu samo nestačí)
+    post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia", "out_of_order": "on",
+                                           "out_of_order_since": "2026-03-01"})
+    base = {"vehicle_id": car, "st:Brzdy": "on", "currency_code": "CZK", "service_date": "2026-03-02"}
+    assert post(client, "/services/add", {**base, "in_progress": "on"}).status_code == 303
+    db.expire_all()
+    assert v.out_of_order
+    from models import ServiceRecord
+    record = db.query(ServiceRecord).one()
+    assert post(client, f"/services/{record.id}/edit", {**base, "date_to": "2026-03-04"}).status_code == 303
+    db.expire_all()
+    assert not v.out_of_order
+    assert item is not None and ">Nepojízdné</span>" not in client.get("/vehicles").text

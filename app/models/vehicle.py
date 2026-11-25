@@ -48,6 +48,8 @@ class Vehicle(Base):
     # Půjčené vozidlo (z půjčovny nebo od známých) - k němu se evidují jednotlivá půjčení
     is_rental = Column(Boolean, nullable=False, default=False, server_default="0")
     lender = Column(String(100), nullable=True)             # koho je půjčené auto (půjčovna / od koho)
+    out_of_order_since = Column(Date, nullable=True)        # nepojízdné od (např. porucha před servisem); None = pojízdné
+    out_of_order_reason = Column(String(200), nullable=True)
     # Povolené rozměry pneumatik dle technického průkazu - jeden na řádek ("205/55 R16 91V")
     tire_sizes = Column(String(500), nullable=True)
 
@@ -102,6 +104,15 @@ class Vehicle(Base):
     @property
     def tire_size_list(self):
         return [line.strip() for line in (self.tire_sizes or "").splitlines() if line.strip()]
+
+    @property
+    def out_of_order(self):
+        return self.out_of_order_since is not None
+
+    @property
+    def out_of_order_text(self):
+        text = f"Nepojízdné od {self.out_of_order_since:%d.%m.%Y}" if self.out_of_order_since else ""
+        return text + (f" – {self.out_of_order_reason}" if text and self.out_of_order_reason else "")
 
     @property
     def active_service(self):

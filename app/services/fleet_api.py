@@ -211,6 +211,8 @@ def vehicles(session, user, only_active=True):
             "vignette": {"status": vignette[0], "date": _iso(vignette[1])} if vignette else None,
             "is_rental": bool(v.is_rental),
             "lender": v.lender,
+            "out_of_order": {"since": _iso(v.out_of_order_since), "reason": v.out_of_order_reason}
+            if v.out_of_order else None,
             "rental": {
                 "from": _iso(datetime.combine(rental.date_from, rental.time_from) if rental.time_from
                              else rental.date_from),

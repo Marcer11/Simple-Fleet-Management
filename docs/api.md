@@ -76,6 +76,7 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "vignette": {"status": "valid", "date": "2027-02-28"},
       "is_rental": false,
       "lender": null,
+      "out_of_order": null,
       "rental": null,
       "last_record": "2026-11-20",
       "note": "Servisní knížka v příruční schránce",
@@ -114,6 +115,7 @@ Vozidla jsou seřazená: nejdřív aktivní, pak ostatní; v rámci skupiny podl
       "vignette": null,
       "is_rental": true,
       "lender": "Půjčovna AutoPraha",
+      "out_of_order": {"since": "2026-11-24", "reason": "nestartuje"},
       "rental": {"from": "2026-05-01T08:30:00", "to": "2026-05-04"},
       "last_record": "2026-05-04",
       "note": null,
@@ -155,6 +157,7 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `vignette` | česká dálniční známka podle zapsaných výdajů, nebo `null`, když žádná není zapsaná. `status`: `valid` (platí, `date` = poslední den platnosti), `expiring` (platí, ale končí do 7 dní), `future` (koupená dopředu, `date` = první den platnosti), `expired` (`date` = poslední den poslední známky) |
 | `is_rental` | půjčené vozidlo (půjčovna, od známého) |
 | `lender` | koho auto je – půjčovna nebo od koho je půjčené (text tak, jak je zapsaný u vozidla); u vlastních vozidel `null` |
+| `out_of_order` | vozidlo je nepojízdné (např. mezi poruchou a servisem): `since` (datum `YYYY-MM-DD`, od kdy), `reason` (důvod, nebo `null`); pojízdné vozidlo má `null`. Zápisem vyzvednutí ze servisu se nepojízdnost sama ukončí |
 | `rental` | jen u půjčeného vozidla: poslední půjčení. `from` a `to` (datum `YYYY-MM-DD`, nebo datum a čas `YYYY-MM-DDTHH:MM:SS`, když je čas zapsaný; `to` je `null`, dokud není vráceno) |
 | `last_record` | datum posledního záznamu u vozidla (tankování, servis, výdaj, poznámka, pneumatiky, půjčení, nákup / prodej), jen do dneška |
 | `note` | poznámka v údajích vozidla (jeden text, např. kde je servisní knížka) |

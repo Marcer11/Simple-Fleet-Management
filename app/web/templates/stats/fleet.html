@@ -75,23 +75,7 @@
 <div class="viz-root">
 {% if summary.charts.monthly_labels %}
 <div class="card">
-    <h2>Náklady po měsících (Kč)</h2>
-    <div class="chart-box"><canvas id="chart-monthly" role="img" aria-label="Měsíční náklady všech vozidel podle kategorie"></canvas></div>
-    <details style="margin-top: 10px">
-        <summary class="small">Zobrazit jako tabulku</summary>
-        <div class="table-wrap">
-        <table>
-            <thead><tr><th>Měsíc</th><th class="num">Palivo</th><th class="num">Servis</th><th class="num">Výdaje</th>{% if summary.rental_cost %}<th class="num">Půjčovné</th>{% endif %}<th class="num">Celkem</th></tr></thead>
-            <tbody>
-            {% for label in summary.charts.monthly_labels %}
-            {% set i = loop.index0 %}
-            {% set f, s, e, rr = summary.charts.monthly_fuel[i], summary.charts.monthly_service[i], summary.charts.monthly_expense[i], summary.charts.monthly_rental[i] %}
-            <tr><td>{{ label }}</td><td class="num">{{ f|num(0) }}</td><td class="num">{{ s|num(0) }}</td><td class="num">{{ e|num(0) }}</td>{% if summary.rental_cost %}<td class="num">{{ rr|num(0) }}</td>{% endif %}<td class="num">{{ (f + s + e + rr)|num(0) }}</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        </div>
-    </details>
+    {{ m.costs_card(summary, "Náklady všech vozidel podle kategorie") }}
 </div>
 {% endif %}
 
@@ -128,12 +112,12 @@
 {% block scripts %}
 {% if summary.rows %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/charts.js?v=7"></script>
+<script src="/static/charts.js?v=8"></script>
 <script>
 (function () {
     const data = SfmCharts.readData();
     if (!data || !window.Chart) return;
-    SfmCharts.monthlyCosts("chart-monthly", data);
+    SfmCharts.periodSwitch("chart-monthly", (period) => SfmCharts.monthlyCosts("chart-monthly", data, period));
     SfmCharts.odometerChart("chart-odometer", data.odometer, "zero", data.odometer_rental);
     SfmCharts.timeChart("chart-price", data.unit_price, {
         decimals: 2, unit: "Kč", thin: true, withTime: true, valueSuffix: (pt) => `Kč/${pt.unit}`,

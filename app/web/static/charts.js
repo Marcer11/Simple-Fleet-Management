@@ -174,10 +174,14 @@ window.SfmCharts = (function () {
         });
     }
 
-    // Skládaný sloupcový graf měsíčních nákladů (palivo / servis / výdaje)
-    function monthlyCosts(id, data) {
+    // Skládaný sloupcový graf nákladů (palivo / servis / výdaje) po měsících nebo po letech (period = "year")
+    function monthlyCosts(id, data, period) {
         const el = document.getElementById(id);
         if (!el || !window.Chart) return;
+        if (period === "year") {
+            data = { monthly_labels: data.yearly_labels, monthly_fuel: data.yearly_fuel, monthly_service: data.yearly_service,
+                     monthly_expense: data.yearly_expense, monthly_rental: data.yearly_rental };
+        }
         const p = setup();
         const mk = (label, values, color) => ({
             label, data: values, backgroundColor: color,
@@ -283,5 +287,22 @@ window.SfmCharts = (function () {
         return el ? JSON.parse(el.textContent) : null;
     }
 
-    return { lineChart, timeChart, monthlyCosts, monthlyBars, odometerChart, unitOf, readData };
+    // Přepínač po měsících / po letech: tlačítka data-chart-period="<id>" data-period="month|year",
+    // tabulky data-period-table="<id>" data-period="…"; draw(period) vrátí nový graf
+    function periodSwitch(id, draw) {
+        const buttons = document.querySelectorAll('[data-chart-period="' + id + '"]');
+        const tables = document.querySelectorAll('[data-period-table="' + id + '"]');
+        let chart = null;
+        function show(period) {
+            if (chart) chart.destroy();
+            chart = draw(period);
+            buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.period === period)));
+            tables.forEach((t) => { t.hidden = t.dataset.period !== period; });
+        }
+        buttons.forEach((b) => b.addEventListener("click", () => show(b.dataset.period)));
+        const pressed = Array.from(buttons).find((b) => b.getAttribute("aria-pressed") === "true");
+        show(pressed ? pressed.dataset.period : "month");
+    }
+
+    return { lineChart, timeChart, monthlyCosts, monthlyBars, odometerChart, periodSwitch, unitOf, readData };
 })();

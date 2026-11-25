@@ -175,6 +175,43 @@
 <svg class="icon {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"{% if label %} role="img" aria-label="{{ label }}"><title>{{ label }}</title>{% else %} aria-hidden="true">{% endif %}{{ ICON_PATHS.get(name, ICON_PATHS["note"])|safe }}</svg>
 {%- endmacro %}
 
+{# Přepínač grafu po měsících / po letech (viz SfmCharts.periodSwitch); delší období začíná po letech #}
+{% macro period_default(labels) -%}{{ "year" if labels|length > 36 else "month" }}{%- endmacro %}
+
+{% macro period_switch(id, default) -%}
+<div class="seg" role="group" aria-label="Období grafu">
+    <button type="button" class="btn btn-sm" data-chart-period="{{ id }}" data-period="month" aria-pressed="{{ 'true' if default == 'month' else 'false' }}">Po měsících</button>
+    <button type="button" class="btn btn-sm" data-chart-period="{{ id }}" data-period="year" aria-pressed="{{ 'true' if default == 'year' else 'false' }}">Po letech</button>
+</div>
+{%- endmacro %}
+
+{% macro costs_card(summary, label) -%}
+{% set c = summary.charts %}
+{% set default = period_default(c.monthly_labels) %}
+<div class="card-head">
+    <h2>Náklady (Kč)</h2>
+    {{ period_switch("chart-monthly", default) }}
+</div>
+<div class="chart-box"><canvas id="chart-monthly" role="img" aria-label="{{ label }}"></canvas></div>
+<details style="margin-top: 10px">
+    <summary class="small">Zobrazit jako tabulku</summary>
+    {% for period, prefix, head in (("month", "monthly", "Měsíc"), ("year", "yearly", "Rok")) %}
+    <div class="table-wrap" data-period-table="chart-monthly" data-period="{{ period }}"{% if period != default %} hidden{% endif %}>
+    <table>
+        <thead><tr><th>{{ head }}</th><th class="num">Palivo</th><th class="num">Servis</th><th class="num">Výdaje</th>{% if summary.rental_cost %}<th class="num">Půjčovné</th>{% endif %}<th class="num">Celkem</th></tr></thead>
+        <tbody>
+        {% for label in c[prefix ~ "_labels"] %}
+        {% set i = loop.index0 %}
+        {% set f, s, e, rr = c[prefix ~ "_fuel"][i], c[prefix ~ "_service"][i], c[prefix ~ "_expense"][i], c[prefix ~ "_rental"][i] %}
+        <tr><td>{{ label }}</td><td class="num">{{ f|num(0) }}</td><td class="num">{{ s|num(0) }}</td><td class="num">{{ e|num(0) }}</td>{% if summary.rental_cost %}<td class="num">{{ rr|num(0) }}</td>{% endif %}<td class="num">{{ (f + s + e + rr)|num(0) }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endfor %}
+</details>
+{%- endmacro %}
+
 {% macro role_badge(role) -%}
 {% if role and role != 'owner' %}<span class="badge badge-info" title="Sdílené vozidlo">Sdíleno · {{ role_labels[role] }}</span>{% endif %}
 {%- endmacro %}

@@ -25,6 +25,20 @@ def _months_range(start, end):
     return keys
 
 
+def _by_year(labels, *series):
+    """Měsíční řady ('YYYY-MM') sečtené po letech: (roky, řada, …)."""
+    years = list(OrderedDict.fromkeys(label[:4] for label in labels))
+    index = {year: i for i, year in enumerate(years)}
+    result = [years]
+    for values in series:
+        sums = [0] * len(years)
+        for label, value in zip(labels, values):
+            sums[index[label[:4]]] += value
+        result.append([round(v, 2) for v in sums])
+    return result
+
+
+
 class StatsService:
     def __init__(self, session):
         self.session = session
@@ -181,15 +195,15 @@ class StatsService:
             first, last = readings[0][0], readings[-1][0]
             start = max(first, date_from) if date_from else first
             end = min(last, date_to) if date_to else last
-            if (end.year - start.year) * 12 + end.month - start.month > 35:
-                start = add_months(date(end.year, end.month, 1), -35)
             for key in _months_range(start, end) if start <= end else []:
                 month_start = date(int(key[:4]), int(key[5:]), 1)
                 month_end = add_months(month_start, 1)
                 km = self._odometer_at(readings, min(month_end, last)) - self._odometer_at(readings, max(month_start, first))
                 labels.append(key)
                 values.append(max(round(km), 0))
-        return {"odometer": points, "monthly_km_labels": labels, "monthly_km": values}
+        years, yearly = _by_year(labels, values)
+        return {"odometer": points, "monthly_km_labels": labels, "monthly_km": values,
+                "yearly_km_labels": years, "yearly_km": yearly}
 
     @staticmethod
     def _odometer_at(readings, day):
@@ -226,9 +240,6 @@ class StatsService:
             end = date_to or max(max(dates), date.today())
             if end < start:
                 end = start
-            # Omezíme na posledních 36 měsíců, aby graf zůstal čitelný
-            if (end.year - start.year) * 12 + end.month - start.month > 36:
-                start = add_months(date(end.year, end.month, 1), -35)
             for key in _months_range(start, end):
                 monthly[key] = {"fuel": 0.0, "service": 0.0, "expense": 0.0, "rental": 0.0}
             for f in fuel:
@@ -248,7 +259,7 @@ class StatsService:
                 if key in monthly:
                     monthly[key]["rental"] += float(r.price_local or 0)
 
-        return {
+        charts = {
             "consumption": dict(consumption_series),
             "unit_price": price_series,
             "monthly_labels": list(monthly.keys()),
@@ -257,6 +268,10 @@ class StatsService:
             "monthly_expense": [round(v["expense"], 2) for v in monthly.values()],
             "monthly_rental": [round(v["rental"], 2) for v in monthly.values()],
         }
+        (charts["yearly_labels"], charts["yearly_fuel"], charts["yearly_service"], charts["yearly_expense"],
+         charts["yearly_rental"]) = _by_year(charts["monthly_labels"], charts["monthly_fuel"], charts["monthly_service"],
+                                             charts["monthly_expense"], charts["monthly_rental"])
+        return charts
 
     def year_costs(self, vehicle_ids, year):
         """Náklady za rok v CZK podle vozidla: {vehicle_id: Decimal}."""
@@ -344,7 +359,9 @@ class StatsService:
         empty = {"rows": [], "fuel_cost": ZERO, "service_cost": ZERO, "expense_cost": ZERO, "rental_cost": ZERO,
                  "total_cost": ZERO, "distance": 0, "cost_per_km": None, "fuel_count": 0,
                  "charts": {"monthly_labels": [], "monthly_fuel": [], "monthly_service": [],
-                            "monthly_expense": [], "monthly_rental": [], "unit_price": {}, "odometer": {},
+                            "monthly_expense": [], "monthly_rental": [], "yearly_labels": [], "yearly_fuel": [],
+                            "yearly_service": [], "yearly_expense": [], "yearly_rental": [],
+                            "unit_price": {}, "odometer": {},
                             "odometer_rental": []}}
         if not ids:
             return empty

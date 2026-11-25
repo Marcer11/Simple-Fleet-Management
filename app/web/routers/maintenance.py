@@ -64,7 +64,11 @@ def _read_service(form):
     data = {
         "vehicle_id": form.int("vehicle_id", "Vozidlo", required=True),
         "service_date": form.date("service_date", "Datum", required=True),
+        "service_time": form.time("service_time", "Čas předání"),
         "odometer": form.int("odometer", "Stav tachometru", min_value=0),
+        "date_to": form.date("date_to", "Vyzvednuto"),
+        "time_to": form.time("time_to", "Čas vyzvednutí"),
+        "odometer_to": form.int("odometer_to", "Km při vyzvednutí", min_value=0),
         "service_type": service_type,
         "place": form.str("place", "Místo", max_len=100),
         "price_paid": form.decimal("price_paid", "Cena", min_value=0),
@@ -79,6 +83,7 @@ def _read_service(form):
     }
     form.check()
     _check_not_future(data["service_date"], "Datum servisu")
+    _check_not_future(data["date_to"], "Vyzvednutí ze servisu")
     return data
 
 
@@ -91,6 +96,9 @@ def _insurance_values(r):
 def _service_values(r):
     values = {
         "vehicle_id": str(r.vehicle_id), "service_date": iso(r.service_date), "odometer": iso(r.odometer),
+        "service_time": r.service_time.strftime("%H:%M") if r.service_time else "",
+        "date_to": iso(r.date_to), "time_to": r.time_to.strftime("%H:%M") if r.time_to else "",
+        "odometer_to": iso(r.odometer_to),
         "place": r.place or "", "price_paid": iso(r.price_paid),
         "currency_code": r.currency_code, "manual_rate": rate_from_record(r), "note": r.note or "",
         **_insurance_values(r),
@@ -144,11 +152,19 @@ async def list_services(request: Request, user=Depends(get_current_user), db=Dep
 async def export_services(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
     _, ids, date_from, date_to, filters = _list_filters(request, db, user)
     records = ServiceRecordService(db).search(ids, date_from, date_to, service_type=filters["service_type"])
-    rows = [(r.vehicle.display_name, r.service_date, r.odometer, r.service_type, r.place,
+    rows = [(r.vehicle.display_name, r.service_date, _hm(r.service_time), r.odometer,
+             r.date_to, _hm(r.time_to), r.odometer_to, r.duration, r.distance,
+             r.service_type, r.place,
              decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local),
              decimal_csv(r.insurance_paid), r.insurer, r.note) for r in records]
-    return csv_response("servis.csv", ["Vozidlo", "Datum", "Tachometr", "Typ", "Místo", "Cena", "Měna",
+    return csv_response("servis.csv", ["Vozidlo", "Datum", "Čas", "Tachometr", "Vyzvednuto", "Čas vyzvednutí",
+                                       "Km při vyzvednutí", "Doba v servisu", "Najel servis",
+                                       "Typ", "Místo", "Cena", "Měna",
                                        "Cena CZK", "Uhradila pojišťovna", "Pojišťovna", "Poznámka"], rows)
+
+
+def _hm(t):
+    return t.strftime("%H:%M") if t else None
 
 
 # ======================================================================

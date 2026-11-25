@@ -111,6 +111,9 @@ Smazání vozidla je schované dole ve formuláři úprav.
 - servisní záznamy (místo, cena v libovolné měně) – **více položek najednou** (olej, brzdy, STK, …
   zaškrtnutím, vlastní položky čárkou); pravidelný servis se počítá i od servisu, kde byla jeho položka
   jednou z více
+- **předání a vyzvednutí** ze servisu: datum, čas a km při předání i vyzvednutí – v seznamu servisu je vidět,
+  jak dlouho bylo vozidlo v servisu a kolik s ním servis najel; v časové ose je vícedenní servis jako
+  předání a vyzvednutí (vyzvednutí bez času na konci dne)
 - **pravidelný servis** – časový a/nebo kilometrový interval od posledního servisu daného typu;
   upozornění, když zbývá méně než 10 % intervalu, nebo po termínu
 - **pojistné plnění** u servisu i výdaje: nenápadné zaškrtávátko „Uplatněna pojistka“ u ceny zobrazí pole

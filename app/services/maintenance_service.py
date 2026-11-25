@@ -187,13 +187,29 @@ class ServiceRecordService(_RecordServiceBase):
         _ensure_vehicle(self.session, data.get("vehicle_id"))
         if not data.get("service_date"):
             raise ValidationError("Datum servisu je povinné.")
+        date_to = data.get("date_to") or None
+        service_time, time_to = data.get("service_time") or None, data.get("time_to") or None
+        if date_to and date_to < data["service_date"]:
+            raise ValidationError("Vyzvednutí ze servisu nemůže být před předáním.")
+        if time_to and not date_to:
+            raise ValidationError("K času vyzvednutí vyplňte i datum vyzvednutí.")
+        if date_to == data["service_date"] and service_time and time_to and time_to < service_time:
+            raise ValidationError("Čas vyzvednutí nemůže být před časem předání.")
+        km_from = _positive_int(data.get("odometer"), "Stav tachometru")
+        km_to = _positive_int(data.get("odometer_to"), "Km při vyzvednutí")
+        if km_from is not None and km_to is not None and km_to < km_from:
+            raise ValidationError("Km při vyzvednutí nemohou být menší než při předání.")
         manual_rate = data.pop("manual_rate", None)
         currency, price_paid, price_local = convert_price(
             data.get("price_paid"), data.get("currency_code"), data["service_date"], manual_rate)
         return {
             "vehicle_id": data["vehicle_id"],
             "service_date": data["service_date"],
-            "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
+            "service_time": service_time,
+            "odometer": km_from,
+            "date_to": date_to,
+            "time_to": time_to,
+            "odometer_to": km_to,
             "service_type": _clean_str(join_service_types([data.get("service_type") or ""]), 255,
                                        "Typ servisu", required=True),
             "place": _clean_str(data.get("place"), 100, "Místo"),

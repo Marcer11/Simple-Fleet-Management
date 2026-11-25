@@ -435,6 +435,9 @@ class StatsService:
         readings = [(r.refuel_datetime.date(), r.odometer) for r in fuel]
         readings += [(d, km) for d, km in self.session.query(ServiceRecord.service_date, ServiceRecord.odometer)
                      .filter(ServiceRecord.vehicle_id == vehicle_id, ServiceRecord.odometer.isnot(None))]
+        readings += [(d, km) for d, km in self.session.query(ServiceRecord.date_to, ServiceRecord.odometer_to)
+                     .filter(ServiceRecord.vehicle_id == vehicle_id, ServiceRecord.odometer_to.isnot(None),
+                             ServiceRecord.date_to.isnot(None))]
         readings += [(d, km) for d, km in self.session.query(Expense.expense_date, Expense.odometer)
                      .filter(Expense.vehicle_id == vehicle_id, Expense.odometer.isnot(None))]
         profile = {"refuel_count": len(fuel), "days_between": None, "per_month": None,

@@ -347,6 +347,8 @@ class VehicleService:
         from models import TireTreadCheck
         values.append(self.session.query(func.max(TireTreadCheck.odometer))
                       .filter(TireTreadCheck.vehicle_id == vehicle_id).scalar())
+        values.append(self.session.query(func.max(ServiceRecord.odometer_to))
+                      .filter(ServiceRecord.vehicle_id == vehicle_id).scalar())
         from models import VehicleRental
         values.append(self.session.query(func.max(VehicleRental.odometer_from))
                       .filter(VehicleRental.vehicle_id == vehicle_id).scalar())

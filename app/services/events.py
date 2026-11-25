@@ -186,11 +186,31 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         query = session.query(ServiceRecord).filter(ServiceRecord.vehicle_id.in_(ids))
         if tire_service_ids:
             query = query.filter(ServiceRecord.id.notin_(tire_service_ids))
-        for r in dated(query, ServiceRecord.service_date, False):
-            detail = " · ".join(x for x in (r.place, _insurance_text(r), (r.note or "").strip()) if x)
-            events.append(Event(KIND_SERVICE, _day(r.service_date), False, by_id[r.vehicle_id], r.service_type,
-                                detail, r.odometer, r.own_cost, f"/services/{r.id}/edit",
-                                icon=_service_icon(r.types)))
+        # předání a vyzvednutí jsou dvě události, pokud vozidlo zůstalo v servisu přes den
+        for r in query.all():
+            url = f"/services/{r.id}/edit"
+            more_days = r.date_to is not None and r.date_to > r.service_date
+            if in_range(_day(r.service_date)):
+                stay = []
+                if more_days:
+                    stay.append(f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}"
+                                + (f" {r.time_to:%H:%M}" if r.time_to else ""))
+                elif r.duration:
+                    stay.append(f"v servisu {r.duration}")
+                if not more_days and r.distance is not None:
+                    stay.append(f"servis najel {r.distance:,} km".replace(",", " "))
+                detail = " · ".join(x for x in (r.place, *stay, _insurance_text(r), (r.note or "").strip()) if x)
+                events.append(Event(KIND_SERVICE, datetime.combine(r.service_date, r.service_time or time(0, 0)),
+                                    r.service_time is not None, by_id[r.vehicle_id], r.service_type,
+                                    detail, r.odometer, r.own_cost, url, icon=_service_icon(r.types)))
+            if more_days and in_range(_day(r.date_to)):
+                parts = [f"v servisu {r.duration}"]
+                if r.distance is not None:
+                    parts.append(f"servis najel {r.distance:,} km".replace(",", " "))
+                title = "Vyzvednutí ze servisu" + (f" – {r.place}" if r.place else "")
+                events.append(Event(KIND_SERVICE, datetime.combine(r.date_to, r.time_to or time(0, 0)),
+                                    r.time_to is not None, by_id[r.vehicle_id], title, " · ".join(parts),
+                                    r.odometer_to, None, url, icon="return", end_of_day=True))
 
     if KIND_EXPENSE in kinds:
         query = session.query(Expense).filter(Expense.vehicle_id.in_(ids))

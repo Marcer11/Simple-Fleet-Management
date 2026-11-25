@@ -28,3 +28,42 @@ def test_service_with_multiple_items(app, db):
     # bez položky nejde uložit
     r = post(client, "/services/add", {"vehicle_id": car, "service_date": "2026-03-02", "currency_code": "CZK"})
     assert r.status_code == 400 and "alespoň jednu" in r.text
+
+
+def test_service_duration_and_distance(app, db):
+    from models import ServiceRecord, Vehicle
+    from services.events import collect_events
+    from services.vehicle_service import VehicleService
+    client = register(app, "svcdur@example.com")
+    car = add_vehicle(client)
+    base = {"vehicle_id": car, "st:Brzdy": "on", "currency_code": "CZK", "place": "Autoservis Novák"}
+    # přes několik dní s časy
+    r = post(client, "/services/add", {**base, "service_date": "2026-03-01", "service_time": "08:30", "odometer": "50000",
+                                       "date_to": "2026-03-03", "time_to": "15:00", "odometer_to": "50012"})
+    assert r.status_code == 303, r.text
+    record = db.query(ServiceRecord).one()
+    assert (record.duration, record.distance) == ("2 dny 6 h", 12)
+    assert VehicleService(db).get_current_odometer(car) == 50012
+    page = client.get("/services?all=1").text
+    assert "v servisu 2 dny 6 h" in page and "servis najel 12\u00a0km" in page
+    form = client.get(f"/services/{record.id}/edit").text
+    assert 'value="15:00"' in form and 'value="50012"' in form
+    # časová osa: předání a vyzvednutí
+    events = collect_events(db, [db.get(Vehicle, car)], kinds=["service"])
+    assert [e.title for e in events] == ["Vyzvednutí ze servisu – Autoservis Novák", "Brzdy"]
+    assert events[0].odometer == 50012 and "servis najel 12 km" in events[0].detail
+    assert events[1].when.hour == 8 and "do 3. 3. 2026 15:00" in events[1].detail
+    # v jednom dni: jedna událost, doba v hodinách; bez časů ve dnech
+    record.date_to, record.time_to, record.service_time = date(2026, 3, 1), None, None
+    db.commit()
+    assert record.duration == "1 den"
+    events = collect_events(db, [db.get(Vehicle, car)], kinds=["service"])
+    assert len(events) == 1 and "v servisu 1 den" in events[0].detail
+
+    # kontroly
+    for extra, error in [({"date_to": "2026-02-28"}, "před předáním"),
+                         ({"time_to": "10:00"}, "datum vyzvednutí"),
+                         ({"date_to": "2026-03-01", "service_time": "10:00", "time_to": "09:00"}, "před časem předání"),
+                         ({"odometer": "100", "odometer_to": "90"}, "menší než při předání")]:
+        r = post(client, "/services/add", {**base, "service_date": "2026-03-01", **extra})
+        assert r.status_code == 400 and error in r.text, extra

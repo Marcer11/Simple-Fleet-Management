@@ -63,11 +63,13 @@
         <tbody>
         {% for r in records %}
         <tr>
-            <td class="nowrap">{{ r.service_date|date }}</td>
+            <td class="nowrap">{{ r.service_date|date }}{% if r.service_time %} {{ r.service_time.strftime("%H:%M") }}{% endif %}
+                {%- if r.date_to and (r.date_to != r.service_date or r.time_to) %}<br><span class="muted small">do {% if r.date_to != r.service_date %}{{ r.date_to|date }} {% endif %}{% if r.time_to %}{{ r.time_to.strftime("%H:%M") }}{% endif %}</span>{% endif %}
+                {%- if r.duration %}<br><span class="muted small">v servisu {{ r.duration }}</span>{% endif %}</td>
             <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>
             <td>{{ r.service_type }}{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
             <td>{{ r.place or "" }}</td>
-            <td class="num">{{ r.odometer|km }}</td>
+            <td class="num">{{ r.odometer|km }}{% if r.distance is not none %}<br><span class="muted small">servis najel {{ r.distance|km }}</span>{% endif %}</td>
             <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" and r.price_paid %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}{{ m.insurance_note(r) }}</td>
             <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/services/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
         </tr>

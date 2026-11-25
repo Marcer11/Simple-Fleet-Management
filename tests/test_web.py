@@ -247,6 +247,7 @@ def test_fuel_filter_dates(app, db):
 
 def test_vignette_reminder(app, db):
     from models import Expense, Reminder
+    from services.maintenance_service import vignette_valid_until
 
     client = register(app, "v@example.com")
     vid = add_vehicle(client)
@@ -255,7 +256,8 @@ def test_vignette_reminder(app, db):
             "price_paid": "2570", "vignette_variant": "year", "valid_from": start.isoformat(), "remind": "on"}
     assert post(client, "/expenses/add", data).status_code == 303
     first = db.query(Expense).one()
-    assert first.valid_until == start + timedelta(days=364)
+    assert first.valid_until == vignette_valid_until(start, "year")
+    assert client.get(f"/expenses/{first.id}/edit").text.count('<option value="year" selected') == 1
     reminder = db.get(Reminder, first.reminder_id)
     assert reminder.due_date == first.valid_until and not reminder.is_done
     assert "Dálniční známka" in client.get(f"/vehicles/{vid}").text
@@ -272,7 +274,7 @@ def test_vignette_reminder(app, db):
     db.expire_all()
     assert db.get(Reminder, reminder.id).is_done
     renewal = db.query(Expense).order_by(Expense.id.desc()).first()
-    assert db.get(Reminder, renewal.reminder_id).due_date == renewal_start + timedelta(days=364)
+    assert db.get(Reminder, renewal.reminder_id).due_date == vignette_valid_until(renewal_start, "year")
 
     # smazání výdaje smaže jeho otevřenou upomínku
     renewal_reminder_id = renewal.reminder_id

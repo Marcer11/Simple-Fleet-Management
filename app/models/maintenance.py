@@ -45,7 +45,7 @@ VALIDITY_CATEGORIES = [VIGNETTE_CATEGORY, "Pojištění", "Parkování", "Daň"]
 
 # Česká elektronická dálniční známka: (popis, počet dní platnosti včetně prvního dne)
 VIGNETTE_VARIANTS = {
-    "year": ("Roční (365 dní)", 365),
+    "year": ("Roční (365 dní, s 29. únorem 366)", 365),
     "30d": ("30denní", 30),
     "10d": ("10denní", 10),
     "1d": ("Jednodenní", 1),

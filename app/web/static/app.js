@@ -161,8 +161,16 @@
         }
         function computeUntil() {
             if (!variant.value || !from.value) return;
-            const d = new Date(from.value + "T12:00:00");
+            const start = new Date(from.value + "T12:00:00");
+            const d = new Date(start);
             d.setDate(d.getDate() + days[variant.value] - 1);
+            if (variant.value === "year") {
+                // roční známka platí 366 dní, pokud období zahrnuje 29. únor
+                for (let y = start.getFullYear(); y <= d.getFullYear(); y++) {
+                    const leap = new Date(y, 1, 29, 12);
+                    if (leap.getMonth() === 1 && leap >= start && leap <= d) { d.setDate(d.getDate() + 1); break; }
+                }
+            }
             until.value = d.toISOString().slice(0, 10);
         }
         function refresh() {

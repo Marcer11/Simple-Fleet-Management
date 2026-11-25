@@ -243,7 +243,15 @@ def vignette_valid_until(valid_from, variant):
     """Poslední den platnosti dálniční známky (platí včetně prvního dne)."""
     if variant not in VIGNETTE_VARIANTS:
         raise ValidationError("Neplatný typ dálniční známky.")
-    return valid_from + timedelta(days=VIGNETTE_VARIANTS[variant][1] - 1)
+    until = valid_from + timedelta(days=VIGNETTE_VARIANTS[variant][1] - 1)
+    if variant == "year" and _includes_leap_day(valid_from, until):
+        until += timedelta(days=1)  # roční známka platí 366 dní, pokud období zahrnuje 29. únor
+    return until
+
+
+def _includes_leap_day(start, end):
+    return any(calendar.isleap(year) and start <= date(year, 2, 29) <= end
+               for year in range(start.year, end.year + 1))
 
 
 # Upozornit na konec platnosti tolik dní předem (krátké známky dřív nedává smysl)

@@ -121,3 +121,25 @@ def test_vehicle_fuel_and_lender_prefilled_from_records(tmp_path):
         _upgrade(conn)
         rows = conn.execute(text("SELECT id, fuel, alt_fuel, lender FROM vehicles ORDER BY id")).all()
     assert [tuple(r) for r in rows] == [(1, "Benzín", "LPG", None), (2, "Benzín", None, "AutoPraha")]
+
+
+def test_year_vignette_over_leap_day_fixed(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'vignette.db'}")
+    with engine.begin() as conn:
+        _upgrade(conn, "0020_vehicle_fuel")
+        conn.execute(text("INSERT INTO vehicles (id, brand, model, is_active, color_hex, is_rental)"
+                          " VALUES (1, 'Škoda', 'Octavia', 1, '#FFFFFF', 0)"))
+        conn.execute(text("INSERT INTO reminders (id, vehicle_id, title, due_date, repeat, notify_days_before,"
+                          " notify_km_before, is_done) VALUES (1, 1, 'Známka', '2024-11-17', 'none', 14, 0, 0)"))
+        for i, (start, end, reminder) in enumerate([("2023-11-19", "2024-11-17", 1),   # přes 29. 2. -> opravit
+                                                    ("2024-03-01", "2025-02-28", None),  # bez 29. 2.
+                                                    ("2024-02-25", "2024-03-05", None)]):  # 10denní
+            conn.execute(text("INSERT INTO expenses (id, vehicle_id, expense_date, category, price_paid, currency_code,"
+                              " valid_from, valid_until, reminder_id) VALUES"
+                              " (:id, 1, :s, 'Dálniční známka', 100, 'CZK', :s, :e, :r)"),
+                         {"id": i + 1, "s": start, "e": end, "r": reminder})
+        _upgrade(conn)
+        rows = conn.execute(text("SELECT valid_until FROM expenses ORDER BY id")).scalars().all()
+        due = conn.execute(text("SELECT due_date FROM reminders")).scalar()
+    assert [str(r) for r in rows] == ["2024-11-18", "2025-02-28", "2024-03-05"]
+    assert str(due) == "2024-11-18"

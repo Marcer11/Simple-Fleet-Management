@@ -38,3 +38,17 @@ def test_vignette_icon_in_vehicle_list(app, db):
     assert "<th>Známka</th>" in html
     assert "vignette-valid" in html and "vignette-expiring" in html and "vignette-expired" in html
     assert "Dálniční známka platí do" in html
+
+
+def test_year_vignette_over_leap_day():
+    from services.maintenance_service import vignette_valid_until as until
+    # období zahrnuje 29. únor -> 366 dní
+    assert until(date(2023, 11, 19), "year") == date(2024, 11, 18)
+    assert until(date(2024, 2, 29), "year") == date(2025, 2, 28)
+    assert until(date(2024, 1, 1), "year") == date(2024, 12, 31)
+    # bez 29. února 365 dní
+    assert until(date(2024, 3, 1), "year") == date(2025, 2, 28)
+    assert until(date(2023, 3, 1), "year") == date(2024, 2, 28)
+    assert until(date(2026, 11, 25), "year") == date(2027, 11, 24)
+    # krátké známky se nemění
+    assert until(date(2024, 2, 25), "10d") == date(2024, 3, 5)

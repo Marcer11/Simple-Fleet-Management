@@ -10,7 +10,7 @@ from models.maintenance import (
 from models.vehicle import ROLE_EDITOR
 from services.maintenance_service import (
     RentalService, DefaultIntervalService, ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
-    collect_alerts,
+    collect_alerts, vignette_valid_until,
 )
 from services.vehicle_service import VehicleService
 from web.common import (
@@ -452,8 +452,7 @@ def _guess_variant(e):
     """Typ známky u uloženého výdaje (podle délky platnosti), jinak vlastní platnost."""
     if e.category != VIGNETTE_CATEGORY or not (e.valid_from and e.valid_until):
         return ""
-    days = (e.valid_until - e.valid_from).days + 1
-    return next((key for key, (_, length) in VIGNETTE_VARIANTS.items() if length == days), "")
+    return next((key for key in VIGNETTE_VARIANTS if vignette_valid_until(e.valid_from, key) == e.valid_until), "")
 
 
 def _expense_defaults(vehicle_id):

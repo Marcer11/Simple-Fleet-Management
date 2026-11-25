@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
@@ -257,7 +258,8 @@ async def leave_vehicle(request: Request, vehicle_id: int, user=Depends(get_curr
 # ----------------------------------------------------------------------
 
 @router.get("/{vehicle_id}/stats")
-async def vehicle_stats(request: Request, vehicle_id: int, period: str = "12m",
+async def vehicle_stats(request: Request, vehicle_id: int, period: Optional[str] = None,
+                        date_from: Optional[str] = None, date_to: Optional[str] = None,
                         user=Depends(get_current_user), db=Depends(get_db)):
     service = VehicleService(db)
     vehicle = service.get_vehicle_for_user(vehicle_id, user)
@@ -269,8 +271,9 @@ async def vehicle_stats(request: Request, vehicle_id: int, period: str = "12m",
                    | {e.expense_date.year for e in vehicle.expenses}
                    | {today.year}, reverse=True)
 
-    period, date_from, date_to = parse_period(period, today)
+    period, date_from, date_to = parse_period(period, today, date_from, date_to)
 
     summary = stats_service.vehicle_summary(vehicle.id, date_from, date_to)
     return render(request, "vehicles/stats.html", vehicle=vehicle, summary=summary,
-                  breakdown=stats_service.fuel_breakdown(vehicle.id, date_from, date_to), period=period, years=years, role=service.get_role(vehicle, user))
+                  breakdown=stats_service.fuel_breakdown(vehicle.id, date_from, date_to), period=period, years=years, role=service.get_role(vehicle, user),
+                  date_from=date_from, date_to=date_to)

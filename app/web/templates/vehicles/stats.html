@@ -9,11 +9,7 @@
     </div>
 </div>
 
-<div class="tabs">
-    <a href="?period=12m" class="{% if period == '12m' %}active{% endif %}">Posledních 12 měsíců</a>
-    {% for y in years %}<a href="?period={{ y }}" class="{% if period == y|string %}active{% endif %}">{{ y }}</a>{% endfor %}
-    <a href="?period=all" class="{% if period == 'all' %}active{% endif %}">Celá historie</a>
-</div>
+{{ m.stats_period(period, years, date_from, date_to) }}
 
 <div class="kpis">
     <div class="kpi"><div class="label">Náklady celkem</div><div class="value">{{ summary.total_cost|czk(0) }}</div></div>

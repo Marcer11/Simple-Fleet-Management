@@ -56,7 +56,20 @@
             if (dateChanged() && dateInputs.every(function (i) { return plausibleDate(i.value); })) submit();
         }
 
+        // výběr s data-custom="<hodnota>": volba vlastního rozsahu jen ukáže pole od-do, odešle se až s daty
+        const customFields = form.querySelector("[data-custom-fields]");
         form.addEventListener("change", function (e) {
+            const custom = e.target.getAttribute && e.target.getAttribute("data-custom");
+            if (custom && customFields) {
+                const show = e.target.value === custom;
+                customFields.hidden = !show;
+                customFields.querySelectorAll("input").forEach(function (i) { i.disabled = !show; });
+                if (show) {
+                    const first = customFields.querySelector("input");
+                    if (first) first.focus();
+                    return;
+                }
+            }
             if (e.target.type === "date") {
                 clearTimeout(timer);
                 timer = setTimeout(trySubmitDates, 1200);

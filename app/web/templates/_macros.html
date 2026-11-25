@@ -216,6 +216,32 @@
 {% if role and role != 'owner' %}<span class="badge badge-info" title="Sdílené vozidlo">Sdíleno · {{ role_labels[role] }}</span>{% endif %}
 {%- endmacro %}
 
+{# Období statistik: výběr (12 měsíců / rok / celá historie / vlastní rozsah od–do) #}
+{% macro stats_period(period, years, date_from, date_to) -%}
+<form class="filters period-select" method="get" data-autosubmit>
+    <div class="field">
+        <label for="flt-period">Období</label>
+        <select id="flt-period" name="period" data-custom="custom">
+            <option value="12m"{% if period == "12m" %} selected{% endif %}>Posledních 12 měsíců</option>
+            {% for y in years %}<option value="{{ y }}"{% if period == y|string %} selected{% endif %}>{{ y }}</option>{% endfor %}
+            <option value="all"{% if period == "all" %} selected{% endif %}>Celá historie</option>
+            <option value="custom"{% if period == "custom" %} selected{% endif %}>Vlastní rozsah…</option>
+        </select>
+    </div>
+    <div class="contents" data-custom-fields{% if period != "custom" %} hidden{% endif %}>
+        <div class="field">
+            <label for="flt-from">Od</label>
+            <input id="flt-from" type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"{% if period != "custom" %} disabled{% endif %}>
+        </div>
+        <div class="field">
+            <label for="flt-to">Do</label>
+            <input id="flt-to" type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"{% if period != "custom" %} disabled{% endif %}>
+        </div>
+    </div>
+    <noscript><button class="btn" type="submit">Zobrazit</button></noscript>
+</form>
+{%- endmacro %}
+
 {% macro period_filter(action, vehicles, filters) -%}
 <form class="filters" method="get" action="{{ action }}" data-autosubmit>
     <div class="field">

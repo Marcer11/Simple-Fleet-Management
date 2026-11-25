@@ -174,6 +174,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
   upomínku konce platnosti, při zápisu nové známky tu starou uzavře a v detailu vozidla
   ukazuje, do kdy známka platí (odkaz „Obnovit“)
   - eDálnice veřejné API pro ověření platnosti nemají, platnost se proto počítá z nákupu
+- **období statistik** (vozidla i všech vozidel) se vybírá ve výběru: posledních 12 měsíců, jednotlivé roky,
+  celá historie nebo vlastní rozsah od–do (pole od–do se ukážou po volbě „Vlastní rozsah…“)
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
   průměrná spotřeba, grafy nákladů, spotřeby a ceny paliva (každé tankování)
 - **náklady a najeté km po měsících nebo po letech** (přepínač u grafu, i v tabulce) za celé zvolené období;

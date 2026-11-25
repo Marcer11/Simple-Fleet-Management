@@ -110,22 +110,11 @@ class ServiceRecord(InsuranceMixin, Base):
         """Jak dlouho bylo vozidlo v servisu (text), jen se zapsaným vyzvednutím."""
         if self.date_to is None:
             return None
+        from .out_of_order import days_text, duration_text
         if self.service_time is not None and self.time_to is not None:
-            minutes = int((datetime.combine(self.date_to, self.time_to)
-                           - datetime.combine(self.service_date, self.service_time)).total_seconds() // 60)
-            days, rest = divmod(minutes, 24 * 60)
-            hours, mins = divmod(rest, 60)
-            parts = [_days_text(days)] if days else []
-            if hours:
-                parts.append(f"{hours} h")
-            if mins and not days:
-                parts.append(f"{mins} min")
-            return " ".join(parts) or "0 min"
-        return _days_text((self.date_to - self.service_date).days + 1)
-
-
-def _days_text(days):
-    return f"{days} {'den' if days == 1 else ('dny' if 1 < days < 5 else 'dní')}"
+            return duration_text(datetime.combine(self.date_to, self.time_to)
+                                 - datetime.combine(self.service_date, self.service_time))
+        return days_text((self.date_to - self.service_date).days + 1)
 
 
 class ServiceInterval(Base):

@@ -221,24 +221,6 @@ class ServiceRecordService(_RecordServiceBase):
             **_insurance(data, price_local),
         }
 
-    def create(self, **data):
-        record = super().create(**data)
-        self._back_in_order(record)
-        return record
-
-    def update(self, record, data):
-        record = super().update(record, data)
-        self._back_in_order(record)
-        return record
-
-    def _back_in_order(self, record):
-        """Vyzvednutím ze servisu (po datu, od kdy je nepojízdné) je vozidlo zase pojízdné."""
-        vehicle = self.session.get(Vehicle, record.vehicle_id)
-        since = vehicle.out_of_order_since
-        if since is not None and record.date_to is not None and record.date_to >= since:
-            vehicle.out_of_order_since = vehicle.out_of_order_reason = None
-            self.session.commit()
-
     def search(self, vehicle_ids, date_from=None, date_to=None, service_type=None, **filters):
         """Filtr podle typu najde i servisy, kde byl typ jednou z více položek."""
         records = super().search(vehicle_ids, date_from, date_to, **filters)

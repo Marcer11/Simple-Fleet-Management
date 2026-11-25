@@ -48,8 +48,6 @@ class Vehicle(Base):
     # Půjčené vozidlo (z půjčovny nebo od známých) - k němu se evidují jednotlivá půjčení
     is_rental = Column(Boolean, nullable=False, default=False, server_default="0")
     lender = Column(String(100), nullable=True)             # koho je půjčené auto (půjčovna / od koho)
-    out_of_order_since = Column(Date, nullable=True)        # nepojízdné od (např. porucha před servisem); None = pojízdné
-    out_of_order_reason = Column(String(200), nullable=True)
     # Povolené rozměry pneumatik dle technického průkazu - jeden na řádek ("205/55 R16 91V")
     tire_sizes = Column(String(500), nullable=True)
 
@@ -106,13 +104,38 @@ class Vehicle(Base):
         return [line.strip() for line in (self.tire_sizes or "").splitlines() if line.strip()]
 
     @property
+    def out_of_order_periods(self):
+        """Období nepojízdnosti podle poznámek: [OutOfOrderPeriod] od nejstaršího, poslední může trvat."""
+        from models.out_of_order import out_of_order_periods
+        return out_of_order_periods(self)
+
+    @property
+    def out_of_order_note(self):
+        """Poznámka "Nepojízdné", která zatím neskončila, jinak None."""
+        periods = self.out_of_order_periods
+        return periods[-1].start if periods and periods[-1].end is None else None
+
+    @property
     def out_of_order(self):
-        return self.out_of_order_since is not None
+        return self.out_of_order_note is not None
+
+    @property
+    def out_of_order_since(self):
+        note = self.out_of_order_note
+        return note.note_datetime if note else None
+
+    @property
+    def out_of_order_reason(self):
+        note = self.out_of_order_note
+        return (note.text or "").strip() or None if note else None
 
     @property
     def out_of_order_text(self):
-        text = f"Nepojízdné od {self.out_of_order_since:%d.%m.%Y}" if self.out_of_order_since else ""
-        return text + (f" – {self.out_of_order_reason}" if text and self.out_of_order_reason else "")
+        note = self.out_of_order_note
+        if note is None:
+            return ""
+        return f"Nepojízdné od {note.note_datetime:%d.%m.%Y %H:%M}".replace(" 00:00", "") + (
+            f" – {self.out_of_order_reason}" if self.out_of_order_reason else "")
 
     @property
     def active_service(self):

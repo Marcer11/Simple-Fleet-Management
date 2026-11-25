@@ -61,7 +61,7 @@ class Event:
 
 
 # Ikona podle typu poznámky / kategorie výdaje / položky servisu (porovnává se malými písmeny)
-NOTE_ICONS = {"nehoda": "crash", "poškození": "warning", "garáž": "garage", "parkování": "parking",
+NOTE_ICONS = {"nehoda": "crash", "poškození": "warning", "nepojízdné": "stop", "opět pojízdné": "car", "garáž": "garage", "parkování": "parking",
               "půjčeno": "key", "vráceno": "key", "pneumatiky": "tire"}
 EXPENSE_ICONS = {"pojištění": "shield", "parkování": "parking", "dálniční známka": "road", "mýtné": "road",
                  "pokuta": "warning", "pneumatiky": "tire", "mytí": "wash"}
@@ -182,6 +182,14 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             events.append(Event(KIND_TIRES, _day(c.check_date), False, by_id[c.vehicle_id], "Kontrola dezénu",
                                 detail, c.odometer, None, f"/tire-checks/{c.id}/edit", icon="gauge"))
 
+    # konec nepojízdnosti (poznámka "Opět pojízdné" nebo vyzvednutí ze servisu) ukáže, jak dlouho trvala
+    ended = {}
+    if KIND_SERVICE in kinds or KIND_NOTE in kinds:
+        for v in vehicles:
+            for period in v.out_of_order_periods:
+                if period.end is not None:
+                    ended[period.end_key] = period
+
     if KIND_SERVICE in kinds:
         query = session.query(ServiceRecord).filter(ServiceRecord.vehicle_id.in_(ids))
         if tire_service_ids:
@@ -201,6 +209,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                     stay.append("zatím v servisu")
                 if not more_days and r.distance is not None:
                     stay.append(f"servis najel {r.distance:,} km".replace(",", " "))
+                if not more_days and ("service", r.id) in ended:
+                    stay.append(f"opět pojízdné (nepojízdné {ended['service', r.id].duration})")
                 detail = " · ".join(x for x in (r.place, *stay, _insurance_text(r), (r.note or "").strip()) if x)
                 events.append(Event(KIND_SERVICE, datetime.combine(r.service_date, r.service_time or time(0, 0)),
                                     r.service_time is not None, by_id[r.vehicle_id], r.service_type,
@@ -209,6 +219,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                 parts = [f"v servisu {r.duration}"]
                 if r.distance is not None:
                     parts.append(f"servis najel {r.distance:,} km".replace(",", " "))
+                if ("service", r.id) in ended:
+                    parts.append(f"opět pojízdné (nepojízdné {ended['service', r.id].duration})")
                 title = "Vyzvednutí ze servisu" + (f" – {r.place}" if r.place else "")
                 events.append(Event(KIND_SERVICE, datetime.combine(r.date_to, r.time_to or time(0, 0)),
                                     r.time_to is not None, by_id[r.vehicle_id], title, " · ".join(parts),
@@ -261,6 +273,9 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                  .filter(VehicleNote.vehicle_id.in_(ids)))
         for n in dated(query, VehicleNote.note_datetime, True):
             detail = (n.text or "").strip() if n.category else "\n".join((n.text or "").strip().split("\n")[1:])
+            if ("note", n.id) in ended:
+                length = f"nepojízdné {ended['note', n.id].duration}"
+                detail = f"{length} · {detail}" if detail else length
             if n.created_by:
                 detail = f"{detail} ({n.created_by.name})" if detail else n.created_by.name
             events.append(Event(KIND_NOTE, n.note_datetime, True, by_id[n.vehicle_id], n.title, detail,

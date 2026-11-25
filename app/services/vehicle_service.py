@@ -19,7 +19,7 @@ VEHICLE_FIELDS = (
     "brand", "model", "production_year", "color", "color_hex", "license_plate",
     "vin", "note", "purchase_date", "sale_date", "is_active", "purchase_price", "sale_price", "kind",
     "tire_sizes", "purchase_odometer", "sale_odometer", "is_rental", "engine_volume", "engine_power",
-    "lender", "fuel", "alt_fuel", "out_of_order_since", "out_of_order_reason",
+    "lender", "fuel", "alt_fuel",
 )
 
 
@@ -109,7 +109,7 @@ class VehicleService:
         data = {key: value for key, value in data.items() if key in VEHICLE_FIELDS}
         errors = []
 
-        for key in ("brand", "model", "color", "note", "lender", "out_of_order_reason"):
+        for key in ("brand", "model", "color", "note", "lender"):
             if key in data and isinstance(data[key], str):
                 data[key] = data[key].strip() or None
 
@@ -137,10 +137,6 @@ class VehicleService:
             errors.append("Alternativní palivo musí být jiné než hlavní.")
         if data.get("alt_fuel") and not data.get("fuel"):
             errors.append("K alternativnímu palivu vyberte i hlavní palivo.")
-        if "out_of_order_since" in data and not data["out_of_order_since"]:
-            data["out_of_order_since"], data["out_of_order_reason"] = None, None  # pojízdné = bez důvodu
-        if data.get("out_of_order_reason") and len(data["out_of_order_reason"]) > 200:
-            errors.append("Důvod nepojízdnosti: nejvýše 200 znaků.")
         if data.get("lender") and len(data["lender"]) > 100:
             errors.append("Koho auto je: nejvýše 100 znaků.")
 

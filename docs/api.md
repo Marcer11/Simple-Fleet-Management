@@ -157,7 +157,7 @@ Prázdné údaje jsou `null` (seznamy `[]`). Hodnota `0` je platná (např. tach
 | `vignette` | česká dálniční známka podle zapsaných výdajů, nebo `null`, když žádná není zapsaná. `status`: `valid` (platí, `date` = poslední den platnosti), `expiring` (platí, ale končí do 7 dní), `future` (koupená dopředu, `date` = první den platnosti), `expired` (`date` = poslední den poslední známky) |
 | `is_rental` | půjčené vozidlo (půjčovna, od známého) |
 | `lender` | koho auto je – půjčovna nebo od koho je půjčené (text tak, jak je zapsaný u vozidla); u vlastních vozidel `null` |
-| `out_of_order` | vozidlo je nepojízdné (např. mezi poruchou a servisem): `since` (datum `YYYY-MM-DD`, od kdy), `reason` (důvod, nebo `null`); pojízdné vozidlo má `null`. Zápisem vyzvednutí ze servisu se nepojízdnost sama ukončí |
+| `out_of_order` | vozidlo je nepojízdné (např. mezi poruchou a servisem): `since` (datum `YYYY-MM-DD`, od kdy), `reason` (důvod, nebo `null`); pojízdné vozidlo má `null`. Eviduje se poznámkami k vozidlu: začíná poznámkou „Nepojízdné“ (její text je `reason`), končí poznámkou „Opět pojízdné“ nebo zápisem vyzvednutí ze servisu |
 | `rental` | jen u půjčeného vozidla: poslední půjčení. `from` a `to` (datum `YYYY-MM-DD`, nebo datum a čas `YYYY-MM-DDTHH:MM:SS`, když je čas zapsaný; `to` je `null`, dokud není vráceno) |
 | `last_record` | datum posledního záznamu u vozidla (tankování, servis, výdaj, poznámka, pneumatiky, půjčení, nákup / prodej), jen do dneška |
 | `note` | poznámka v údajích vozidla (jeden text, např. kde je servisní knížka) |

@@ -95,37 +95,52 @@ def test_vehicle_list_status_icons(app, db):
     assert 'class="in-service"' not in client.get("/vehicles").text
 
 
-def test_vehicle_out_of_order(app, db):
-    from datetime import date as _date
-    from models import Vehicle
+def test_vehicle_out_of_order_notes(app, db):
+    from datetime import datetime
+    from models import Vehicle, ServiceRecord
+    from services.events import collect_events
     from test_api import new_key, vehicles_api
     client = register(app, "ooo@example.com")
-    car = add_vehicle(client, license_plate="9OO0001", out_of_order="on", out_of_order_reason="nestartuje")
+    car = add_vehicle(client, license_plate="9OO0001")
+    detail = client.get(f"/vehicles/{car}").text
+    assert "category=Nepojízdné" in detail and "Opět pojízdné</a>" not in detail
+
+    def note(day, hm, category, text=""):
+        r = post(client, "/notes/add", {"vehicle_id": car, "note_date": day, "note_time": hm,
+                                        "category": category, "text": text})
+        assert r.status_code == 303, r.text
+
+    note("2026-03-01", "08:00", "Nepojízdné", "nestartuje")
     v = db.get(Vehicle, car)
-    assert v.out_of_order_since == _date.today() and v.out_of_order_reason == "nestartuje"
+    assert v.out_of_order and v.out_of_order_since == datetime(2026, 3, 1, 8, 0)
+    assert v.out_of_order_reason == "nestartuje"
     html = client.get("/vehicles").text
-    assert ">Nepojízdné</span>" in html and "nestartuje" in html
-    assert "Nepojízdné od" in client.get(f"/vehicles/{car}").text
-    assert 'id="f-out_of_order" name="out_of_order" value="on" checked' in client.get(f"/vehicles/{car}/edit").text
+    assert ">Nepojízdné</span>" in html and "Nepojízdné od 01.03.2026 08:00 – nestartuje" in html
+    assert "Opět pojízdné</a>" in client.get(f"/vehicles/{car}").text
     item = vehicles_api(app, new_key(client)).json()["vehicles"][0]
-    assert item["out_of_order"] == {"since": _date.today().isoformat(), "reason": "nestartuje"}
+    assert item["out_of_order"] == {"since": "2026-03-01", "reason": "nestartuje"}
 
-    # zrušení zaškrtnutím v úpravě vozidla smaže i důvod
-    r = post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia", "out_of_order_reason": "x"})
-    assert r.status_code == 303, r.text
+    # poznámka "Opět pojízdné" nepojízdnost ukončí, v časové ose je délka
+    note("2026-03-03", "10:30", "Opět pojízdné")
     db.expire_all()
-    assert (v.out_of_order_since, v.out_of_order_reason) == (None, None)
+    assert not v.out_of_order and v.out_of_order_periods[0].duration == "2 dny 2 h"
+    events = collect_events(db, [v], kinds=["note"])
+    assert events[0].title == "Opět pojízdné" and events[0].icon == "car" and "nepojízdné 2 dny 2 h" in events[0].detail
+    assert events[1].icon == "stop"
+    assert vehicles_api(app, new_key(client)).json()["vehicles"][0]["out_of_order"] is None
 
-    # vyzvednutím ze servisu je zase pojízdné (předání do servisu samo nestačí)
-    post(client, f"/vehicles/{car}/edit", {"brand": "Škoda", "model": "Octavia", "out_of_order": "on",
-                                           "out_of_order_since": "2026-03-01"})
-    base = {"vehicle_id": car, "st:Brzdy": "on", "currency_code": "CZK", "service_date": "2026-03-02"}
+    # vyzvednutí ze servisu ji ukončí také (předání do servisu ne)
+    note("2026-03-10", "09:00", "Nepojízdné")
+    base = {"vehicle_id": car, "st:Brzdy": "on", "currency_code": "CZK", "service_date": "2026-03-11"}
     assert post(client, "/services/add", {**base, "in_progress": "on"}).status_code == 303
     db.expire_all()
     assert v.out_of_order
-    from models import ServiceRecord
     record = db.query(ServiceRecord).one()
-    assert post(client, f"/services/{record.id}/edit", {**base, "date_to": "2026-03-04"}).status_code == 303
+    assert post(client, f"/services/{record.id}/edit", {**base, "date_to": "2026-03-14"}).status_code == 303
     db.expire_all()
     assert not v.out_of_order
-    assert item is not None and ">Nepojízdné</span>" not in client.get("/vehicles").text
+    pickup = [e for e in collect_events(db, [v], kinds=["service"]) if e.title.startswith("Vyzvednutí")][0]
+    assert "opět pojízdné (nepojízdné 4 dny)" in pickup.detail
+    assert ">Nepojízdné</span>" not in client.get("/vehicles").text
+    # úprava vozidla už stav nemá
+    assert "out_of_order" not in client.get(f"/vehicles/{car}/edit").text

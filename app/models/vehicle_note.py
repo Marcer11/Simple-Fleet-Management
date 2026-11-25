@@ -4,7 +4,12 @@ from sqlalchemy.orm import relationship
 from .base import Base
 
 # Návrhy typu poznámky (lze napsat i vlastní)
-NOTE_CATEGORIES = ["Garáž", "Půjčeno", "Vráceno", "Nehoda", "Poškození", "Pneumatiky", "Parkování", "Jiné"]
+NOTE_CATEGORIES = ["Garáž", "Půjčeno", "Vráceno", "Nehoda", "Poškození", "Nepojízdné", "Opět pojízdné",
+                   "Pneumatiky", "Parkování", "Jiné"]
+
+# Nepojízdnost vozidla: začíná poznámkou "Nepojízdné", končí poznámkou "Opět pojízdné" nebo vyzvednutím ze servisu
+OUT_OF_ORDER = "Nepojízdné"
+BACK_IN_ORDER = "Opět pojízdné"
 
 
 class VehicleNote(Base):

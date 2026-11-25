@@ -31,6 +31,8 @@
     <a class="btn btn-primary" href="/fuel-records/add?vehicle_id={{ vid }}">{{ m.icon("fuel") }} Tankování</a>
     {% if vehicle.is_rental %}<a class="btn" href="/rentals/add?vehicle_id={{ vid }}">{{ m.icon("key") }} Půjčení</a>{% endif %}
     <a class="btn" href="/services/add?vehicle_id={{ vid }}">{{ m.icon("service") }} Servis</a>
+    {% if vehicle.out_of_order %}<a class="btn" href="/notes/add?vehicle_id={{ vid }}&amp;category=Opět%20pojízdné">{{ m.icon("car") }} Opět pojízdné</a>
+    {% else %}<a class="btn" href="/notes/add?vehicle_id={{ vid }}&amp;category=Nepojízdné">{{ m.icon("stop") }} Nepojízdné</a>{% endif %}
     <a class="btn" href="/expenses/add?vehicle_id={{ vid }}">{{ m.icon("expense") }} Výdaj</a>
     <a class="btn" href="/notes/add?vehicle_id={{ vid }}">{{ m.icon("note") }} Poznámka</a>
     <a class="btn" href="/tire-swaps/add?vehicle_id={{ vid }}">{{ m.icon("tire") }} Přezutí</a>

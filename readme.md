@@ -55,9 +55,10 @@ nasazených pneumatik, dálniční známky, vozidla v servisu (nevyzvednuto) a u
 upomínky, pneumatiky – oranžová = blíží se, červená = po termínu, v nápovědě seznam). Ikona dálniční
 známky podle výdajů s platností: zelená = platí (v nápovědě do kdy), oranžová = končí do týdne, šedá =
 vypršela nebo platí až od budoucího data; navazující známka koupená dopředu platnost prodlužuje.
-Vozidlo lze v úpravě označit jako **nepojízdné** (od kdy, důvod – např. mezi poruchou a servisem); v přehledu
-vozidel i v detailu má červený štítek „Nepojízdné“ (v nápovědě od kdy a proč), v API položka `out_of_order`.
-Zapsáním vyzvednutí ze servisu se nepojízdnost sama ukončí.
+**Nepojízdné** vozidlo (např. mezi poruchou a servisem) se zapisuje poznámkou typu „Nepojízdné“ (text = důvod);
+končí poznámkou „Opět pojízdné“ nebo zápisem vyzvednutí ze servisu. Obě poznámky jsou v detailu vozidla jako rychlé
+tlačítko. Nepojízdné vozidlo má v přehledu vozidel i v detailu červený štítek (v nápovědě od kdy a proč), v API položku
+`out_of_order`; v časové ose je u konce nepojízdnosti, jak dlouho trvala.
 Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Půjčená vozidla

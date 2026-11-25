@@ -16,11 +16,6 @@
             <input id="f-lender" name="lender" type="text" maxlength="100" list="lenders" value="{{ m.val('lender') }}" autocomplete="off">
             {{ m.datalist("lenders", lenders or []) }}
         </div>
-        {{ m.checkbox("out_of_order", "Nepojízdné (porucha, nehoda…)") }}
-        <div class="contents" data-show-when="f-out_of_order">
-        {{ m.field("out_of_order_since", "Nepojízdné od", "date") }}
-        {{ m.field("out_of_order_reason", "Důvod", maxlength=200) }}
-        </div>
         {{ m.field("brand", "Značka", required=true, maxlength=50) }}
         {{ m.field("model", "Model", required=true, maxlength=50) }}
         {{ m.field("license_plate", "SPZ", maxlength=12, style="text-transform: uppercase") }}

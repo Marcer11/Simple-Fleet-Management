@@ -143,3 +143,15 @@ def test_year_vignette_over_leap_day_fixed(tmp_path):
         due = conn.execute(text("SELECT due_date FROM reminders")).scalar()
     assert [str(r) for r in rows] == ["2024-11-18", "2025-02-28", "2024-03-05"]
     assert str(due) == "2024-11-18"
+
+
+def test_out_of_order_moved_to_notes(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'ooo.db'}")
+    with engine.begin() as conn:
+        _upgrade(conn, "0024_vehicle_out_of_order")
+        conn.execute(text("INSERT INTO vehicles (id, brand, model, is_active, color_hex, is_rental, out_of_order_since,"
+                          " out_of_order_reason) VALUES (1, 'Škoda', 'Octavia', 1, '#FFFFFF', 0, '2026-11-24', 'nestartuje'),"
+                          " (2, 'Toyota', 'Yaris', 1, '#FFFFFF', 0, NULL, NULL)"))
+        _upgrade(conn)
+        rows = conn.execute(text("SELECT vehicle_id, note_datetime, category, text FROM vehicle_notes")).all()
+    assert [(r[0], str(r[1])[:16], r[2], r[3]) for r in rows] == [(1, "2026-11-24 00:00", "Nepojízdné", "nestartuje")]

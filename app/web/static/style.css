@@ -469,6 +469,12 @@ table.tires .badge { margin-top: 4px; }
 .icon { width: 1.15em; height: 1.15em; vertical-align: -.2em; flex: none; }
 .icon-vehicle { color: var(--muted); }
 .tire-icons { display: inline-flex; gap: 2px; vertical-align: middle; }
+.vehicle-icons { display: inline-flex; gap: 6px; align-items: center; vertical-align: middle; }
+.in-service { display: inline-flex; color: var(--warning); }
+.alert-icon { display: inline-flex; align-items: center; gap: 1px; }
+.alert-icon-warning { color: var(--warning); }
+.alert-icon-overdue { color: var(--danger); }
+.alert-count { font-size: .75em; font-weight: 600; }
 .season-summer { color: var(--season-summer); }
 .season-winter { color: var(--season-winter); }
 .season-allseason { color: var(--muted); }  /* jen dělicí čára, poloviny mají vlastní barvu */

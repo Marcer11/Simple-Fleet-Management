@@ -24,8 +24,7 @@
             <th class="num">Tachometr</th>
             <th class="num">Spotřeba</th>
             <th class="num">Náklady {{ today.year }}</th>
-            <th>Pneu</th>
-            <th>Známka</th>
+            <th>Info</th>
             <th>Poslední záznam</th>
             {% if show != 'active' %}<th>Stav</th>{% endif %}
         </tr>
@@ -40,9 +39,8 @@
             <td class="num nowrap">{{ odometers.get(v.id)|km }}</td>
             <td class="num nowrap">{% for ft, info in cons.items() %}{% if loop.first %}{{ info.value|num(1) }} {{ info.unit }}/100 km{% endif %}{% else %}–{% endfor %}</td>
             <td class="num nowrap">{{ year_costs.get(v.id)|czk(0) if year_costs.get(v.id) else "–" }}</td>
-            <td>{{ m.tire_icons(tires.get(v.id)) or "–" }}</td>
-            {% set vig = vignettes.get(v.id) %}
-            <td data-sort="{{ vig[1].isoformat() if vig and vig[0] in ('valid', 'expiring') else '' }}">{{ m.vignette_icon(vig) or "–" }}</td>
+            {% set icons = m.tire_icons(tires.get(v.id)) ~ m.vignette_icon(vignettes.get(v.id)) ~ m.service_icon(v.active_service) ~ m.alerts_icon(alerts.get(v.id)) %}
+            <td data-sort="{{ (alerts.get(v.id) or [])|length }}"><span class="vehicle-icons">{{ icons or "–" }}</span></td>
             <td class="nowrap">{{ last_dates.get(v.id)|date or "–" }}</td>
             {% if show != 'active' %}<td>{% if v.is_sold %}<span class="badge">Prodáno</span>{% elif v.is_returned %}<span class="badge">Vráceno</span>{% elif v.is_active %}<span class="badge badge-ok">Aktivní</span>{% else %}<span class="badge">Neaktivní</span>{% endif %}</td>{% endif %}
         </tr>

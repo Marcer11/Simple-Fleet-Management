@@ -133,6 +133,14 @@
     "expired": "Dálniční známka vypršela " ~ day|date}[state] %}<span class="vignette vignette-{{ state }}" title="{{ text }}">{{ icon("road", text) }}</span>{% endif %}
 {%- endmacro %}
 
+{% macro service_icon(record) -%}
+{% if record %}{% set text = "V servisu od " ~ record.service_date|date ~ (" – " ~ record.place if record.place else "") %}<span class="in-service" title="{{ text }}">{{ icon("service", text) }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro alerts_icon(alerts) -%}
+{% if alerts %}{% set lines = [] %}{% for a in alerts %}{% set _ = lines.append(a.title ~ " – " ~ a.status.summary) %}{% endfor %}<span class="alert-icon alert-icon-{{ 'overdue' if alerts|selectattr('status.level', 'equalto', 'overdue')|list else 'warning' }}" title="{{ lines|join('\n') }}">{{ icon("warning", lines|join("; ")) }}{% if alerts|length > 1 %}<span class="alert-count">{{ alerts|length }}</span>{% endif %}</span>{% endif %}
+{%- endmacro %}
+
 {% macro tire_icons(entries) -%}
 {% if entries %}<span class="tire-icons">{% for season, labels in entries %}{{ season_icon(season, season ~ " pneumatiky: " ~ labels|join(", ")) }}{% endfor %}</span>{% endif %}
 {%- endmacro %}

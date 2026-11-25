@@ -104,6 +104,12 @@ class Vehicle(Base):
         return [line.strip() for line in (self.tire_sizes or "").splitlines() if line.strip()]
 
     @property
+    def active_service(self):
+        """Servis, ve kterém vozidlo právě je (zatím nevyzvednuto), jinak None."""
+        return max((r for r in self.service_records if r.in_progress),
+                   key=lambda r: (r.service_date, r.id), default=None)
+
+    @property
     def fuels(self):
         """Druhy paliva vozidla (hlavní, alternativní); prázdné = neuvedeno."""
         return [f for f in (self.fuel, self.alt_fuel) if f]

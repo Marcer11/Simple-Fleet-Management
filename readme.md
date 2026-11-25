@@ -49,8 +49,10 @@ hlavní palivo), objem motoru (cm³), výkon (kW, v detailu i v koních), barva 
 tachometru při nákupu a prodeji (ztráta hodnoty, najeto za dobu vlastnictví), rozměry pneumatik dle TP (jen údaj
 u vozidla), aktivní/neaktivní. Vozidlo s datem prodeje se mezi aktivními nezobrazuje (zapsáním prodeje se deaktivuje).
 Seznam vozidel ve výchozím stavu ukazuje všechna vozidla seřazená podle posledního záznamu (sloupec „Poslední
-záznam“, záložka „Jen aktivní“), dále tachometr, spotřebu, náklady za rok, typ pneumatik a stav (aktivní /
-neaktivní / prodáno / vráceno); vlastník je až v detailu vozidla. Sloupec „Známka“ ukazuje ikonu dálniční
+záznam“, záložka „Jen aktivní“), dále tachometr, spotřebu, náklady za rok, sloupec „Info“ s ikonami a stav
+(aktivní / neaktivní / prodáno / vráceno); vlastník je až v detailu vozidla. Sloupec „Info“ ukazuje ikony
+nasazených pneumatik, dálniční známky, vozidla v servisu (nevyzvednuto) a upozornění (servisní intervaly,
+upomínky, pneumatiky – oranžová = blíží se, červená = po termínu, v nápovědě seznam). Ikona dálniční
 známky podle výdajů s platností: zelená = platí (v nápovědě do kdy), oranžová = končí do týdne, šedá =
 vypršela nebo platí až od budoucího data; navazující známka koupená dopředu platnost prodlužuje.
 Smazání vozidla je schované dole ve formuláři úprav.
@@ -113,7 +115,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
   jednou z více
 - **předání a vyzvednutí** ze servisu: datum, čas a km při předání i vyzvednutí – v seznamu servisu je vidět,
   jak dlouho bylo vozidlo v servisu a kolik s ním servis najel; v časové ose je vícedenní servis jako
-  předání a vyzvednutí (vyzvednutí bez času na konci dne)
+  předání a vyzvednutí (vyzvednutí bez času na konci dne); zaškrtnutím „Vozidlo je zatím v servisu“ se vozidlo
+  označí jako v servisu (ikona v přehledu vozidel, štítek v detailu) do zapsání vyzvednutí
 - **pravidelný servis** – časový a/nebo kilometrový interval od posledního servisu daného typu;
   upozornění, když zbývá méně než 10 % intervalu, nebo po termínu
 - **pojistné plnění** u servisu i výdaje: nenápadné zaškrtávátko „Uplatněna pojistka“ u ceny zobrazí pole

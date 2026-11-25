@@ -210,6 +210,7 @@ class ServiceRecordService(_RecordServiceBase):
             "date_to": date_to,
             "time_to": time_to,
             "odometer_to": km_to,
+            "in_progress": bool(data.get("in_progress")) and not date_to,  # vyzvednutím servis končí
             "service_type": _clean_str(join_service_types([data.get("service_type") or ""]), 255,
                                        "Typ servisu", required=True),
             "place": _clean_str(data.get("place"), 100, "Místo"),

@@ -84,6 +84,7 @@ class ServiceRecord(InsuranceMixin, Base):
     date_to = Column(Date, nullable=True)                  # vyzvednutí ze servisu
     time_to = Column(Time, nullable=True)
     odometer_to = Column(Integer, nullable=True)           # km při vyzvednutí
+    in_progress = Column(Boolean, nullable=False, default=False)  # vozidlo je zatím v servisu (nevyzvednuto)
     service_type = Column(String(255), nullable=False)  # jedna nebo více položek oddělených ", "
     place = Column(String(100), nullable=True)
     price_paid = Column(DECIMAL(12, 3), nullable=True)

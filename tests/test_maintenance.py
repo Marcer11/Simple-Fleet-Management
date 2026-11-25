@@ -67,3 +67,29 @@ def test_service_duration_and_distance(app, db):
                          ({"odometer": "100", "odometer_to": "90"}, "menší než při předání")]:
         r = post(client, "/services/add", {**base, "service_date": "2026-03-01", **extra})
         assert r.status_code == 400 and error in r.text, extra
+
+
+def test_vehicle_list_status_icons(app, db):
+    from models import ServiceRecord, Vehicle
+    client = register(app, "icons@example.com")
+    car = add_vehicle(client)
+    base = {"vehicle_id": car, "st:Brzdy": "on", "currency_code": "CZK", "place": "Autoservis Novák",
+            "service_date": date.today().isoformat()}
+    assert post(client, "/services/add", {**base, "in_progress": "on"}).status_code == 303
+    record = db.query(ServiceRecord).one()
+    assert record.in_progress and db.get(Vehicle, car).active_service.id == record.id
+    html = client.get("/vehicles").text
+    assert "<th>Info</th>" in html and "<th>Pneu</th>" not in html
+    assert 'class="in-service" title="V servisu od' in html and "Autoservis Novák" in html
+    assert "V servisu od" in client.get(f"/vehicles/{car}").text
+    # upozornění (upomínka po termínu)
+    post(client, "/reminders/add", {"vehicle_id": car, "title": "Výměna stěračů",
+                                    "due_date": "2020-01-01", "repeat": "none"})
+    html = client.get("/vehicles").text
+    assert "alert-icon-overdue" in html and "Výměna stěračů" in html
+    # vyzvednutím servis končí (zaškrtnutí se nepoužije)
+    r = post(client, f"/services/{record.id}/edit", {**base, "in_progress": "on", "date_to": base["service_date"]})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    assert not db.get(ServiceRecord, record.id).in_progress and db.get(Vehicle, car).active_service is None
+    assert 'class="in-service"' not in client.get("/vehicles").text

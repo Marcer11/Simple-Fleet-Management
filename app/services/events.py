@@ -197,6 +197,8 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                                 + (f" {r.time_to:%H:%M}" if r.time_to else ""))
                 elif r.duration:
                     stay.append(f"v servisu {r.duration}")
+                elif r.in_progress:
+                    stay.append("zatím v servisu")
                 if not more_days and r.distance is not None:
                     stay.append(f"servis najel {r.distance:,} km".replace(",", " "))
                 detail = " · ".join(x for x in (r.place, *stay, _insurance_text(r), (r.note or "").strip()) if x)

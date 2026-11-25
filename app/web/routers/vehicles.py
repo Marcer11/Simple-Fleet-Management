@@ -83,9 +83,12 @@ async def list_vehicles(request: Request, show: str = "all", user=Depends(get_cu
     consumption = {v.id: stats.avg_consumption(v.id) for v in vehicles}
     year_costs = stats.year_costs([v.id for v in vehicles], date.today().year)
     inactive_count = len(service.get_vehicles_for_user(user)) - len(service.get_vehicles_for_user(user, True))
+    alerts = {}
+    for alert in collect_alerts(db, [v for v in vehicles if v.in_use]):
+        alerts.setdefault(alert.vehicle.id, []).append(alert)
     return render(request, "vehicles/list.html", vehicles=vehicles, roles=roles, odometers=odometers,
                   consumption=consumption, year_costs=year_costs, last_dates=last_dates,
-                  vignettes=service.vignette_status(vehicles),
+                  vignettes=service.vignette_status(vehicles), alerts=alerts,
                   show=show, inactive_count=inactive_count, tires=mounted_seasons(db, [v.id for v in vehicles]))
 
 

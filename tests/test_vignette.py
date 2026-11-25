@@ -35,7 +35,7 @@ def test_vignette_icon_in_vehicle_list(app, db):
     assert status[chained] == ("valid", today + timedelta(days=34))
 
     html = client.get("/vehicles").text
-    assert "<th>Známka</th>" in html
+    assert "<th>Info</th>" in html and "<th>Známka</th>" not in html
     assert "vignette-valid" in html and "vignette-expiring" in html and "vignette-expired" in html
     assert "Dálniční známka platí do" in html
 

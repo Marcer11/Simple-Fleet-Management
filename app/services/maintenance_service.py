@@ -162,6 +162,7 @@ class _RecordServiceBase:
     def update(self, record, data):
         current = {c.name: getattr(record, c.name) for c in self.model.__table__.columns if c.name != "id"}
         current.update(data)
+        current["_id"] = record.id
         for key, value in self._validate(current).items():
             setattr(record, key, value)
         self.session.commit()
@@ -199,6 +200,12 @@ class ServiceRecordService(_RecordServiceBase):
         km_to = _positive_int(data.get("odometer_to"), "Km při vyzvednutí")
         if km_from is not None and km_to is not None and km_to < km_from:
             raise ValidationError("Km při vyzvednutí nemohou být menší než při předání.")
+        exclude = ("service", data.get("_id"))
+        check_odometer_order(self.session, data["vehicle_id"], _at(data["service_date"], service_time), km_from,
+                             service_time is not None, exclude)
+        if date_to:
+            check_odometer_order(self.session, data["vehicle_id"], _at(date_to, time_to), km_to,
+                                 time_to is not None, exclude)
         manual_rate = data.pop("manual_rate", None)
         currency, price_paid, price_local = convert_price(
             data.get("price_paid"), data.get("currency_code"), data["service_date"], manual_rate)
@@ -356,6 +363,9 @@ class ExpenseService(_RecordServiceBase):
             raise ValidationError("Datum výdaje je povinné.")
         if data.get("price_paid") in (None, ""):
             raise ValidationError("Částka je povinná.")
+        check_odometer_order(self.session, data["vehicle_id"], data["expense_date"],
+                             _positive_int(data.get("odometer"), "Stav tachometru"),
+                             exclude=("expense", data.get("_id")))
         manual_rate = data.pop("manual_rate", None)
         variant = data.pop("vignette_variant", None)
         valid_from = data.get("valid_from") or None
@@ -412,6 +422,12 @@ class RentalService(_RecordServiceBase):
         km_to = _positive_int(data.get("odometer_to"), "Kilometry při vrácení")
         if km_from is not None and km_to is not None and km_to < km_from:
             raise ValidationError("Kilometry při vrácení nemohou být menší než při půjčení.")
+        exclude = ("rental", data.get("_id"))
+        check_odometer_order(self.session, data["vehicle_id"], _at(data["date_from"], time_from), km_from,
+                             time_from is not None, exclude)
+        if date_to:
+            check_odometer_order(self.session, data["vehicle_id"], _at(date_to, time_to), km_to,
+                                 time_to is not None, exclude)
         manual_rate = data.get("manual_rate")
         currency, price_paid, price_local = convert_price(
             data.get("price_paid"), data.get("currency_code"), data["date_from"], manual_rate)
@@ -764,37 +780,67 @@ def collect_alerts(session, vehicles, only_alerts=True, today=None):
 # Poznámky k vozidlu
 # ----------------------------------------------------------------------
 
-def check_odometer_order(session, vehicle_id, when, odometer, has_time=True, exclude=(None, None)):
-    """Stav tachometru musí odpovídat ostatním záznamům vozidla v čase (poznámky, přezutí).
+def _at(day, at_time=None):
+    return datetime.combine(day, at_time or datetime.min.time())
 
-    Stejný stav v různé dny je v pořádku (motorka přes zimu v garáži). Záznamy jen s datem
-    (servis, výdaje, přezutí) se se záznamem ze stejného dne neporovnávají.
-    exclude = ("note" | "tire_swap" | "tread_check", id) - upravovaný záznam se neporovnává sám se sebou.
-    """
-    kind, exclude_id = exclude
-    readings = []  # (čas, km, popis, má čas)
-    for at, km in (session.query(FuelRecord.refuel_datetime, FuelRecord.odometer)
-                   .filter(FuelRecord.vehicle_id == vehicle_id)):
-        readings.append((at, km, "tankování", True))
+
+def odometer_readings(session, vehicle_id):
+    """Všechny zapsané stavy tachometru vozidla: [(čas, km, popis, má čas, (druh, id))]."""
+    from models import TireDefect
+    readings = []
+    for at, km, rid in (session.query(FuelRecord.refuel_datetime, FuelRecord.odometer, FuelRecord.id)
+                        .filter(FuelRecord.vehicle_id == vehicle_id)):
+        readings.append((at, km, "tankování", True, ("fuel", rid)))
     for at, km, rid in (session.query(VehicleNote.note_datetime, VehicleNote.odometer, VehicleNote.id)
                         .filter(VehicleNote.vehicle_id == vehicle_id, VehicleNote.odometer.isnot(None))):
-        if not (kind == "note" and rid == exclude_id):
-            readings.append((at, km, "poznámky", True))
-    for d, km, rid in (session.query(TireSwap.swap_date, TireSwap.odometer, TireSwap.id)
-                       .filter(TireSwap.vehicle_id == vehicle_id)):
-        if not (kind == "tire_swap" and rid == exclude_id):
-            readings.append((datetime.combine(d, datetime.min.time()), km, "přezutí", False))
-    for d, km, rid in (session.query(TireTreadCheck.check_date, TireTreadCheck.odometer, TireTreadCheck.id)
-                       .filter(TireTreadCheck.vehicle_id == vehicle_id)):
-        if not (kind == "tread_check" and rid == exclude_id):
-            readings.append((datetime.combine(d, datetime.min.time()), km, "kontroly dezénu", False))
-    for model, column, label in ((ServiceRecord, ServiceRecord.service_date, "servisu"),
-                                 (Expense, Expense.expense_date, "výdaje")):
-        for d, km in (session.query(column, model.odometer)
-                      .filter(model.vehicle_id == vehicle_id, model.odometer.isnot(None))):
-            readings.append((datetime.combine(d, datetime.min.time()), km, label, False))
+        readings.append((at, km, "poznámky", True, ("note", rid)))
+    for model, column, label, kind in ((TireSwap, TireSwap.swap_date, "přezutí", "tire_swap"),
+                                       (TireTreadCheck, TireTreadCheck.check_date, "kontroly dezénu", "tread_check"),
+                                       (TireDefect, TireDefect.defect_date, "poškození pneumatiky", "tire_defect"),
+                                       (Expense, Expense.expense_date, "výdaje", "expense")):
+        for d, km, rid in (session.query(column, model.odometer, model.id)
+                           .filter(model.vehicle_id == vehicle_id, model.odometer.isnot(None))):
+            readings.append((_at(d), km, label, False, (kind, rid)))
+    for r in session.query(ServiceRecord).filter(ServiceRecord.vehicle_id == vehicle_id):
+        if r.odometer is not None:
+            readings.append((_at(r.service_date, r.service_time), r.odometer, "servisu", r.service_time is not None,
+                             ("service", r.id)))
+        if r.odometer_to is not None and r.date_to is not None:
+            readings.append((_at(r.date_to, r.time_to), r.odometer_to, "vyzvednutí ze servisu",
+                             r.time_to is not None, ("service", r.id)))
+    for r in session.query(VehicleRental).filter(VehicleRental.vehicle_id == vehicle_id):
+        if r.odometer_from is not None:
+            readings.append((_at(r.date_from, r.time_from), r.odometer_from, "půjčení", r.time_from is not None,
+                             ("rental", r.id)))
+        if r.odometer_to is not None and r.date_to is not None:
+            readings.append((_at(r.date_to, r.time_to), r.odometer_to, "vrácení", r.time_to is not None,
+                             ("rental", r.id)))
+    vehicle = session.get(Vehicle, vehicle_id)
+    if vehicle is not None:
+        if vehicle.purchase_date and vehicle.purchase_odometer is not None:
+            readings.append((_at(vehicle.purchase_date), vehicle.purchase_odometer, "nákupu", False, ("vehicle", None)))
+        if vehicle.sale_date and vehicle.sale_odometer is not None:
+            readings.append((_at(vehicle.sale_date), vehicle.sale_odometer, "prodeje", False, ("vehicle", None)))
+    return readings
 
-    for at, km, label, reading_has_time in readings:
+
+def check_odometer_order(session, vehicle_id, when, odometer, has_time=True, exclude=(None, None)):
+    """Stav tachometru musí odpovídat všem ostatním záznamům vozidla v čase (tankování, servis, výdaje,
+    poznámky, pneumatiky, půjčení, nákup / prodej): dřívější záznam nesmí mít víc km, pozdější méně.
+
+    Stejný stav v různé dny je v pořádku (motorka přes zimu v garáži). Záznam bez času se se záznamem
+    ze stejného dne neporovnává (nevíme, co bylo dřív).
+    exclude = (druh, id) - upravovaný záznam se neporovnává sám se sebou
+    (druh: fuel, note, tire_swap, tread_check, tire_defect, expense, service, rental).
+    """
+    if odometer is None or when is None:
+        return
+    if not isinstance(when, datetime):
+        when, has_time = _at(when), False
+    kind, exclude_id = exclude
+    for at, km, label, reading_has_time, key in odometer_readings(session, vehicle_id):
+        if exclude_id is not None and key == (kind, exclude_id):
+            continue
         if has_time and reading_has_time:
             before, after = at < when, at > when
         else:

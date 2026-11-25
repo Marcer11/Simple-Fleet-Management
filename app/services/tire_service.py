@@ -395,9 +395,13 @@ class TireDefectService:
         vehicle_id = vehicle_id or self.vehicle_on(tire, data["defect_date"])
         if _has_price(price) and not vehicle_id:
             raise ValidationError("Pro zápis ceny opravy vyberte vozidlo (výdaj patří k vozidlu).")
+        odometer = _positive_int(data.get("odometer"), "Stav tachometru")
+        if vehicle_id:
+            check_odometer_order(self.session, vehicle_id, data["defect_date"], odometer,
+                                 exclude=("tire_defect", defect.id if defect else None))
         values = {
             "tire_id": tire.id, "vehicle_id": vehicle_id, "defect_date": data["defect_date"],
-            "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
+            "odometer": odometer,
             "position": _clean_str(data.get("position"), 20, "Pozice"),
             "description": _clean_str(data.get("description"), 200, "Popis", required=True),
         }

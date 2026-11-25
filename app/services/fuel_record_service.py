@@ -242,23 +242,6 @@ class FuelRecordService:
         return {key: data[key] for key in FUEL_RECORD_FIELDS}
 
     def _check_odometer(self, vehicle_id, refuel_datetime, odometer, exclude_id=None):
-        """Stav tachometru musí odpovídat chronologii tankování."""
-        base = self.session.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id)
-        if exclude_id is not None:
-            base = base.filter(FuelRecord.id != exclude_id)
-
-        previous = (base.filter(FuelRecord.refuel_datetime < refuel_datetime)
-                    .order_by(FuelRecord.refuel_datetime.desc()).first())
-        if previous and previous.odometer > odometer:
-            raise ValidationError(
-                f"Stav tachometru ({odometer} km) je nižší než u předchozího tankování "
-                f"{previous.refuel_datetime:%d.%m.%Y} ({previous.odometer} km)."
-            )
-
-        following = (base.filter(FuelRecord.refuel_datetime > refuel_datetime)
-                     .order_by(FuelRecord.refuel_datetime.asc()).first())
-        if following and following.odometer < odometer:
-            raise ValidationError(
-                f"Stav tachometru ({odometer} km) je vyšší než u následujícího tankování "
-                f"{following.refuel_datetime:%d.%m.%Y} ({following.odometer} km)."
-            )
+        """Stav tachometru musí odpovídat všem záznamům vozidla v čase (tankování, přezutí, servis…)."""
+        from services.maintenance_service import check_odometer_order
+        check_odometer_order(self.session, vehicle_id, refuel_datetime, odometer, exclude=("fuel", exclude_id))

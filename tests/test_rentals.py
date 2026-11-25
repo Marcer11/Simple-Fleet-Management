@@ -181,7 +181,7 @@ def test_rental_times_order_timeline(app, db):
     r = post(client, f"/rentals/{item.id}/edit", {"vehicle_id": vid, "provider": "Půjčovna AutoPraha",
                                                   "date_from": "2026-05-01", "time_from": "08:30",
                                                   "date_to": "2026-05-04", "time_to": "10:15",
-                                                  "odometer_from": "15000", "odometer_to": "15420",
+                                                  "odometer_from": "15000", "odometer_to": "15380",
                                                   "price_paid": "3600", "currency_code": "CZK"})
     assert r.status_code == 303
     db.expire_all()

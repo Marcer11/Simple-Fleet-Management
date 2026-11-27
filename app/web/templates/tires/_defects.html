@@ -1,0 +1,24 @@
+{# Tabulka poškození pneumatik. Vstup: defects #}
+{% import "_macros.html" as m with context %}
+{% if defects %}
+<div class="card">
+    <h2>Poškození</h2>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Datum</th><th>Pneumatika</th><th>Pozice</th><th>Co se stalo</th><th class="num">Oprava</th><th></th></tr></thead>
+        <tbody>
+        {% for d in defects %}
+        <tr>
+            <td class="nowrap">{{ d.defect_date|date }}{% if d.odometer %}<div class="small muted">{{ d.odometer|km }}</div>{% endif %}</td>
+            <td><a href="/tires/{{ d.tire_id }}">{{ d.tire.label }}</a></td>
+            <td>{{ d.position or "–" }}</td>
+            <td>{{ d.description }}</td>
+            <td class="num">{{ d.expense.price_local|czk(0) if d.expense else "–" }}</td>
+            <td class="actions-cell"><a class="btn btn-sm" href="/tire-defects/{{ d.id }}/edit">Upravit</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}

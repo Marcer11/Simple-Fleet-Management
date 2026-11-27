@@ -386,6 +386,7 @@ class ExpenseService(_RecordServiceBase):
             "expense_date": data["expense_date"],
             "category": _clean_str(data.get("category"), 30, "Kategorie", required=True),
             "description": _clean_str(data.get("description"), 200, "Popis"),
+            "place": _clean_str(data.get("place"), 100, "Místo"),
             "odometer": _positive_int(data.get("odometer"), "Stav tachometru"),
             "price_paid": price_paid,
             "currency_code": currency,

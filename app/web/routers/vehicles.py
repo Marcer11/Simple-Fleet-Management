@@ -7,9 +7,12 @@ from fastapi.responses import RedirectResponse
 from models.vehicle import ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_LEVELS, SHARE_ROLES
 from services.errors import ValidationError
 from services.events import collect_events
-from services.tire_service import mounted_seasons, open_mounts
+from services.tire_service import TireSwapService, TireTreadCheckService, mounted_seasons, open_mounts
+from models import TireDefect
+from services.fuel_record_service import FuelRecordService
 from services.maintenance_service import (
-    ServiceIntervalService, ReminderService, ExpenseService, collect_alerts,
+    ServiceIntervalService, ServiceRecordService, ReminderService, ExpenseService, VehicleNoteService,
+    collect_alerts,
 )
 from services.stats_service import StatsService
 from services.vehicle_service import VehicleService
@@ -123,36 +126,96 @@ async def add_vehicle_post(request: Request, user=Depends(get_current_user), db=
 # Detail, úprava, smazání
 # ----------------------------------------------------------------------
 
-@router.get("/{vehicle_id}")
-async def vehicle_detail(request: Request, vehicle_id: int, user=Depends(get_current_user), db=Depends(get_db)):
-    service = VehicleService(db)
-    vehicle = service.get_vehicle_for_user(vehicle_id, user)
-    role = service.get_role(vehicle, user)
-    odometer = service.get_current_odometer(vehicle.id)
+# Záložky detailu vozidla (klíč -> popisek); Statistiky mají vlastní adresu
+VEHICLE_TABS = {"": "Přehled", "detail": "Údaje", "fuel": "Tankování", "service": "Servis",
+                "expenses": "Výdaje", "notes": "Poznámky", "tires": "Pneumatiky"}
+LEVEL_ORDER = {"overdue": 0, "warning": 1, "ok": 2, "unknown": 3}
 
+
+def vehicle_head(db, vehicle, role):
+    """Společné údaje hlavičky vozidla (detail i statistiky)."""
+    return {"vehicle": vehicle, "role": role, "vehicle_tabs": VEHICLE_TABS,
+            "can_edit": ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR], "is_owner": role == ROLE_OWNER,
+            "tire_seasons": mounted_seasons(db, [vehicle.id]).get(vehicle.id)}
+
+
+def _intervals_and_reminders(db, vehicle, odometer):
     interval_service = ServiceIntervalService(db)
     reminder_service = ReminderService(db)
     intervals = [(i, interval_service.get_status(i, odometer))
                  for i in interval_service.effective_for_vehicles([vehicle], only_active=False)]
     reminders = [(r, reminder_service.get_status(r, odometer))
                  for r in reminder_service.list_for_vehicles([vehicle.id])]
+    return intervals, reminders
 
-    return render(
-        request, "vehicles/detail.html",
-        vehicle=vehicle, role=role, odometer=odometer,
-        alerts=collect_alerts(db, [vehicle]),
-        intervals=intervals, reminders=reminders,
-        validities=ExpenseService(db).current_validities(vehicle.id),
-        avg_consumption=StatsService(db).avg_consumption(vehicle.id),
-        profile=StatsService(db).usage_profile(vehicle.id),
-        breakdown=StatsService(db).fuel_breakdown(vehicle.id),
-        events=collect_events(db, [vehicle], limit=15),
-        mounted_tires=open_mounts(db, vehicle.id),
-        tire_seasons=mounted_seasons(db, [vehicle.id]).get(vehicle.id),
-        editable_ids={vehicle.id} if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set(),
-        year_cost=StatsService(db).year_costs([vehicle.id], date.today().year).get(vehicle.id),
-        owner=vehicle.owner, rentals=list(vehicle.rentals),
-    )
+
+@router.get("/{vehicle_id}")
+async def vehicle_detail(request: Request, vehicle_id: int, tab: str = "", user=Depends(get_current_user),
+                         db=Depends(get_db)):
+    service = VehicleService(db)
+    vehicle = service.get_vehicle_for_user(vehicle_id, user)
+    role = service.get_role(vehicle, user)
+    tab = tab if tab in VEHICLE_TABS else ""
+    odometer = service.get_current_odometer(vehicle.id)
+    stats = StatsService(db)
+    ids = [vehicle.id]
+    context = {**vehicle_head(db, vehicle, role), "tab": tab, "odometer": odometer,
+               "editable_ids": set(ids) if ROLE_LEVELS[role] >= ROLE_LEVELS[ROLE_EDITOR] else set()}
+    year_start = date(date.today().year, 1, 1)
+
+    if tab == "":
+        intervals, reminders = _intervals_and_reminders(db, vehicle, odometer)
+        due = sorted(((i, s) for i, s in intervals + reminders
+                      if getattr(i, "is_active", True) and s.level in ("overdue", "warning", "ok")),
+                     key=lambda x: (LEVEL_ORDER[x[1].level], x[1].days_left if x[1].days_left is not None else 99999))
+        fuel_service = FuelRecordService(db)
+        fuel_year = fuel_service.search(ids, year_start)
+        services = ServiceRecordService(db).search(ids)
+        expenses_year = ExpenseService(db).search(ids, year_start)
+        context.update(
+            alerts=collect_alerts(db, [vehicle]),
+            avg_consumption=stats.avg_consumption(vehicle.id),
+            profile=stats.usage_profile(vehicle.id),
+            year_cost=stats.year_costs(ids, date.today().year).get(vehicle.id),
+            last_fuel=next(iter(fuel_service.search(ids, limit=1)), None),
+            fuel_year={"count": len(fuel_year), "cost": sum((r.price_local or 0 for r in fuel_year), 0)},
+            last_service=services[0] if services else None, next_due=due[0] if due else None,
+            services_year=sum((r.own_cost or 0 for r in services if r.service_date >= year_start), 0),
+            expenses_year={"count": len(expenses_year), "cost": sum((r.own_cost or 0 for r in expenses_year), 0)},
+            validities=ExpenseService(db).current_validities(vehicle.id),
+            mounted_tires=open_mounts(db, vehicle.id),
+            events=collect_events(db, [vehicle], limit=15),
+        )
+    elif tab == "detail":
+        context.update(validities=ExpenseService(db).current_validities(vehicle.id),
+                       profile=stats.usage_profile(vehicle.id), owner=vehicle.owner, rentals=list(vehicle.rentals))
+    elif tab == "fuel":
+        records = FuelRecordService(db).search(ids)
+        context.update(records=records, breakdown=stats.fuel_breakdown(vehicle.id),
+                       totals={"count": len(records), "price": sum((r.price_local or 0 for r in records), 0)},
+                       avg_consumption=stats.avg_consumption(vehicle.id))
+    elif tab == "service":
+        intervals, reminders = _intervals_and_reminders(db, vehicle, odometer)
+        records = ServiceRecordService(db).search(ids)
+        context.update(intervals=intervals, reminders=reminders, records=records,
+                       total=sum((r.price_local or 0 for r in records), 0))
+    elif tab == "expenses":
+        records = ExpenseService(db).search(ids)
+        by_category = {}
+        for r in records:
+            by_category[r.category] = by_category.get(r.category, 0) + (r.own_cost or 0)
+        context.update(records=records, total=sum((r.price_local or 0 for r in records), 0),
+                       by_category=sorted(by_category.items(), key=lambda kv: -kv[1]),
+                       validities=ExpenseService(db).current_validities(vehicle.id))
+    elif tab == "notes":
+        context.update(notes=VehicleNoteService(db).search(ids))
+    elif tab == "tires":
+        context.update(mounted_tires=open_mounts(db, vehicle.id), swaps=TireSwapService(db).for_vehicles(ids),
+                       checks=TireTreadCheckService(db).for_vehicles(ids),
+                       defects=(db.query(TireDefect).filter(TireDefect.vehicle_id == vehicle.id)
+                                .order_by(TireDefect.defect_date.desc(), TireDefect.id.desc()).all()),
+                       can_delete_swap={})
+    return render(request, "vehicles/detail.html", **context)
 
 
 @router.get("/{vehicle_id}/edit")
@@ -183,7 +246,7 @@ async def activate_vehicle(request: Request, vehicle_id: int, user=Depends(get_c
     vehicle = service.get_vehicle_for_user(vehicle_id, user, ROLE_EDITOR)
     service.update_vehicle(vehicle, {"is_active": True})
     flash(request, "Vozidlo bylo aktivováno.")
-    return RedirectResponse(f"/vehicles/{vehicle_id}", status_code=303)
+    return RedirectResponse(f"/vehicles/{vehicle_id}?tab=detail", status_code=303)
 
 
 @router.post("/{vehicle_id}/deactivate")
@@ -192,7 +255,7 @@ async def deactivate_vehicle(request: Request, vehicle_id: int, user=Depends(get
     vehicle = service.get_vehicle_for_user(vehicle_id, user, ROLE_EDITOR)
     service.update_vehicle(vehicle, {"is_active": False})
     flash(request, "Vozidlo bylo deaktivováno.")
-    return RedirectResponse(f"/vehicles/{vehicle_id}", status_code=303)
+    return RedirectResponse(f"/vehicles/{vehicle_id}?tab=detail", status_code=303)
 
 
 @router.post("/{vehicle_id}/delete")
@@ -274,6 +337,7 @@ async def vehicle_stats(request: Request, vehicle_id: int, period: Optional[str]
     period, date_from, date_to = parse_period(period, today, date_from, date_to)
 
     summary = stats_service.vehicle_summary(vehicle.id, date_from, date_to)
-    return render(request, "vehicles/stats.html", vehicle=vehicle, summary=summary,
-                  breakdown=stats_service.fuel_breakdown(vehicle.id, date_from, date_to), period=period, years=years, role=service.get_role(vehicle, user),
-                  date_from=date_from, date_to=date_to)
+    return render(request, "vehicles/stats.html", summary=summary,
+                  breakdown=stats_service.fuel_breakdown(vehicle.id, date_from, date_to), period=period, years=years,
+                  date_from=date_from, date_to=date_to, tab="stats",
+                  **vehicle_head(db, vehicle, service.get_role(vehicle, user)))

@@ -1,0 +1,25 @@
+{# Tabulka kontrol dezénu. Vstup: checks, editable_ids, show_vehicle #}
+{% import "_macros.html" as m with context %}
+{% set with_vehicle = show_vehicle is not defined or show_vehicle %}
+{% if checks %}
+<div class="card">
+    <h2>Kontroly dezénu</h2>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Datum</th>{% if with_vehicle %}<th>Vozidlo</th>{% endif %}<th class="num">Tachometr</th><th>Naměřeno (mm)</th><th></th></tr></thead>
+        <tbody>
+        {% for c in checks %}
+        <tr>
+            <td class="nowrap">{{ c.check_date|date }}</td>
+            {% if with_vehicle %}<td>{{ m.color_dot(c.vehicle) }} <a href="/vehicles/{{ c.vehicle.id }}">{{ c.vehicle.display_name }}</a></td>{% endif %}
+            <td class="num">{{ c.odometer|km }}</td>
+            <td>{% for tire, readings in c.by_tire() %}<div>{{ m.season_icon(tire.season) }} <a href="/tires/{{ tire.id }}">{{ tire.label }}</a>: <span class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</span></div>{% endfor %}
+                {% if c.note %}<div class="small muted">{{ c.note }}</div>{% endif %}</td>
+            <td class="actions-cell">{% if c.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/tire-checks/{{ c.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Místa{% endblock %}
+{% macro volumes(v) -%}
+{% for unit, amount in v.items() %}{{ amount|num(0) }} {{ unit }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}
+{%- endmacro %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Místa</h1>
+        <div class="sub">Kde jste byli, s jakým vozidlem a kolik jste utratili</div>
+    </div>
+</div>
+
+<nav class="subnav" aria-label="Druh místa">
+    {% for key, label in kinds.items() %}
+    <a href="/places?kind={{ key }}"{% if key == kind %} class="active" aria-current="page"{% endif %}>{{ label }}<span class="count">{{ counts[key] }}</span></a>
+    {% endfor %}
+</nav>
+
+<div class="card">
+    {% call m.period_filter("/places", vehicles, filters) %}<input type="hidden" name="kind" value="{{ kind }}">{% endcall %}
+
+    {% if kind == "station" %}
+    {% if brands %}
+    <div class="table-wrap">
+    <table class="stations">
+        <thead><tr>
+            <th>Značka / stanice</th><th class="num">Tankování</th><th class="num">Množství</th>
+            <th class="num">Celkem</th><th class="num" title="Průměrná cena za litr (vážená množstvím)">Kč/l</th>
+            <th class="num">Naposledy</th>
+        </tr></thead>
+        {% for b in brands %}
+        <tbody>
+        <tr class="group-row">
+            <td>{{ b.brand }}{% if b.stations|length > 1 %} <span class="muted small">({{ b.stations|length }} {{ "stanice" if b.stations|length < 5 else "stanic" }})</span>{% endif %}</td>
+            <td class="num">{{ b.count }}</td>
+            <td class="num">{{ volumes(b.volume) }}</td>
+            <td class="num">{{ b.cost|czk(0) }}</td>
+            <td class="num">{{ b.avg_price|num(2) if b.avg_price else "–" }}</td>
+            <td class="num">{{ b.last|date }}</td>
+        </tr>
+        {% for s in b.stations %}
+        {% set url = place_url("station", s.name, s.address) %}
+        <tr class="child-row">
+            <td>
+                {% if s.address %}{% if url %}<a href="{{ url }}">{{ s.address }}</a>{% else %}{{ s.address }}{% endif %}{% if s.name and s.name != b.brand %}<div class="muted small">{{ s.name }}</div>{% endif %}
+                {% elif url %}<a href="{{ url }}">{{ s.name }}</a><div class="muted small">adresa neuvedena</div>
+                {% else %}<span class="muted">bez názvu</span>{% endif %}
+            </td>
+            <td class="num">{{ s.count }}</td>
+            <td class="num">{{ volumes(s.volume) }}</td>
+            <td class="num">{{ s.cost|czk(0) }}</td>
+            <td class="num">{{ s.avg_price|num(2) if s.avg_price else "–" }}</td>
+            <td class="num">{{ s.last|date }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        {% endfor %}
+    </table>
+    </div>
+    {% else %}<div class="empty">Ve zvoleném období nejsou žádná tankování.</div>{% endif %}
+
+    {% elif items %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>{{ "Servis" if kind == "service" else "Místo" }}</th><th class="num">{{ "Návštěv" if kind == "service" else "Výdajů" }}</th>
+            <th class="num">Utraceno</th><th>Vozidla</th><th class="num">Naposledy</th></tr></thead>
+        <tbody>
+        {% for p in items %}
+        <tr>
+            <td><a href="{{ p.url }}"><strong>{{ p.name }}</strong></a></td>
+            <td class="num">{{ p.count }}</td>
+            <td class="num">{{ p.cost|czk(0) }}</td>
+            <td class="small">{{ p.vehicles|join(", ") }}</td>
+            <td class="num nowrap">{{ p.last|date }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><td>Celkem ({{ items|length }} míst)</td><td class="num">{{ total_count }}</td><td class="num">{{ total_cost|czk(0) }}</td><td colspan="2"></td></tr></tfoot>
+    </table>
+    </div>
+    {% elif kind == "service" %}
+    <div class="empty">Ve zvoleném období není žádný servis se zapsaným místem. Místo vyplníte u servisu v poli „Místo / servis“.</div>
+    {% else %}
+    <div class="empty">Ve zvoleném období není žádný výdaj se zapsaným místem. Místo (myčka, parkoviště, prodejna…) vyplníte u výdaje.</div>
+    {% endif %}
+</div>
+{% endblock %}

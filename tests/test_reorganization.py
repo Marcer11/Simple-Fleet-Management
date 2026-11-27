@@ -33,7 +33,7 @@ def test_default_intervals_apply_unless_vehicle_overrides(app, db):
                                    "st:Výměna oleje": "on", "currency_code": "CZK"})
     alerts = [a for a in collect_alerts(db, vehicles) if a.kind == "interval"]
     assert any(a.vehicle.id == car and a.title == "Výměna oleje" and a.status.level == "overdue" for a in alerts)
-    detail = client.get(f"/vehicles/{car}").text
+    detail = client.get(f"/vehicles/{car}?tab=service").text
     assert "univerzální" in detail and "/intervals/add?vehicle_id=%d&amp;service_type=V%%C3%%BDm%%C4%%9Bna%%20oleje" % car in detail
 
     # vlastní interval vozidla má přednost (vypnutý interval univerzální vypne)

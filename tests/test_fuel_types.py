@@ -129,7 +129,7 @@ def test_consumption_by_category_and_breakdown(app, db):
     assert round(float(names["Natural 98"]["consumption"]), 2) == round((38 + 36) / 2000 * 100, 2)
     assert float(names["Natural 95"]["consumption"]) == 7.4
 
-    page = client.get(f"/vehicles/{vid}").text
+    page = client.get(f"/vehicles/{vid}?tab=fuel").text
     assert "Spotřeba a palivo" in page and "alternativní" in page and "Natural 98" in page
     assert "Spotřeba a palivo" in client.get(f"/vehicles/{vid}/stats?period=all").text
 

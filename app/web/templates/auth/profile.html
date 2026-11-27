@@ -1,13 +1,8 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Profil{% endblock %}
+{% block title %}Nastavení{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Profil</h1>
-        <div class="sub">{{ current_user.email }}</div>
-    </div>
-</div>
+{{ m.settings_head("account") }}
 
 <div class="grid grid-2">
     <div class="card">
@@ -72,13 +67,6 @@
         {% endif %}
     </div>
     {% endif %}
-
-    <div class="card">
-        <h2>Paliva</h2>
-        <p class="small muted">Seznam paliv nabízených při tankování (např. Natural 95, Verva Diesel) a jejich druh
-            pro výpočet spotřeby.</p>
-        <div class="form-actions"><a class="btn" href="/fuel-types">Upravit seznam paliv</a></div>
-    </div>
 
     <div class="card" id="api-key">
         <h2>API klíč pro Timeline</h2>

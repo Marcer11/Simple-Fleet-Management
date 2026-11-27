@@ -8,10 +8,10 @@
         <div class="sub">Kde jsou, kolik najely a jak dlouho vydržely</div>
     </div>
     <div class="actions">
-        <a class="btn" href="/tire-defects/add">Poškození</a>
-        <a class="btn" href="/tire-checks/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Kontrola dezénu</a>
-        <a class="btn" href="/tire-swaps/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Přezutí</a>
-        <a class="btn btn-primary" href="/tires/add">+ Pneumatika</a>
+        <a class="btn" href="/tire-defects/add">{{ m.icon("plus") }} Poškození</a>
+        <a class="btn" href="/tire-checks/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">{{ m.icon("plus") }} Kontrola dezénu</a>
+        <a class="btn" href="/tire-swaps/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">{{ m.icon("plus") }} Přezutí</a>
+        <a class="btn btn-primary" href="/tires/add">{{ m.icon("plus") }} Pneumatika</a>
     </div>
 </div>
 
@@ -25,7 +25,7 @@
         {% for level, text in r.warnings %}
         <li>
             <span class="badge badge-{{ level }}">{{ "Výměna" if level == "danger" else "Brzy" }}</span>
-            <span class="what">{{ m.season_icon(r.tire.season) }} <a href="/tires/{{ r.tire.id }}/edit"><strong>{{ r.tire.label }}</strong></a>
+            <span class="what">{{ m.season_icon(r.tire.season) }} <a href="/tires/{{ r.tire.id }}"><strong>{{ r.tire.label }}</strong></a>
                 {% if r.mount %}<span class="small muted">· {{ r.mount.vehicle.display_name }}, {{ r.mount.position_label|lower }}</span>{% endif %}</span>
             <span class="small">{{ text }}</span>
         </li>
@@ -97,7 +97,7 @@
         {% set t = r.tire %}
         <tr{% if r.status == "retired" %} class="muted-row"{% endif %}>
             <td>
-                {{ m.season_icon(t.season) }} <a href="/tires/{{ t.id }}/edit"><strong>{{ t.label }}</strong></a>
+                {{ m.season_icon(t.season) }} <a href="/tires/{{ t.id }}"><strong>{{ t.label }}</strong></a>
                 <div class="small muted">{{ [t.quantity_label, t.size, t.rim_label, ("DOT " ~ t.dot) if t.dot]|select|join(" · ") }}</div>
             </td>
             <td>
@@ -119,7 +119,6 @@
             <td class="num">{{ r.cost|czk(0) if r.cost else "–" }}{% if r.cost_per_1000 %}<div class="small muted">{{ r.cost_per_1000|czk(0) }}/1000 km</div>{% endif %}</td>
             <td class="actions-cell">
                 {% if r.status != "retired" %}<a class="btn btn-sm" href="/tire-swaps/add?tire_id={{ t.id }}{% if r.mount %}&vehicle_id={{ r.mount.vehicle_id }}{% endif %}">Nasadit</a>{% endif %}
-                <a class="btn btn-sm" href="/tires/{{ t.id }}/edit">Detail</a>
             </td>
         </tr>
         {% endfor %}
@@ -132,77 +131,8 @@
     {% endif %}
 </div>
 
-{% if swaps %}
-<div class="card">
-    <h2>Přezutí</h2>
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Nasazeno</th><th>Sundáno (dezén)</th><th>Kde</th><th class="num">Cena</th><th></th></tr></thead>
-        <tbody>
-        {% for s in swaps %}
-        <tr>
-            <td class="nowrap">{{ s.swap_date|date }}</td>
-            <td>{{ m.color_dot(s.vehicle) }} {{ s.vehicle.display_name }}</td>
-            <td class="num">{{ s.odometer|km }}</td>
-            {% set stayed = s.removed|map(attribute="tire_id")|list %}
-            <td>{% for mnt in s.mounted %}{% if mnt.tire_id in stayed %}<span class="muted">{{ mnt.tire.label }} <span class="small">(zůstává – {{ mnt.position_label|lower }})</span></span>{% else %}{{ mnt.tire.label }} <span class="small muted">({{ mnt.position_label|lower }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">jen sundáno</span>{% endfor %}</td>
-            {% set gone = s.removed|selectattr("vehicle_id", "equalto", s.vehicle_id)|list %}
-            <td>{% for mnt in gone %}{{ mnt.tire.label }}{% if mnt.tire_id in stayed %} <span class="small muted">(zčásti)</span>{% endif %}{% if mnt.treads_label %} <span class="small muted">({{ mnt.treads_label }} mm)</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">–</span>{% endfor %}</td>
-            <td>{{ s.place_label }}{% if s.service_record and s.service_record.place %} <span class="small muted">· {{ s.service_record.place }}</span>{% endif %}</td>
-            <td class="num">{{ s.service_record.price_local|czk(0) if s.service_record and s.service_record.price_local is not none else "–" }}</td>
-            <td class="actions-cell">{% if s.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/tire-swaps/{{ s.id }}/edit">Upravit</a>{% endif %}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
-</div>
-{% endif %}
-
-{% if checks %}
-<div class="card">
-    <h2>Kontroly dezénu</h2>
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Naměřeno (mm)</th><th></th></tr></thead>
-        <tbody>
-        {% for c in checks %}
-        <tr>
-            <td class="nowrap">{{ c.check_date|date }}</td>
-            <td>{{ m.color_dot(c.vehicle) }} {{ c.vehicle.display_name }}</td>
-            <td class="num">{{ c.odometer|km }}</td>
-            <td>{% for tire, readings in c.by_tire() %}<div>{{ m.season_icon(tire.season) }} {{ tire.label }}: <span class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</span></div>{% endfor %}
-                {% if c.note %}<div class="small muted">{{ c.note }}</div>{% endif %}</td>
-            <td class="actions-cell">{% if c.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/tire-checks/{{ c.id }}/edit">Upravit</a>{% endif %}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
-</div>
-{% endif %}
-
-{% if defects %}
-<div class="card">
-    <h2>Poškození</h2>
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Datum</th><th>Pneumatika</th><th>Pozice</th><th>Co se stalo</th><th class="num">Oprava</th><th></th></tr></thead>
-        <tbody>
-        {% for d in defects %}
-        <tr>
-            <td class="nowrap">{{ d.defect_date|date }}{% if d.odometer %}<div class="small muted">{{ d.odometer|km }}</div>{% endif %}</td>
-            <td>{{ d.tire.label }}</td>
-            <td>{{ d.position or "–" }}</td>
-            <td>{{ d.description }}</td>
-            <td class="num">{{ d.expense.price_local|czk(0) if d.expense else "–" }}</td>
-            <td class="actions-cell"><a class="btn btn-sm" href="/tire-defects/{{ d.id }}/edit">Upravit</a></td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
-</div>
-{% endif %}
+{% include "tires/_swaps.html" %}
+{% include "tires/_checks.html" %}
+{% include "tires/_defects.html" %}
 
 {% endblock %}

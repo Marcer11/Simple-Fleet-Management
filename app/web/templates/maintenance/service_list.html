@@ -3,11 +3,13 @@
 {% block title %}Servis{% endblock %}
 {% block content %}
 <div class="page-head">
-    <h1>Servis</h1>
+    <div>
+        <h1>Servis</h1>
+        <div class="sub">Pravidelný servis a historie · servisy najdete v <a href="/places?kind=service">Místech</a></div>
+    </div>
     <div class="actions">
-        <a class="btn" href="/tires{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">Pneumatiky</a>
-        <a class="btn" href="/service-intervals">Servisní intervaly</a>
-        <a class="btn btn-primary" href="/services/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Zapsat servis</a>
+        <a class="btn" href="/services/export.csv?{{ request.query_params }}">Export CSV</a>
+        <a class="btn btn-primary" href="/services/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">{{ m.icon("plus") }} Servis</a>
     </div>
 </div>
 
@@ -15,7 +17,7 @@
     <div class="card-head">
         <h2>Pravidelný servis</h2>
         <div class="actions">
-            <a class="small" href="/service-intervals">Univerzální intervaly</a>
+            <a class="small" href="/service-intervals">Univerzální intervaly (nastavení)</a>
             <a class="btn btn-sm" href="/intervals/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Interval vozidla</a>
         </div>
     </div>
@@ -43,10 +45,7 @@
 </div>
 
 <div class="card">
-    <div class="card-head">
-        <h2>Historie servisu</h2>
-        <a class="btn btn-sm" href="/services/export.csv?{{ request.query_params }}">Export CSV</a>
-    </div>
+    <h2>Historie servisu</h2>
     {% call m.period_filter("/services", vehicles, filters) %}
     <div class="field">
         <label for="flt-type">Typ</label>
@@ -57,27 +56,7 @@
     </div>
     {% endcall %}
     {% if records %}
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Datum</th><th>Vozidlo</th><th>Typ</th><th>Místo</th><th class="num">Tachometr</th><th class="num">Cena</th><th></th></tr></thead>
-        <tbody>
-        {% for r in records %}
-        <tr>
-            <td class="nowrap">{{ r.service_date|date }}{% if r.service_time %} {{ r.service_time.strftime("%H:%M") }}{% endif %}
-                {%- if r.date_to and (r.date_to != r.service_date or r.time_to) %}<br><span class="muted small">do {% if r.date_to != r.service_date %}{{ r.date_to|date }} {% endif %}{% if r.time_to %}{{ r.time_to.strftime("%H:%M") }}{% endif %}</span>{% endif %}
-                {%- if r.duration %}<br><span class="muted small">v servisu {{ r.duration }}</span>{% endif %}</td>
-            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>
-            <td>{{ r.service_type }}{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
-            <td>{{ r.place or "" }}</td>
-            <td class="num">{{ r.odometer|km }}{% if r.distance is not none %}<br><span class="muted small">servis najel {{ r.distance|km }}</span>{% endif %}</td>
-            <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" and r.price_paid %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}{{ m.insurance_note(r) }}</td>
-            <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/services/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-        <tfoot><tr><td colspan="5">Celkem</td><td class="num">{{ total|czk }}</td><td></td></tr></tfoot>
-    </table>
-    </div>
+    {% include "maintenance/_service_table.html" %}
     {% else %}<div class="empty">Ve zvoleném období není žádný servis.</div>{% endif %}
 </div>
 {% endblock %}

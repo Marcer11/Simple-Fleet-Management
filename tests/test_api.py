@@ -151,7 +151,7 @@ def test_api_vehicles(app):
         ("2026-07-05T10:00:00", "Garáž", "U chalupy", 1200)]
     assert v["notes"][0]["author"]
     assert (v["engine_volume"], v["engine_power"]) == (1498, 110)
-    detail = client.get(f"/vehicles/{active}").text.replace(" ", " ")
+    detail = client.get(f"/vehicles/{active}?tab=detail").text.replace(" ", " ")
     assert "1 498 cm³" in detail and "110 kW" in detail and "150 k" in detail
     assert 'value="1498"' in client.get(f"/vehicles/{active}/edit").text
     assert v["fuel_types"] == ["Benzín"] and v["vignette"] is None and v["rental"] is None

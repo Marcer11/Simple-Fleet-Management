@@ -159,11 +159,9 @@ async def _save_tire(request, db, user, tire):
     except (ValidationError, NotFoundError) as e:
         db.rollback()
         return render(request, "tires/tire_form.html", status_code=400, values=form.values, error=str(e),
-                      stats=tire_stats(db, [tire])[0] if tire else None,
-                      defects=TireDefectService(db).for_tires([tire.id]) if tire else [],
                       **_tire_context(db, user, tire))
     flash(request, f"Pneumatika {tire.label} byla uložena.")
-    return RedirectResponse("/tires", status_code=303)
+    return RedirectResponse(f"/tires/{tire.id}", status_code=303)
 
 
 @router.post("/tires/add")
@@ -171,12 +169,21 @@ async def tire_add(request: Request, user=Depends(get_current_user), db=Depends(
     return await _save_tire(request, db, user, None)
 
 
+@router.get("/tires/{tire_id}")
+async def tire_detail(request: Request, tire_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    """Detail pneumatiky: stav, životnost, údaje, historie nasazení, měření dezénu a poškození."""
+    tire = TireService(db).get_for_user(user, tire_id)
+    checks = sorted({r.check for r in tire.tread_readings}, key=lambda c: (c.check_date, c.id), reverse=True)
+    return render(request, "tires/detail.html", tire=tire, stats=tire_stats(db, [tire])[0],
+                  checks=[(c, [r for r in c.readings if r.tire_id == tire.id]) for c in checks],
+                  defects=TireDefectService(db).for_tires([tire.id]),
+                  editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)))
+
+
 @router.get("/tires/{tire_id}/edit")
 async def tire_edit_form(request: Request, tire_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     tire = TireService(db).get_for_user(user, tire_id)
-    stats = tire_stats(db, [tire])[0]
-    return render(request, "tires/tire_form.html", values=_tire_values(tire), stats=stats,
-                  defects=TireDefectService(db).for_tires([tire.id]), **_tire_context(db, user, tire))
+    return render(request, "tires/tire_form.html", values=_tire_values(tire), **_tire_context(db, user, tire))
 
 
 @router.post("/tires/{tire_id}/edit")

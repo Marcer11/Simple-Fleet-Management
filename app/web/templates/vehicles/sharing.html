@@ -4,8 +4,8 @@
 {% block content %}
 <div class="page-head">
     <div>
+        {{ m.back("/vehicles/%d?tab=detail"|format(vehicle.id), vehicle.display_name) }}
         <h1>Sdílení vozidla</h1>
-        <div class="sub"><a href="/vehicles/{{ vehicle.id }}">{{ m.color_dot(vehicle) }} {{ vehicle.display_name }}</a></div>
     </div>
 </div>
 

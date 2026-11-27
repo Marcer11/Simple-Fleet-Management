@@ -4,10 +4,10 @@
 {% block content %}
 <div class="page-head">
     <div>
+        {{ m.back("/fuel-records", "Tankování") }}
         <h1>Import tankování</h1>
         <div class="sub">CSV se sloupci: {{ columns|join("; ") }}</div>
     </div>
-    <div class="actions"><a class="btn" href="/fuel-records">Tankování</a></div>
 </div>
 
 {% if not vehicles %}
@@ -23,7 +23,7 @@
         </div>
         {{ m.select("price_mode", "Cena v souboru je", [("unit", "za litr / jednotku"), ("total", "celková")]) }}
     </div>
-    <p class="small muted">{% if timeline_ready %}Pumpa se u každého tankování dohledá v Timeline; když se nenajde, použije se pumpa ze souboru (bez adresy).{% else %}Pumpa a adresa se dohledají v Timeline, když si v <a href="/profile">profilu</a> nastavíte API klíč – jinak se použije pumpa ze souboru.{% endif %}</p>
+    <p class="small muted">{% if timeline_ready %}Pumpa se u každého tankování dohledá v Timeline; když se nenajde, použije se pumpa ze souboru (bez adresy).{% else %}Pumpa a adresa se dohledají v Timeline, když si v <a href="/profile">Nastavení</a> nastavíte API klíč – jinak se použije pumpa ze souboru.{% endif %}</p>
     <div class="form-actions"><button type="submit" class="btn btn-primary">Načíst náhled</button></div>
 </form>
 {% endif %}

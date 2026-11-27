@@ -2,12 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}Statistiky – {{ vehicle.display_name }}{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Statistiky</h1>
-        <div class="sub"><a href="/vehicles/{{ vehicle.id }}">{{ m.color_dot(vehicle) }} {{ vehicle.display_name }}</a></div>
-    </div>
-</div>
+{% include "vehicles/_head.html" %}
 
 {{ m.stats_period(period, years, date_from, date_to) }}
 

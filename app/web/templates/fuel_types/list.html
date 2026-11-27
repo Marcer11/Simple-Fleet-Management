@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Paliva{% endblock %}
+{% block title %}Paliva · Nastavení{% endblock %}
 {# Výběr více značek pump: zaškrtávátka + pole pro další značku. form_id = atribut form (řádek tabulky) #}
 {% macro brand_picker(selected, form_id=none, open=false) -%}
 {%- set chosen = selected|map("lower")|list %}
@@ -19,13 +19,8 @@
 {%- endmacro %}
 
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Paliva</h1>
-        <div class="sub">Nabídka ve formuláři tankování</div>
-    </div>
-    <div class="actions"><a class="btn" href="/fuel-records/add">+ Přidat tankování</a></div>
-</div>
+{{ m.settings_head("fuels") }}
+<p class="muted small">Paliva nabízená ve formuláři tankování, jejich druh pro výpočet spotřeby a pumpy, kde se prodávají.</p>
 
 <div class="card">
     <div class="table-wrap">

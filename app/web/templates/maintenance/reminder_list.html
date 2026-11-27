@@ -3,8 +3,11 @@
 {% block title %}Upomínky{% endblock %}
 {% block content %}
 <div class="page-head">
-    <h1>Upomínky</h1>
-    <a class="btn btn-primary" href="/reminders/add">+ Přidat upomínku</a>
+    <div>
+        {{ m.back("/", "Přehled") }}
+        <h1>Upomínky</h1>
+    </div>
+    <a class="btn btn-primary" href="/reminders/add">{{ m.icon("plus") }} Upomínka</a>
 </div>
 
 <div class="tabs">

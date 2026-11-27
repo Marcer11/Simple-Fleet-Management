@@ -1,0 +1,29 @@
+{# Poznámky k vozidlu #}
+{% import "_macros.html" as m with context %}
+{% set vid = vehicle.id %}
+{% if can_edit %}
+<div class="tab-actions">
+    <a class="btn btn-sm btn-primary" href="/notes/add?vehicle_id={{ vid }}">{{ m.icon("plus") }} Poznámka</a>
+</div>
+{% endif %}
+<div class="card">
+    {% if notes %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Kdy</th><th>Typ</th><th>Poznámka</th><th class="num">Tachometr</th><th>Zapsal</th><th></th></tr></thead>
+        <tbody>
+        {% for n in notes %}
+        <tr>
+            <td class="nowrap">{{ n.note_datetime|datetime }}</td>
+            <td>{{ n.category or "–" }}</td>
+            <td style="white-space: pre-line">{{ n.text or "" }}</td>
+            <td class="num">{{ n.odometer|km if n.odometer is not none else "–" }}</td>
+            <td class="small muted">{{ n.created_by.name if n.created_by else "" }}</td>
+            <td class="actions-cell">{% if can_edit %}<a class="btn btn-sm" href="/notes/{{ n.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty small">Zatím žádné poznámky. Poznámkou zapíšete třeba garáž, nehodu nebo nepojízdnost.</div>{% endif %}
+</div>

@@ -8,19 +8,21 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-    <link rel="stylesheet" href="/static/style.css?v=16">
+    <link rel="stylesheet" href="/static/style.css?v=17">
     {% block head %}{% endblock %}
 </head>
 <body>
 {% set nav_items = [
     ("/", "Přehled"),
     ("/vehicles", "Vozidla"),
+    ("/tires", "Pneumatiky"),
     ("/fuel-records", "Tankování"),
     ("/services", "Servis"),
     ("/expenses", "Výdaje"),
-    ("/tires", "Pneumatiky"),
+    ("/places", "Místa"),
     ("/stats", "Statistiky"),
 ] %}
+{% set in_settings = path.startswith("/profile") or path.startswith("/fuel-types") or path.startswith("/service-intervals") %}
 <header class="topbar">
     <div class="topbar-inner">
         <a class="brand" href="/"><img src="/static/icons/icon.svg" alt="">Fleet Manager</a>
@@ -31,7 +33,7 @@
             {% endfor %}
         </nav>
         <div class="user-menu">
-            <a href="/profile" title="Profil"><span class="user-name">{{ current_user.name }}</span><span aria-hidden="true"> ⚙</span></a>
+            <a href="/profile" class="settings-link{% if in_settings %} active{% endif %}" title="Nastavení" aria-label="Nastavení – {{ current_user.name }}"><span class="user-name">{{ current_user.name }}</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></a>
             <form method="post" action="/logout">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit">Odhlásit</button>
@@ -53,7 +55,7 @@
 </main>
 
 <footer class="site">Simple Fleet Manager</footer>
-<script src="/static/app.js?v=17"></script>
+<script src="/static/app.js?v=18"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

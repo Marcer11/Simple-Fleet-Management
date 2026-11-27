@@ -1,0 +1,32 @@
+{# Hlavička vozidla se záložkami (detail i statistiky). Vstup: vehicle, role, can_edit, tire_seasons, vehicle_tabs, tab #}
+{% import "_macros.html" as m with context %}
+{% set vid = vehicle.id %}
+<div class="page-head">
+    <div>
+        {{ m.back("/vehicles", "Vozidla") }}
+        <h1>{{ m.color_dot(vehicle, "lg") }} {{ vehicle.brand }} {{ vehicle.model }}</h1>
+        <div class="sub plate-line">
+            {{ m.vehicle_icon(vehicle) }} {{ vehicle.license_plate or "bez SPZ" }} {{ m.tire_icons(tire_seasons) }}
+            {% if vehicle.is_rental %}<span class="badge badge-info">Půjčené{% if vehicle.lender %} · {{ vehicle.lender }}{% endif %}</span>{% endif %}
+            {% if vehicle.out_of_order %}<span class="badge badge-danger">{{ vehicle.out_of_order_text }}</span>{% endif %}
+            {% set in_service = vehicle.active_service %}
+            {% if in_service %}<a class="badge badge-warning" href="/services/{{ in_service.id }}/edit" title="Zapsat vyzvednutí">V servisu od {{ in_service.service_date|date }}</a>{% endif %}
+            {% if vehicle.is_returned %}<span class="badge">Vráceno {{ vehicle.last_rental.date_to|date }}</span>{% endif %}
+            {% if vehicle.is_sold %}<span class="badge">Prodáno {{ vehicle.sale_date|date }}</span>
+            {% elif not vehicle.is_active %}<span class="badge">Neaktivní</span>{% endif %}
+            {{ m.role_badge(role) }}
+        </div>
+    </div>
+    {% if can_edit %}
+    <div class="actions">
+        <a class="btn" href="/vehicles/{{ vid }}/edit">{{ m.icon("edit") }} Upravit</a>
+        {{ m.add_menu(vehicle, "Zapsat") }}
+    </div>
+    {% endif %}
+</div>
+<nav class="subnav" aria-label="Vozidlo">
+    {% for key, label in vehicle_tabs.items() %}
+    <a href="/vehicles/{{ vid }}{{ ('?tab=' ~ key) if key }}"{% if key == tab %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+    <a href="/vehicles/{{ vid }}/stats"{% if tab == "stats" %} class="active" aria-current="page"{% endif %}>Statistiky</a>
+</nav>

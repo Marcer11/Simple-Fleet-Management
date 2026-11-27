@@ -223,6 +223,7 @@ class Expense(InsuranceMixin, Base):
     expense_date = Column(Date, nullable=False)
     category = Column(String(30), nullable=False)
     description = Column(String(200), nullable=True)
+    place = Column(String(100), nullable=True)             # kde (myčka, parkoviště, prodejna…)
     odometer = Column(Integer, nullable=True)
     price_paid = Column(DECIMAL(12, 3), nullable=False)
     currency_code = Column(CHAR(3), nullable=False, default="CZK")

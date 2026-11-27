@@ -5,7 +5,7 @@ klíč a stejný způsob přihlášení.
 
 ## Přihlášení
 
-- Uživatel si klíč vygeneruje v evidenci v **Profilu → API klíč pro Timeline**. Klíč má tvar `fk_…`
+- Uživatel si klíč vygeneruje v evidenci v **Nastavení → Účet → API klíč pro Timeline**. Klíč má tvar `fk_…`
   (46 znaků) a ukáže se jen jednou.
 - Klíč se posílá jen v hlavičce, nikdy v adrese:
   ```

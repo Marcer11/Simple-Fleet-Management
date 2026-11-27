@@ -11,7 +11,8 @@
 {{ m.field("time_to", "Čas vyzvednutí", "time") }}
 {{ m.field("odometer_to", "Km při vyzvednutí", "number", min=0, step=1, inputmode="numeric") }}
 {{ m.checkbox("in_progress", "Vozidlo je zatím v servisu (nevyzvednuto)") }}
-{{ m.field("place", "Místo / servis", maxlength=100) }}
+{{ m.field("place", "Místo / servis", maxlength=100, list="service-places", autocomplete="off") }}
+{{ m.datalist("service-places", places) }}
 <fieldset class="field field-wide">
     <legend>Co se dělalo <span class="req">*</span></legend>
     <div class="check-grid">

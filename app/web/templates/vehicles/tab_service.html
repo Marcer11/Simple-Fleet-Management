@@ -1,0 +1,62 @@
+{# Servis vozidla: pravidelný servis, upomínky a historie servisu #}
+{% import "_macros.html" as m with context %}
+{% set vid = vehicle.id %}
+{% if can_edit %}
+<div class="tab-actions">
+    <a class="btn btn-sm" href="/intervals/add?vehicle_id={{ vid }}">{{ m.icon("plus") }} Interval</a>
+    <a class="btn btn-sm" href="/reminders/add?vehicle_id={{ vid }}">{{ m.icon("plus") }} Upomínka</a>
+    <a class="btn btn-sm btn-primary" href="/services/add?vehicle_id={{ vid }}">{{ m.icon("plus") }} Servis</a>
+</div>
+{% endif %}
+<div class="grid grid-2">
+<div class="card">
+    <div class="card-head">
+        <h2>Pravidelný servis</h2>
+        <a class="small" href="/service-intervals">Univerzální intervaly</a>
+    </div>
+    {% if intervals %}
+    <ul class="alert-list">
+        {% for i, s in intervals %}
+        <li>
+            {% if i.is_active %}{{ m.status_badge(s) }}{% else %}<span class="badge">Vypnuto</span>{% endif %}
+            <span class="what">
+                <strong>{{ i.service_type }}</strong>
+                <span class="muted small">· každých {% if i.interval_months %}{{ i.interval_months }} měs.{% endif %}{% if i.interval_months and i.interval_km %} / {% endif %}{% if i.interval_km %}{{ i.interval_km|km }}{% endif %}{% if i.is_default %} · univerzální{% endif %}</span><br>
+                {% if i.is_active %}<span class="small">Další: {% if s.due_date %}{{ s.due_date|date }}{% endif %}{% if s.due_date and s.due_km %}, {% endif %}{% if s.due_km %}{{ s.due_km|km }}{% endif %}{% if not s.due_date and not s.due_km %}neznámé{% endif %}
+                {% if s.days_left is not none or s.km_left is not none %}<span class="muted">({{ s.summary }})</span>{% endif %}</span>{% endif %}
+            </span>
+            {% if can_edit %}{{ m.interval_edit_link(i) }}{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}<div class="empty small">Žádný pravidelný servis.</div>{% endif %}
+</div>
+<div class="card">
+    <h2>Upomínky</h2>
+    {% if reminders %}
+    <ul class="alert-list">
+        {% for r, s in reminders %}
+        <li>
+            {{ m.status_badge(s) }}
+            <span class="what">
+                <strong>{{ r.title }}</strong>{% if r.repeat != "none" or r.repeat_km %} <span class="muted small">↻</span>{% endif %}<br>
+                <span class="small">{% if r.due_date %}{{ r.due_date|date }}{% endif %}{% if r.due_date and r.due_odometer %}, {% endif %}{% if r.due_odometer %}{{ r.due_odometer|km }}{% endif %} <span class="muted">({{ s.summary }})</span></span>
+            </span>
+            {% if can_edit %}
+            <span class="actions">
+                <form method="post" action="/reminders/{{ r.id }}/done">{{ m.csrf() }}<input type="hidden" name="next" value="{{ path }}?tab=service"><button class="btn btn-sm" type="submit">Vyřízeno</button></form>
+                <a class="btn btn-sm" href="/reminders/{{ r.id }}/edit">Upravit</a>
+            </span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}<div class="empty small">Žádné upomínky.</div>{% endif %}
+</div>
+</div>
+<div class="card">
+    <h2>Historie servisu</h2>
+    {% if records %}
+    {% with show_vehicle=false %}{% include "maintenance/_service_table.html" %}{% endwith %}
+    {% else %}<div class="empty small">Zatím žádný servis.</div>{% endif %}
+</div>

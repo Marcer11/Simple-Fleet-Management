@@ -12,6 +12,7 @@ from services.maintenance_service import (
     RentalService, DefaultIntervalService, ServiceRecordService, ServiceIntervalService, ReminderService, ExpenseService, VehicleNoteService,
     collect_alerts, vignette_valid_until,
 )
+from services import places
 from services.vehicle_service import VehicleService
 from web.common import (
     visible_vehicles, check_record_access, default_filter_period, csv_response, decimal_csv,
@@ -114,7 +115,8 @@ def _service_context(db, user):
     known = {t.lower() for t in SERVICE_TYPES}
     used = ServiceRecordService(db).get_service_types(VehicleService(db).get_accessible_ids(user))
     return {"service_types": SERVICE_TYPES + [t for t in used if t.lower() not in known],
-            "type_prefix": TYPE_PREFIX}
+            "type_prefix": TYPE_PREFIX,
+            "places": places.known_names(db, "service", VehicleService(db).get_accessible_ids(user))}
 
 
 register_crud(router, CrudConfig(
@@ -434,6 +436,7 @@ def _read_expense(form):
         "expense_date": form.date("expense_date", "Datum", required=True),
         "category": form.str("category", "Kategorie", required=True, max_len=30),
         "description": form.str("description", "Popis", max_len=200),
+        "place": form.str("place", "Místo", max_len=100),
         "odometer": form.int("odometer", "Stav tachometru", min_value=0),
         "price_paid": form.decimal("price_paid", "Částka", required=True, min_value=0),
         "currency_code": form.str("currency_code", "Měna") or "CZK",
@@ -457,7 +460,7 @@ def _read_expense(form):
 def _expense_values(e):
     return {
         "vehicle_id": str(e.vehicle_id), "expense_date": iso(e.expense_date), "category": e.category,
-        "description": e.description or "", "odometer": iso(e.odometer), "price_paid": iso(e.price_paid),
+        "description": e.description or "", "place": e.place or "", "odometer": iso(e.odometer), "price_paid": iso(e.price_paid),
         "currency_code": e.currency_code, "manual_rate": rate_from_record(e), "note": e.note or "",
         "valid_from": iso(e.valid_from), "valid_until": iso(e.valid_until),
         "remind": "on" if e.reminder_id else "", "vignette_variant": _guess_variant(e),
@@ -489,6 +492,7 @@ register_crud(router, CrudConfig(
         "vignette_category": VIGNETTE_CATEGORY,
         "vignette_variants": {key: label for key, (label, _) in VIGNETTE_VARIANTS.items()},
         "vignette_days": {key: days for key, (_, days) in VIGNETTE_VARIANTS.items()},
+        "places": places.known_names(db, "expense", VehicleService(db).get_accessible_ids(user)),
     },
     messages={"created": "Výdaj byl uložen.", "deleted": "Výdaj byl smazán."},
     prefill_params=("category", "valid_from"),
@@ -513,10 +517,10 @@ async def list_expenses(request: Request, user=Depends(get_current_user), db=Dep
 async def export_expenses(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
     _, ids, date_from, date_to, filters = _list_filters(request, db, user)
     records = ExpenseService(db).search(ids, date_from, date_to, category=filters["category"])
-    rows = [(r.vehicle.display_name, r.expense_date, r.category, r.description, r.odometer,
+    rows = [(r.vehicle.display_name, r.expense_date, r.category, r.description, r.place, r.odometer,
              decimal_csv(r.price_paid), r.currency_code, decimal_csv(r.price_local),
              decimal_csv(r.insurance_paid), r.insurer, r.note) for r in records]
-    return csv_response("vydaje.csv", ["Vozidlo", "Datum", "Kategorie", "Popis", "Tachometr", "Částka", "Měna",
+    return csv_response("vydaje.csv", ["Vozidlo", "Datum", "Kategorie", "Popis", "Místo", "Tachometr", "Částka", "Měna",
                                        "Částka CZK", "Uhradila pojišťovna", "Pojišťovna", "Poznámka"], rows)
 
 

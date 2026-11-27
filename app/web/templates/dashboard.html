@@ -7,14 +7,7 @@
         <h1>Přehled</h1>
         <div class="sub">Aktivní vozidla: {{ active|length }} · Náklady {{ year }}: {{ total_year_cost|czk(0) }}</div>
     </div>
-    {% if editable %}
-    <div class="actions quick-actions">
-        <a class="btn btn-primary" href="/fuel-records/add">{{ m.icon("fuel") }} Tankování</a>
-        <a class="btn" href="/services/add">{{ m.icon("service") }} Servis</a>
-        <a class="btn" href="/expenses/add">{{ m.icon("expense") }} Výdaj</a>
-        <a class="btn" href="/notes/add">{{ m.icon("note") }} Poznámka</a>
-    </div>
-    {% endif %}
+    {% if editable %}<div class="actions">{{ m.add_menu() }}</div>{% endif %}
 </div>
 
 {% if not vehicles %}

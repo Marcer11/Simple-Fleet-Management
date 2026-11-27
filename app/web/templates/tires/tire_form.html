@@ -4,28 +4,12 @@
 {% block content %}
 <div class="page-head">
     <div>
+        {% if tire %}{{ m.back("/tires/%d"|format(tire.id), tire.label) }}{% else %}{{ m.back("/tires", "Pneumatiky") }}{% endif %}
         <h1>{{ "Upravit pneumatiku" if tire else "Nová pneumatika" }}</h1>
         <div class="sub">Jedna guma, pár nebo celá sada – kterou nasazujete společně</div>
     </div>
-    {% if tire %}
-    <div class="actions">
-        <a class="btn" href="/tire-defects/add?tire_id={{ tire.id }}">Zapsat poškození</a>
-        {% if not tire.retired_date %}<a class="btn btn-primary" href="/tire-swaps/add?tire_id={{ tire.id }}{% if stats.mount %}&vehicle_id={{ stats.mount.vehicle_id }}{% endif %}">Nasadit / přezout</a>{% endif %}
-    </div>
-    {% endif %}
 </div>
 
-{% if tire and stats %}
-<div class="kpis">
-    <div class="kpi"><div class="label">Stav</div><div class="value">{% if stats.mount %}Na voze{% elif tire.retired_date %}Vyřazeno{% else %}Uskladněno{% endif %}</div>
-        <div class="hint">{% if stats.mount %}{{ stats.mount.vehicle.display_name }} – {{ stats.mount.position_label|lower }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
-    <div class="kpi"><div class="label">Najeto</div><div class="value">{{ stats.km|km }}</div><div class="hint">{{ stats.mounts }}× nasazeno, {{ stats.used_years|num(1) }} roku na voze</div></div>
-    <div class="kpi"><div class="label">Dezén</div><div class="value">{{ (stats.tread|num(1) ~ " mm") if stats.tread is not none else "–" }}</div>
-        <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.min_tread|num(1) }} mm{% endif %}</div></div>
-    <div class="kpi"><div class="label">Náklady</div><div class="value">{{ stats.cost|czk(0) if stats.cost else "–" }}</div><div class="hint">{{ (stats.cost_per_1000|czk(0) ~ " / 1000 km") if stats.cost_per_1000 else "" }}</div></div>
-</div>
-{% if stats.warnings %}<div class="card">{% for level, text in stats.warnings %}<span class="badge badge-{{ level }}">{{ text }}</span> {% endfor %}</div>{% endif %}
-{% endif %}
 
 <form method="post" class="card">
     {{ m.csrf() }}
@@ -85,47 +69,11 @@
     </details>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Uložit</button>
-        <a class="btn" href="/tires">Zrušit</a>
+        <a class="btn" href="{{ '/tires/%d'|format(tire.id) if tire else '/tires' }}">Zrušit</a>
     </div>
 </form>
 
 {% if tire %}
-<div class="card">
-    <h2>Historie nasazení</h2>
-    {% if tire.mounts %}
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Vozidlo</th><th>Pozice</th><th>Nasazeno</th><th>Sundáno</th><th class="num">Najeto</th><th class="num">Dezén při sundání</th></tr></thead>
-        <tbody>
-        {% for mnt in tire.mounts|reverse %}
-        <tr>
-            <td>{{ m.color_dot(mnt.vehicle) }} {{ mnt.vehicle.display_name }}</td>
-            <td>{{ mnt.position_label }}</td>
-            <td class="nowrap">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
-            <td class="nowrap">{% if mnt.removed_date %}{{ mnt.removed_date|date }}<div class="small muted">{{ mnt.removed_km|km }}</div>{% else %}<span class="badge badge-ok">na voze</span>{% endif %}</td>
-            <td class="num">{{ ((mnt.removed_km - mnt.mounted_km)|km) if mnt.removed_km is not none else "–" }}</td>
-            <td class="num">{{ (mnt.treads_label ~ " mm") if mnt.treads_label else "–" }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
-    {% else %}<div class="empty small">Zatím nenasazeno. <a href="/tire-swaps/add?tire_id={{ tire.id }}">Nasadit na vozidlo</a></div>{% endif %}
-</div>
-
-{% if defects %}
-<div class="card">
-    <h2>Poškození</h2>
-    <ul class="alert-list">
-        {% for d in defects %}
-        <li><span class="what"><strong>{{ d.description }}</strong> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}</span></span>
-            <span class="small">{{ d.expense.price_local|czk(0) if d.expense else "" }}</span>
-            <span class="actions"><a class="btn btn-sm" href="/tire-defects/{{ d.id }}/edit">Upravit</a></span></li>
-        {% endfor %}
-    </ul>
-</div>
-{% endif %}
-
 <details class="danger-zone">
     <summary>Smazání pneumatiky</summary>
     <p class="small muted">Smaže pneumatiku včetně historie nasazení a poškození, výdaje za nákup a opravy a přezutí,

@@ -28,7 +28,7 @@ def test_vehicle_fuel_form_and_fuel_offer(app, db):
     r = post(client, "/vehicles/add", {"brand": "X", "model": "Y", "alt_fuel": "LPG"})
     assert r.status_code == 400 and "hlavní palivo" in r.text
 
-    detail = client.get(f"/vehicles/{lpg}").text
+    detail = client.get(f"/vehicles/{lpg}?tab=detail").text
     assert "Benzín + LPG" in detail
     edit = client.get(f"/vehicles/{lpg}/edit").text
     assert '<option value="LPG" selected>' in edit

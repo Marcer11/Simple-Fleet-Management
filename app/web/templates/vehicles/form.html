@@ -3,7 +3,10 @@
 {% block title %}{{ "Upravit vozidlo" if vehicle else "Nové vozidlo" }}{% endblock %}
 {% block content %}
 <div class="page-head">
-    <h1>{{ "Upravit vozidlo" if vehicle else "Nové vozidlo" }}</h1>
+    <div>
+        {% if vehicle %}{{ m.back("/vehicles/%d?tab=detail"|format(vehicle.id), vehicle.display_name) }}{% else %}{{ m.back("/vehicles", "Vozidla") }}{% endif %}
+        <h1>{{ "Upravit vozidlo" if vehicle else "Nové vozidlo" }}</h1>
+    </div>
 </div>
 
 <form method="post" class="card">

@@ -11,6 +11,8 @@
     {{ m.datalist("categories", categories) }}
 </div>
 {{ m.field("description", "Popis", maxlength=200) }}
+{{ m.field("place", "Místo", maxlength=100, list="expense-places", autocomplete="off") }}
+{{ m.datalist("expense-places", places) }}
 {{ m.field("odometer", "Stav tachometru (km)", "number", min=0, step=1) }}
 {{ m.price_fields(currencies, "Částka", required=true) }}
 {{ m.insurance_toggle() }}

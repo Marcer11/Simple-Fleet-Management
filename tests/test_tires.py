@@ -242,7 +242,7 @@ def test_vehicle_tire_sizes(app, db):
     # rozměry dle TP jsou jen údaj u vozidla - nikam se nepropisují
     form = client.get("/tires/add").text
     assert "vehicle-sizes" not in form and "225/45 R17 91W" not in form
-    assert "205/55 R16 91V" in client.get(f"/vehicles/{car}").text
+    assert "205/55 R16 91V" in client.get(f"/vehicles/{car}?tab=detail").text
     wrong = add_tire(client, db, size="195/65 R15 91H")
     page = client.get(f"/tire-swaps/add?vehicle_id={car}").text
     assert '"fits"' not in page and "dle TP" not in page

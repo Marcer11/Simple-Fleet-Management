@@ -1,0 +1,17 @@
+{# Tankování vozidla: spotřeba podle paliva a všechna tankování #}
+{% import "_macros.html" as m with context %}
+{% set vid = vehicle.id %}
+<div class="tab-actions">
+    <a class="btn btn-sm" href="/fuel-records/export.csv?vehicle_id={{ vid }}&amp;all=1">Export CSV</a>
+    {% if can_edit %}<a class="btn btn-sm" href="/fuel-records/import?vehicle_id={{ vid }}">Import CSV</a>
+    <a class="btn btn-sm btn-primary" href="/fuel-records/add?vehicle_id={{ vid }}">{{ m.icon("plus") }} Tankování</a>{% endif %}
+</div>
+{% if breakdown %}
+{% with title="Spotřeba a palivo" %}{% include "vehicles/_fuel_breakdown.html" %}{% endwith %}
+{% endif %}
+<div class="card">
+    <h2>Všechna tankování</h2>
+    {% if records %}
+    {% with show_vehicle=false %}{% include "fuel/_table.html" %}{% endwith %}
+    {% else %}<div class="empty small">Zatím žádné tankování.</div>{% endif %}
+</div>

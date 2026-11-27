@@ -3,10 +3,13 @@
 {% block title %}Výdaje{% endblock %}
 {% block content %}
 <div class="page-head">
-    <h1>Výdaje</h1>
+    <div>
+        <h1>Výdaje</h1>
+        <div class="sub">Pojištění, STK, známky, parkování a další · místa najdete v <a href="/places?kind=expense">Místech</a></div>
+    </div>
     <div class="actions">
         <a class="btn" href="/expenses/export.csv?{{ request.query_params }}">Export CSV</a>
-        <a class="btn btn-primary" href="/expenses/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">+ Přidat výdaj</a>
+        <a class="btn btn-primary" href="/expenses/add{% if filters.vehicle_id %}?vehicle_id={{ filters.vehicle_id }}{% endif %}">{{ m.icon("plus") }} Výdaj</a>
     </div>
 </div>
 
@@ -22,24 +25,7 @@
     {% endcall %}
 
     {% if records %}
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Datum</th><th>Vozidlo</th><th>Kategorie</th><th>Popis</th><th class="num">Částka</th><th></th></tr></thead>
-        <tbody>
-        {% for r in records %}
-        <tr>
-            <td class="nowrap">{{ r.expense_date|date }}</td>
-            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>
-            <td>{{ r.category }}</td>
-            <td>{{ r.description or "" }}</td>
-            <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}{{ m.insurance_note(r) }}</td>
-            <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/expenses/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-        <tfoot><tr><td colspan="4">Celkem</td><td class="num">{{ total|czk }}</td><td></td></tr></tfoot>
-    </table>
-    </div>
+    {% include "maintenance/_expense_table.html" %}
     {% else %}<div class="empty">Ve zvoleném období nejsou žádné výdaje.</div>{% endif %}
 </div>
 

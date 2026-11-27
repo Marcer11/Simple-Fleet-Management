@@ -21,11 +21,26 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
 ## Funkce
 
 ### Rozvržení aplikace
-- **výchozí obrazovka (Přehled)**: rychlé zápisy (tankování, servis, výdaj, poznámka), upozornění
-  a pod nimi časová osa všech vozidel; filtr časové osy je skrytý a zobrazí se po kliknutí na „Filtr“
-- **detail vozidla**: nahoře tlačítka pro zápis k vozidlu (tankování, servis, výdaj, poznámka, přezutí,
-  kontrola dezénu, upomínka), hlavní čísla a upozornění; údaje o vozidle, pneumatiky, pravidelný servis
-  a upomínky a spotřeba jsou ve sbalovacích sekcích; pod nimi časová osa vozidla
+- **hlavní menu**: Přehled, Vozidla, Pneumatiky (entity s vlastním detailem), Tankování, Servis, Výdaje
+  (činnosti s nimi), Místa a Statistiky; ozubené kolo vpravo otevře **Nastavení** se záložkami Účet
+  (jméno, heslo, klíče pro Timeline), Paliva a Servisní intervaly
+- **výchozí obrazovka (Přehled)**: tlačítko „+ Nový záznam“ s nabídkou (tankování, servis, výdaj, poznámka,
+  přezutí, kontrola dezénu, upomínka), upozornění a pod nimi časová osa všech vozidel; filtr časové osy je
+  skrytý a zobrazí se po kliknutí na „Filtr“
+- **detail vozidla** má záložky: *Přehled* (hlavní čísla, upozornění, souhrn tankování / servisu / výdajů
+  a platností / nasazených pneumatik a časová osa), *Údaje* (údaje o vozidle, platnosti, půjčení, aktivace
+  a sdílení), *Tankování* (spotřeba podle paliva a všechna tankování), *Servis* (pravidelný servis,
+  upomínky, historie), *Výdaje*, *Poznámky*, *Pneumatiky* (na voze, přezutí, kontroly dezénu, poškození)
+  a *Statistiky*; v hlavičce je „Upravit“ a nabídka „Zapsat“ s předvyplněným vozidlem
+  (včetně Nepojízdné / Opět pojízdné)
+- **detail pneumatiky** jen pro čtení (stav, životnost, údaje, historie nasazení, kontroly dezénu,
+  poškození); úprava je samostatný formulář přes „Upravit“
+- **Místa** (`/places`): servisy, čerpací stanice a místa výdajů podle názvů zapsaných u záznamů (stejný
+  název s jinou velikostí písmen je stejné místo, pumpa se rozlišuje podle adresy); detail místa ukáže
+  počet návštěv, útratu, první a poslední návštěvu, rozpis po vozidlech a po letech a všechny návštěvy;
+  názvy míst v tabulkách jsou odkazy na detail; ve formuláři servisu a výdaje se nabízí dříve zapsaná místa
+- **podstránky a detaily** mají nad nadpisem odkaz zpět („‹ Vozidla“, „‹ Pneumatiky“, „‹ Místa“…);
+  tlačítka pro přidání jsou vždy „+ Co“ (+ Tankování, + Servis, + Pneumatika…)
 - **tabulky** lze řadit kliknutím na záhlaví sloupce (datum, číslo i text, prázdné hodnoty vždy na konci); řazení se drží v adrese
   stránky (`?sort=`)
 - **návrat po úpravě**: z formuláře (přidání, úprava, smazání i Zrušit) se aplikace vrátí na stránku, odkud
@@ -104,14 +119,15 @@ Smazání vozidla je schované dole ve formuláři úprav.
     Hotově = Hotovost; částečně `1` = nedotankováno do plna
   - pumpa (i s adresou) se u každého tankování dohledá v Timeline, jinak se použije pumpa ze souboru bez adresy
   - nejdřív náhled (chybné řádky, už zapsaná tankování se stejným časem a tachometrem se přeskočí), pak uložení
-- **vlastní seznam paliv** (Tankování → Paliva): nově zadané palivo se uloží do nabídky; každé palivo má
+- **vlastní seznam paliv** (Nastavení → Paliva): nově zadané palivo se uloží do nabídky; každé palivo má
   *druh* (benzín, nafta, LPG, CNG, elektřina), podle kterého se počítá spotřeba a určuje jednotka –
   Natural 95 i Verva 100 jsou benzín; přejmenování se promítne i do zapsaných tankování
 - palivo lze navázat na **značky pump** (Verva 100 → ORLEN, V-Power → Shell, i víc značek);
   (výběr zaškrtnutím z pump, kde se tankovalo, a známých značek, další lze dopsat); formulář tankování pak
   u dané pumpy nabízí jen její paliva a paliva bez omezení a tankování paliva u jiné pumpy nejde uložit
-- **přehled čerpacích stanic** – značka (podle názvu stanice) → jednotlivé stanice podle adresy,
-  počet tankování, množství, útrata, průměrná cena za litr
+- **přehled čerpacích stanic** (Místa → Čerpací stanice) – značka (podle názvu stanice) → jednotlivé
+  stanice podle adresy, počet tankování, množství, útrata, průměrná cena za litr; stará adresa
+  `/fuel-records/stations` přesměruje
 - **API pro Timeline** – Timeline si načítá tankování vozidla podle SPZ do výdajů výletů
 
 ### Servis, pravidelný servis, upomínky
@@ -171,7 +187,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
 - přezutí a poškození jsou i na časové ose
 
 ### Výdaje a statistiky
-- ostatní výdaje (dálniční známka, pojištění, mytí, mýtné, …) s převodem měny, export CSV
+- ostatní výdaje (dálniční známka, pojištění, mytí, mýtné, …) s místem (myčka, parkoviště…),
+  převodem měny a exportem CSV
 - **platnost výdaje** (dálniční známka, pojištění, …) – u dálniční známky stačí zvolit typ
   (roční / 30denní / 10denní / jednodenní) a konec platnosti se dopočítá; aplikace založí
   upomínku konce platnosti, při zápisu nové známky tu starou uzavře a v detailu vozidla
@@ -252,7 +269,7 @@ Registraci přes web lze vypnout: `ALLOW_REGISTRATION=false`.
 Aplikace Timeline (běží na stejném serveru) zná podle záznamů polohy, u které pumpy uživatel byl.
 - v `.env` nastavte `TIMELINE_URL` (např. `http://127.0.0.1:5000`); prázdné = funkce vypnutá
 - každý uživatel si v Timeline vygeneruje API klíč (Správa → Účet a zabezpečení → API klíč)
-  a uloží ho ve svém **Profilu**; klíč se zobrazuje jen zkráceně
+  a uloží ho v **Nastavení → Účet**; klíč se zobrazuje jen zkráceně
 - dotaz jde přes server aplikace (`/fuel-records/timeline-stop`), klíč se do prohlížeče
   nedostane; klíč ani poloha se nelogují, timeout 5 s, výpadek Timeline neblokuje uložení
 
@@ -260,7 +277,7 @@ Aplikace Timeline (běží na stejném serveru) zná podle záznamů polohy, u k
 
 Opačným směrem si Timeline z evidence načítá tankování vozidla podle SPZ a seznam vozidel.
 Popis pro volající stranu (parametry, ukázky odpovědí, význam položek) je v [docs/api.md](docs/api.md).
-- uživatel si v **Profilu → API klíč pro Timeline** vygeneruje klíč (`fk_…`); ukáže se jen jednou,
+- uživatel si v **Nastavení → Účet → API klíč pro Timeline** vygeneruje klíč (`fk_…`); ukáže se jen jednou,
   v databázi je uložen jen jeho SHA-256; „Vygenerovat nový“ starý zneplatní, „Zrušit“ ho smaže
 - Timeline běží na stejném serveru, volá tedy přímo `http://127.0.0.1:8000/api/refuels`
 

@@ -11,7 +11,7 @@ from services.errors import ValidationError, NotFoundError
 from services.fuel_record_service import FuelRecordService
 from services.fuel_type_service import FuelTypeService
 from services.pricing import fuel_prices
-from services.stations import brand_patterns, station_overview
+from services.stations import brand_patterns
 from services.vehicle_service import VehicleService
 from web.common import (
     editable_vehicles, visible_vehicles, check_record_access, flash_vehicle_alerts,
@@ -77,14 +77,10 @@ async def export_fuel_records(request: Request, user=Depends(get_current_user), 
 
 
 @router.get("/stations")
-async def stations(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
-    """Přehled čerpacích stanic: značka -> konkrétní stanice, počet tankování a útrata."""
-    vehicles, records, filters = _filters(request, db, user)
-    overview = station_overview(records)
-    totals = {"count": len(records), "cost": sum((r.price_local or 0 for r in records), 0),
-              "brands": len(overview), "stations": sum(len(b["stations"]) for b in overview)}
-    return render(request, "fuel/stations.html", vehicles=vehicles, filters=filters,
-                  overview=overview, totals=totals)
+async def stations(request: Request):
+    """Čerpací stanice jsou v Místech (stará adresa přesměruje i s filtrem)."""
+    query = request.url.query
+    return RedirectResponse("/places?kind=station" + (f"&{query}" if query else ""), status_code=303)
 
 
 # ----------------------------------------------------------------------

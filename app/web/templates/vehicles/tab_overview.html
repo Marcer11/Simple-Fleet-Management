@@ -1,0 +1,66 @@
+{# Přehled vozidla: hlavní čísla, upozornění, souhrn po oblastech a časová osa #}
+{% import "_macros.html" as m with context %}
+{% set vid = vehicle.id %}
+<div class="kpis kpis-compact">
+    <div class="kpi"><div class="label">Tachometr</div><div class="value">{{ odometer|km }}</div></div>
+    <div class="kpi">
+        <div class="label">Průměrná spotřeba</div>
+        <div class="value">
+            {% for ft, info in avg_consumption.items() %}{{ info.value|num(1) }}<span class="small"> {{ info.unit }}/100 km</span>{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}
+        </div>
+    </div>
+    <div class="kpi"><div class="label">Najezdí za rok</div><div class="value">{{ profile.km_per_year|km if profile.km_per_year else "–" }}</div></div>
+    <div class="kpi"><div class="label">Náklady {{ today.year }}</div><div class="value">{{ year_cost|czk(0) if year_cost else "–" }}</div></div>
+</div>
+
+{% if alerts %}
+<div class="card">
+    <h2>Upozornění</h2>
+    {% with show_vehicle=false %}{% include "_alerts.html" %}{% endwith %}
+</div>
+{% endif %}
+
+<div class="summary-grid">
+    <section class="summary-card">
+        <h3>{{ m.icon("fuel") }} <a href="/vehicles/{{ vid }}?tab=fuel">Tankování</a></h3>
+        {% if last_fuel %}
+        <div class="line">Naposledy {{ last_fuel.refuel_datetime|date }} · {{ last_fuel.volume_liters|qty }} {{ last_fuel.unit }}{% if last_fuel.station_name %} · {{ m.place_link("station", last_fuel.station_name, last_fuel.station_address) }}{% endif %}</div>
+        <div class="line muted">Letos {{ fuel_year.count }}× · {{ fuel_year.cost|czk(0) }}</div>
+        {% else %}<div class="line muted">Zatím žádné tankování.</div>{% endif %}
+    </section>
+    <section class="summary-card">
+        <h3>{{ m.icon("service") }} <a href="/vehicles/{{ vid }}?tab=service">Servis</a></h3>
+        {% if last_service %}
+        <div class="line">Naposledy {{ last_service.service_date|date }} · {{ last_service.service_type|truncate(40) }}{% if last_service.place %} · {{ m.place_link("service", last_service.place) }}{% endif %}</div>
+        {% else %}<div class="line muted">Zatím žádný servis.</div>{% endif %}
+        {% if next_due %}{% set i, s = next_due %}
+        <div class="line">Příště: {{ i.title or i.service_type }} {{ m.status_badge(s) }} <span class="muted small">{{ s.summary }}</span></div>
+        {% endif %}
+        {% if services_year %}<div class="line muted">Letos {{ services_year|czk(0) }}</div>{% endif %}
+    </section>
+    <section class="summary-card">
+        <h3>{{ m.icon("expense") }} <a href="/vehicles/{{ vid }}?tab=expenses">Výdaje</a></h3>
+        <div class="line">Letos {{ expenses_year.count }}× · {{ expenses_year.cost|czk(0) }}</div>
+        {% for cat, e, days_left, renew_from in validities %}
+        <div class="line">{{ cat }}: {% if days_left < 0 %}<span class="badge badge-danger">propadlá {{ e.valid_until|date }}</span>{% else %}do {{ e.valid_until|date }}{% if days_left <= 14 %} <span class="badge badge-warning">zbývá {{ days_left }} d</span>{% endif %}{% endif %}</div>
+        {% endfor %}
+    </section>
+    <section class="summary-card">
+        <h3>{{ m.icon("tire") }} <a href="/vehicles/{{ vid }}?tab=tires">Pneumatiky</a></h3>
+        {% for mnt in mounted_tires %}
+        <div class="line">{{ m.season_icon(mnt.tire.season) }} <a href="/tires/{{ mnt.tire.id }}">{{ mnt.tire.label }}</a> <span class="muted small">· {{ mnt.position_label }}{% if odometer is not none and odometer >= mnt.mounted_km %} · {{ (odometer - mnt.mounted_km)|km }}{% endif %}</span></div>
+        {% else %}<div class="line muted">Na voze není zapsaná žádná pneumatika.</div>{% endfor %}
+    </section>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>Časová osa</h2>
+        <a class="small" href="/?vehicle_id={{ vid }}&amp;all=1#timeline">Celá časová osa</a>
+    </div>
+    {% if events %}
+    {% with show_vehicle=false, with_year=true %}{% include "_timeline_items.html" %}{% endwith %}
+    {% else %}
+    <div class="empty small">Zatím žádné události.</div>
+    {% endif %}
+</div>

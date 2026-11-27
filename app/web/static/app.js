@@ -801,6 +801,23 @@
     })();
 
     // ------------------------------------------------------------------
+    // Rozbalovací nabídka (<details data-menu>): zavře se kliknutím mimo ni, výběrem položky nebo Esc
+    // ------------------------------------------------------------------
+    document.addEventListener("click", function (event) {
+        document.querySelectorAll("details[data-menu][open]").forEach(function (menu) {
+            if (!menu.contains(event.target) || event.target.closest(".menu-panel a")) menu.removeAttribute("open");
+        });
+    });
+    document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        document.querySelectorAll("details[data-menu][open]").forEach(function (menu) {
+            menu.removeAttribute("open");
+            const summary = menu.querySelector("summary");
+            if (summary) summary.focus();
+        });
+    });
+
+    // ------------------------------------------------------------------
     // Návrat po úpravě záznamu: odkaz na formulář (…/add, …/edit, import) dostane ?next=<tato stránka>,
     // formulář pak po uložení, zrušení i smazání vrátí uživatele zpět (i se scrollem).
     // ------------------------------------------------------------------

@@ -2,13 +2,8 @@
 {% import "_macros.html" as m with context %}
 {% block title %}Servisní intervaly{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Servisní intervaly</h1>
-        <div class="sub">Platí pro všechna vaše vozidla, pokud u vozidla nenastavíte jinak.</div>
-    </div>
-    <div class="actions"><a class="btn" href="/services">Servis</a></div>
-</div>
+{{ m.settings_head("intervals") }}
+<p class="muted small">Univerzální servisní intervaly platí pro všechna vaše vozidla, pokud u vozidla nenastavíte jinak.</p>
 
 <div class="card">
     {% if intervals %}

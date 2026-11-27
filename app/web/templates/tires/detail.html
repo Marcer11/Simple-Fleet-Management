@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ tire.label }}{% endblock %}
+{% block content %}
+{% set mount = stats.mount %}
+<div class="page-head">
+    <div>
+        {{ m.back("/tires", "Pneumatiky") }}
+        <h1>{{ m.season_icon(tire.season) }} {{ tire.label }}</h1>
+        <div class="sub plate-line">
+            {{ [tire.quantity_label, tire.size, tire.rim_label, ("DOT " ~ tire.dot) if tire.dot]|select|join(" · ") }}
+            {% if stats.status == "mounted" %}<span class="badge badge-ok">Na voze</span>
+            {% elif stats.status == "stored" %}<span class="badge badge-muted">Uskladněno</span>
+            {% else %}<span class="badge badge-muted">Vyřazeno {{ tire.retired_date|date }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/tires/{{ tire.id }}/edit">{{ m.icon("edit") }} Upravit</a>
+        {% if not tire.retired_date %}
+        <details class="menu" data-menu>
+            <summary class="btn btn-primary">{{ m.icon("plus") }} Zapsat</summary>
+            <div class="menu-panel">
+                <a href="/tire-swaps/add?tire_id={{ tire.id }}{% if mount %}&amp;vehicle_id={{ mount.vehicle_id }}{% endif %}">{{ m.icon("tire") }} {{ "Přezutí" if mount else "Nasazení na vozidlo" }}</a>
+                {% if mount %}<a href="/tire-checks/add?vehicle_id={{ mount.vehicle_id }}">{{ m.icon("gauge") }} Kontrola dezénu</a>{% endif %}
+                <a href="/tire-defects/add?tire_id={{ tire.id }}">{{ m.icon("warning") }} Poškození</a>
+            </div>
+        </details>
+        {% else %}
+        <a class="btn" href="/tire-defects/add?tire_id={{ tire.id }}">{{ m.icon("plus") }} Poškození</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="kpis kpis-compact">
+    <div class="kpi"><div class="label">Kde je</div><div class="value">{% if mount %}Na voze{% elif tire.retired_date %}Vyřazeno{% else %}Uskladněno{% endif %}</div>
+        <div class="hint">{% if mount %}<a href="/vehicles/{{ mount.vehicle_id }}?tab=tires">{{ mount.vehicle.display_name }}</a> – {{ mount.position_label|lower }}{% elif tire.retired_date %}{{ tire.retired_reason or "" }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
+    <div class="kpi"><div class="label">Najeto</div><div class="value">{{ stats.km|km }}</div><div class="hint">{{ stats.mounts }}× nasazeno, {{ stats.used_years|num(1) }} roku na voze</div></div>
+    <div class="kpi"><div class="label">Dezén</div><div class="value">{{ (stats.tread|num(1) ~ " mm") if stats.tread is not none else "–" }}</div>
+        <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.min_tread|num(1) }} mm{% endif %}</div></div>
+    <div class="kpi"><div class="label">Náklady</div><div class="value">{{ stats.cost|czk(0) if stats.cost else "–" }}</div><div class="hint">{{ (stats.cost_per_1000|czk(0) ~ " / 1000 km") if stats.cost_per_1000 else "" }}</div></div>
+</div>
+{% if stats.warnings %}<div class="card">{% for level, text in stats.warnings %}<span class="badge badge-{{ level }}">{{ text }}</span> {% endfor %}</div>{% endif %}
+
+<div class="card">
+    <div class="card-head">
+        <h2>Údaje</h2>
+        <a class="btn btn-sm" href="/tires/{{ tire.id }}/edit">{{ m.icon("edit") }} Upravit údaje</a>
+    </div>
+    <div class="details">
+        <div><div class="label">Typ</div><div class="value">{{ tire.season }}</div></div>
+        <div><div class="label">Výrobce a model</div><div class="value">{{ [tire.manufacturer, tire.model]|select|join(" ") }}</div></div>
+        <div><div class="label">Rozměr</div><div class="value">{{ tire.size or "–" }}</div></div>
+        <div><div class="label">Počet kusů</div><div class="value">{{ tire.quantity }}</div></div>
+        <div><div class="label">Disky</div><div class="value">{{ tire.rim_label or "–" }}</div></div>
+        <div><div class="label">Rok výroby</div><div class="value">{{ tire.production_year or "–" }}{% if tire.dot %} <span class="small muted">· DOT {{ tire.dot }}</span>{% endif %}{% if tire.age_years is not none %} <span class="small muted">· {{ tire.age_years }} let</span>{% endif %}</div></div>
+        <div><div class="label">Dezén při nákupu</div><div class="value">{{ (tire.new_tread_mm|num(1) ~ " mm") if tire.new_tread_mm is not none else "–" }}</div></div>
+        <div><div class="label">Minimální dezén</div><div class="value">{{ tire.min_tread|num(1) }} mm <span class="small muted">· {{ "nastavené" if tire.min_tread_mm is not none else "zákonné" }}</span></div></div>
+        <div><div class="label">Koupeno</div><div class="value">{{ tire.purchase_date|date or "–" }}{% if tire.price_local is not none %} <span class="small muted">· {{ tire.price_local|czk(0) }}</span>{% endif %}</div></div>
+        <div><div class="label">Místo uložení</div><div class="value">{{ tire.storage_location or "–" }}</div></div>
+        {% if tire.retired_date %}<div><div class="label">Vyřazeno</div><div class="value">{{ tire.retired_date|date }}{% if tire.retired_reason %} <span class="small muted">· {{ tire.retired_reason }}</span>{% endif %}</div></div>{% endif %}
+    </div>
+    {% if tire.note %}<p style="white-space: pre-line">{{ tire.note }}</p>{% endif %}
+</div>
+
+<div class="card">
+    <h2>Historie nasazení</h2>
+    {% if tire.mounts %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Vozidlo</th><th>Pozice</th><th>Nasazeno</th><th>Sundáno</th><th class="num">Najeto</th><th class="num">Dezén při sundání</th></tr></thead>
+        <tbody>
+        {% for mnt in tire.mounts|reverse %}
+        <tr>
+            <td>{{ m.color_dot(mnt.vehicle) }} <a href="/vehicles/{{ mnt.vehicle_id }}?tab=tires">{{ mnt.vehicle.display_name }}</a></td>
+            <td>{{ mnt.position_label }}</td>
+            <td class="nowrap">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
+            <td class="nowrap">{% if mnt.removed_date %}{{ mnt.removed_date|date }}<div class="small muted">{{ mnt.removed_km|km }}</div>{% else %}<span class="badge badge-ok">na voze</span>{% endif %}</td>
+            <td class="num">{{ ((mnt.removed_km - mnt.mounted_km)|km) if mnt.removed_km is not none else "–" }}</td>
+            <td class="num">{{ (mnt.treads_label ~ " mm") if mnt.treads_label else "–" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty small">Zatím nenasazeno.{% if not tire.retired_date %} <a href="/tire-swaps/add?tire_id={{ tire.id }}">Nasadit na vozidlo</a>{% endif %}</div>{% endif %}
+</div>
+
+{% if checks %}
+<div class="card">
+    <h2>Kontroly dezénu</h2>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Naměřeno (mm)</th><th></th></tr></thead>
+        <tbody>
+        {% for c, readings in checks %}
+        <tr>
+            <td class="nowrap">{{ c.check_date|date }}</td>
+            <td>{{ m.color_dot(c.vehicle) }} <a href="/vehicles/{{ c.vehicle_id }}?tab=tires">{{ c.vehicle.display_name }}</a></td>
+            <td class="num">{{ c.odometer|km }}</td>
+            <td class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</td>
+            <td class="actions-cell">{% if c.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/tire-checks/{{ c.id }}/edit">Upravit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% if defects %}
+<div class="card">
+    <h2>Poškození</h2>
+    <ul class="alert-list">
+        {% for d in defects %}
+        <li><span class="what"><strong>{{ d.description }}</strong> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}{% if d.vehicle %} · {{ d.vehicle.display_name }}{% endif %}</span></span>
+            <span class="small">{{ d.expense.price_local|czk(0) if d.expense else "" }}</span>
+            <span class="actions"><a class="btn btn-sm" href="/tire-defects/{{ d.id }}/edit">Upravit</a></span></li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

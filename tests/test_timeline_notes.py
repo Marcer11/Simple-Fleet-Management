@@ -60,7 +60,7 @@ def test_vehicle_prices_and_hidden_delete(app, db):
     vehicle = db.get(Vehicle, vid)
     db.refresh(vehicle)
     assert float(vehicle.purchase_price) == 300000 and float(vehicle.sale_price) == 120000.5
-    detail = client.get(f"/vehicles/{vid}").text
+    detail = client.get(f"/vehicles/{vid}?tab=detail").text
     assert "Ztráta hodnoty" in detail and "179 999,50" not in detail  # zaokrouhleno na Kč
     # smazání není v detailu, jen schované ve formuláři úprav
     assert f"/vehicles/{vid}/delete" not in detail
@@ -138,7 +138,7 @@ def test_purchase_and_sale_odometer(app, db):
     assert r.status_code == 303, r.text
     db.expire_all()
     assert db.get(Vehicle, car).owned_km == 100000
-    detail = client.get(f"/vehicles/{car}").text
+    detail = client.get(f"/vehicles/{car}?tab=detail").text
     assert "Najeto za vlastnictví" in detail and "45 000 km" in detail.replace("\xa0", " ")
     timeline = client.get("/timeline?all=1").text.replace("\xa0", " ")
     assert "najeto za vlastnictví 100 000 km" in timeline

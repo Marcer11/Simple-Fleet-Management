@@ -1,0 +1,22 @@
+{# Tabulka výdajů. Vstup: records, total, editable_ids, show_vehicle (výchozí ano) #}
+{% import "_macros.html" as m with context %}
+{% set with_vehicle = show_vehicle is not defined or show_vehicle %}
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Datum</th>{% if with_vehicle %}<th>Vozidlo</th>{% endif %}<th>Kategorie</th><th>Popis</th><th>Místo</th><th class="num">Částka</th><th></th></tr></thead>
+    <tbody>
+    {% for r in records %}
+    <tr>
+        <td class="nowrap">{{ r.expense_date|date }}</td>
+        {% if with_vehicle %}<td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>{% endif %}
+        <td>{{ r.category }}{% if r.valid_until %}<br><span class="muted small">platí do {{ r.valid_until|date }}</span>{% endif %}</td>
+        <td>{{ r.description or "" }}</td>
+        <td>{{ m.place_link("expense", r.place) }}</td>
+        <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}{{ m.insurance_note(r) }}</td>
+        <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/expenses/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td colspan="{{ 5 if with_vehicle else 4 }}">Celkem</td><td class="num">{{ total|czk }}</td><td></td></tr></tfoot>
+</table>
+</div>

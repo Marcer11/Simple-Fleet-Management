@@ -136,14 +136,5 @@
     {% endif %}
 </form>
 
-{% if swap %}
-<div class="card">
-    {% if can_delete %}
-    {{ m.delete_button("/tire-swaps/%d/delete"|format(swap.id), "Smazat přezutí? Pneumatiky se vrátí, jak byly před ním.", "Smazat přezutí", small=false) }}
-    {% else %}
-    <p class="small muted">Přezutí nejde smazat – pneumatiky z něj už byly později sundány. Nejdřív smažte novější přezutí.</p>
-    {% endif %}
-</div>
-{% endif %}
 {% endif %}
 {% endblock %}

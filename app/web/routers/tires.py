@@ -16,7 +16,8 @@ from services.tire_service import (
     tire_stats, wheel_layout,
 )
 from services.vehicle_service import VehicleService
-from web.common import COMMON_CURRENCIES, check_record_access, editable_vehicles, visible_vehicles
+from web import record_views
+from web.common import COMMON_CURRENCIES, check_record_access, editable_vehicles, render_record, visible_vehicles
 from web.deps import get_db, get_current_user, flash, render
 from web.forms import FormReader, iso, parse_filter_int, rate_from_record
 
@@ -317,6 +318,14 @@ def _swap_values(swap):
     return values
 
 
+@router.get("/tire-swaps/{swap_id:int}")
+async def swap_detail(request: Request, swap_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    service = TireSwapService(db)
+    swap = service.get(swap_id)
+    check_record_access(db, user, swap)
+    return render_record(request, db, user, swap, record_views.tire_swap(swap, service.can_delete(swap)))
+
+
 @router.get("/tire-swaps/{swap_id}/edit")
 async def swap_edit_form(request: Request, swap_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     swap = TireSwapService(db).get(swap_id)
@@ -410,6 +419,12 @@ async def defect_add_form(request: Request, user=Depends(get_current_user), db=D
 @router.post("/tire-defects/add")
 async def defect_add(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
     return await _save_defect(request, db, user, None)
+
+
+@router.get("/tire-defects/{defect_id:int}")
+async def defect_detail(request: Request, defect_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    d = _owned_defect(db, user, defect_id)
+    return render(request, "record_detail.html", view=record_views.tire_defect(d), can_edit=True)
 
 
 @router.get("/tire-defects/{defect_id}/edit")
@@ -510,6 +525,13 @@ async def check_add(request: Request, user=Depends(get_current_user), db=Depends
     if not vehicle_id:
         return RedirectResponse("/tire-checks/add", status_code=303)
     return await _save_check(request, db, user, _editable_vehicle(db, user, vehicle_id), None)
+
+
+@router.get("/tire-checks/{check_id:int}")
+async def check_detail(request: Request, check_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    check = TireTreadCheckService(db).get(check_id)
+    check_record_access(db, user, check)
+    return render_record(request, db, user, check, record_views.tire_check(check))
 
 
 @router.get("/tire-checks/{check_id}/edit")

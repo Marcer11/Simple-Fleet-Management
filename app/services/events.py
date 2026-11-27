@@ -132,7 +132,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             if r.station_name:
                 detail += f" · {r.station_name}"
             events.append(Event(KIND_FUEL, r.refuel_datetime, True, by_id[r.vehicle_id], r.fuel_type, detail,
-                                r.odometer, r.price_local, f"/fuel-records/{r.id}/edit"))
+                                r.odometer, r.price_local, f"/fuel-records/{r.id}"))
 
     # servis / výdaj založený přezutím nebo poškozením pneu se ukáže jen jako událost pneumatik
     tire_service_ids = {i for (i,) in session.query(TireSwap.service_record_id)
@@ -160,14 +160,14 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             events.append(Event(KIND_TIRES, _day(s.swap_date), False, by_id[s.vehicle_id], "Přezutí pneumatik",
                                 "\n".join(parts), s.odometer,
                                 s.service_record.price_local if s.service_record else None,
-                                f"/tire-swaps/{s.id}/edit"))
+                                f"/tire-swaps/{s.id}"))
         query = (session.query(TireDefect).options(joinedload(TireDefect.tire), joinedload(TireDefect.expense))
                  .filter(TireDefect.vehicle_id.in_(ids)))
         for d in dated(query, TireDefect.defect_date, False):
             detail = " · ".join(x for x in (d.tire.label, d.position) if x)
             events.append(Event(KIND_TIRES, _day(d.defect_date), False, by_id[d.vehicle_id],
                                 f"Poškození pneu: {d.description}", detail, d.odometer,
-                                d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}/edit",
+                                d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}",
                                 icon="warning"))
         query = (session.query(TireTreadCheck).options(joinedload(TireTreadCheck.readings))
                  .filter(TireTreadCheck.vehicle_id.in_(ids)))
@@ -176,7 +176,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                      for tire, readings in c.by_tire()]
             detail = "\n".join(lines)
             events.append(Event(KIND_TIRES, _day(c.check_date), False, by_id[c.vehicle_id], "Kontrola dezénu",
-                                detail, c.odometer, None, f"/tire-checks/{c.id}/edit", icon="gauge"))
+                                detail, c.odometer, None, f"/tire-checks/{c.id}", icon="gauge"))
 
     # konec nepojízdnosti (poznámka "Opět pojízdné" nebo vyzvednutí ze servisu) ukáže, jak dlouho trvala
     ended = {}
@@ -192,7 +192,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             query = query.filter(ServiceRecord.id.notin_(tire_service_ids))
         # předání a vyzvednutí jsou dvě události, pokud vozidlo zůstalo v servisu přes den
         for r in query.all():
-            url = f"/services/{r.id}/edit"
+            url = f"/services/{r.id}"
             more_days = r.date_to is not None and r.date_to > r.service_date
             if in_range(_day(r.service_date)):
                 stay = []
@@ -233,14 +233,14 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             if r.insurance_claim:
                 parts.append(_insurance_text(r))
             events.append(Event(KIND_EXPENSE, _day(r.expense_date), False, by_id[r.vehicle_id], r.category,
-                                " · ".join(parts), r.odometer, r.own_cost, f"/expenses/{r.id}/edit",
+                                " · ".join(parts), r.odometer, r.own_cost, f"/expenses/{r.id}",
                                 icon=EXPENSE_ICONS.get(r.category.lower(), "expense")))
 
     if KIND_RENTAL in kinds:
         query = session.query(VehicleRental).filter(VehicleRental.vehicle_id.in_(ids))
         # půjčení a vrácení jsou dvě události (vrácení jen se zapsaným koncem půjčení)
         for r in query.all():
-            url = f"/rentals/{r.id}/edit"
+            url = f"/rentals/{r.id}"
             if in_range(_day(r.date_from)):
                 parts = [f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}"
                          + (f" {r.time_to:%H:%M}" if r.time_to else "") if r.date_to else "zatím nevráceno"]
@@ -271,14 +271,14 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             if n.created_by:
                 detail = f"{detail} ({n.created_by.name})" if detail else n.created_by.name
             events.append(Event(KIND_NOTE, n.note_datetime, True, by_id[n.vehicle_id], n.title, detail,
-                                n.odometer, None, f"/notes/{n.id}/edit", icon=_note_icon(n.category)))
+                                n.odometer, None, f"/notes/{n.id}", icon=_note_icon(n.category)))
 
     if KIND_VEHICLE in kinds:
         for v in vehicles:
             if v.purchase_date and in_range(_day(v.purchase_date)):
                 events.append(Event(KIND_VEHICLE, _day(v.purchase_date), False, v, "Nákup vozidla",
                                     odometer=v.purchase_odometer, amount=v.purchase_price,
-                                    url=f"/vehicles/{v.id}/edit", icon="key"))
+                                    url=f"/vehicles/{v.id}?tab=detail", icon="key"))
             if v.sale_date and in_range(_day(v.sale_date)):
                 parts = []
                 if v.value_loss is not None:
@@ -286,7 +286,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                 if v.owned_km is not None:
                     parts.append(f"najeto za vlastnictví {v.owned_km:,} km".replace(",", " "))
                 events.append(Event(KIND_VEHICLE, _day(v.sale_date), False, v, "Prodej vozidla", " · ".join(parts),
-                                    odometer=v.sale_odometer, amount=v.sale_price, url=f"/vehicles/{v.id}/edit"))
+                                    odometer=v.sale_odometer, amount=v.sale_price, url=f"/vehicles/{v.id}?tab=detail"))
 
     # nejnovější nahoře; ve stejný den události s časem před celodenními
     events.sort(key=lambda e: e.order, reverse=True)

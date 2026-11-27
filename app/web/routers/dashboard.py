@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, Response
 
 from services.maintenance_service import collect_alerts
+from services.insights import year_overview
 from services.stats_service import StatsService
 from services.vehicle_service import VehicleService
 from models.vehicle import ROLE_EDITOR
@@ -24,6 +25,7 @@ async def dashboard(request: Request, user=Depends(get_current_user), db=Depends
     timeline = timeline_context(request, db, user)
     return render(request, "dashboard.html", alerts=collect_alerts(db, active), active=active, year=year,
                   total_year_cost=sum(year_costs.values(), 0),
+                  overview=year_overview(db, active, date(year, 1, 1), date.today()) if active else None,
                   editable=vehicle_service.get_accessible_ids(user, ROLE_EDITOR), **timeline)
 
 

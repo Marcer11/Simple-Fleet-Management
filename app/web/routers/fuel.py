@@ -14,9 +14,10 @@ from services.pricing import fuel_prices
 from services.stations import brand_patterns
 from services.vehicle_service import VehicleService
 from web.common import (
-    editable_vehicles, visible_vehicles, check_record_access, flash_vehicle_alerts,
+    editable_vehicles, visible_vehicles, check_record_access, flash_vehicle_alerts, render_record,
     default_filter_period, csv_response, decimal_csv, COMMON_CURRENCIES,
 )
+from web import record_views
 from web.deps import get_db, get_current_user, flash, render
 from web.forms import FormReader, iso, parse_filter_date, parse_filter_int, rate_from_record
 
@@ -305,6 +306,13 @@ async def add_post(request: Request, user=Depends(get_current_user), db=Depends(
     if form.raw.get("next") == "add":
         return RedirectResponse(f"/fuel-records/add?vehicle_id={vehicle.id}", status_code=303)
     return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
+
+
+@router.get("/{record_id:int}")
+async def detail(request: Request, record_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    record = FuelRecordService(db).get_fuel_record(record_id)
+    check_record_access(db, user, record)
+    return render_record(request, db, user, record, record_views.fuel(record))
 
 
 @router.get("/{record_id}/edit")

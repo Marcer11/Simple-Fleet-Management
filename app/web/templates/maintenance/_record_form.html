@@ -23,7 +23,7 @@
         <a class="btn" href="{{ '/vehicles/%d'|format(record.vehicle_id) if record else back_url }}">Zrušit</a>
     </div>
 </form>
-{% if record %}
+{% if record and allow_delete %}
 <div class="card">
     <div class="card-head">
         <span></span>

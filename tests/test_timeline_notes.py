@@ -62,10 +62,10 @@ def test_vehicle_prices_and_hidden_delete(app, db):
     assert float(vehicle.purchase_price) == 300000 and float(vehicle.sale_price) == 120000.5
     detail = client.get(f"/vehicles/{vid}?tab=detail").text
     assert "Ztráta hodnoty" in detail and "179 999,50" not in detail  # zaokrouhleno na Kč
-    # smazání není v detailu, jen schované ve formuláři úprav
-    assert f"/vehicles/{vid}/delete" not in detail
-    edit = client.get(f"/vehicles/{vid}/edit").text
-    assert f"/vehicles/{vid}/delete" in edit and "danger-zone" in edit
+    # smazání je jen ve Správě vozidla (sbalené), ne ve formuláři úprav ani na přehledu
+    assert f"/vehicles/{vid}/delete" in detail and "danger-zone" in detail and "Správa vozidla" in detail
+    assert f"/vehicles/{vid}/delete" not in client.get(f"/vehicles/{vid}").text
+    assert f"/vehicles/{vid}/delete" not in client.get(f"/vehicles/{vid}/edit").text
     timeline = client.get("/timeline?all=1").text
     assert "Prodej vozidla" in timeline and "Nákup vozidla" in timeline
     bad = post(client, f"/vehicles/{vid}/edit", {"brand": "Škoda", "model": "Octavia", "purchase_price": "-5"})

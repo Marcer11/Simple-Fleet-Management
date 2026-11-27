@@ -89,21 +89,7 @@
 </div>
 </div>
 
-{% if summary.expense_by_category %}
-<div class="card">
-    <h2>Ostatní výdaje podle kategorie</h2>
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Kategorie</th><th class="num">Částka</th><th class="num">Podíl</th></tr></thead>
-        <tbody>
-        {% for cat, amount in summary.expense_by_category.items() %}
-        <tr><td>{{ cat }}</td><td class="num">{{ amount|czk(0) }}</td><td class="num">{{ (amount / summary.expense_cost * 100)|num(0) }} %</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
-</div>
-{% endif %}
+{% with show_vehicle=false %}{% include "stats/_insights.html" %}{% endwith %}
 
 <script type="application/json" id="chart-data">{{ summary.charts|tojson }}</script>
 {% endblock %}

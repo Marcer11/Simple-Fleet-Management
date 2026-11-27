@@ -18,10 +18,7 @@
         </div>
     </div>
     {% if can_edit %}
-    <div class="actions">
-        <a class="btn" href="/vehicles/{{ vid }}/edit">{{ m.icon("edit") }} Upravit</a>
-        {{ m.add_menu(vehicle, "Zapsat") }}
-    </div>
+    <div class="actions">{{ m.add_menu(vehicle, "Zapsat") }}</div>
     {% endif %}
 </div>
 <nav class="subnav" aria-label="Vozidlo">

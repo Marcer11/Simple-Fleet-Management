@@ -2,6 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% set heading = "Upravit upomínku" if record else "Nová upomínka" %}
 {% set back_url = "/reminders" %}
+{% set allow_delete = true %}
 {% set delete_url = "/reminders/%d/delete"|format(record.id) if record else "" %}
 {% block fields %}
 {{ m.field("title", "Název", required=true, maxlength=100) }}

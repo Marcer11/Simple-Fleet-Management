@@ -2,10 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% set vid = vehicle.id %}
 <div class="card">
-    <div class="card-head">
-        <h2>Údaje o vozidle</h2>
-        {% if can_edit %}<a class="btn btn-sm" href="/vehicles/{{ vid }}/edit">{{ m.icon("edit") }} Upravit údaje</a>{% endif %}
-    </div>
+    <h2>Údaje o vozidle</h2>
     <div class="details">
         <div><div class="label">Druh</div><div class="value">{{ vehicle.kind_label }}</div></div>
         <div><div class="label">SPZ</div><div class="value">{{ vehicle.license_plate or "–" }}</div></div>
@@ -55,16 +52,15 @@
     {% if rentals %}
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Od</th><th>Do</th><th class="num">Km</th><th class="num">Najeto</th><th class="num">Půjčovné</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Od</th><th>Do</th><th class="num">Km</th><th class="num">Najeto</th><th class="num">Půjčovné</th></tr></thead>
         <tbody>
         {% for r in rentals %}
         <tr>
-            <td><span class="nowrap">{{ r.date_from|date }}{% if r.time_from %} {{ r.time_from.strftime("%H:%M") }}{% endif %}</span>{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
+            <td><a class="nowrap" href="/rentals/{{ r.id }}">{{ r.date_from|date }}{% if r.time_from %} {{ r.time_from.strftime("%H:%M") }}{% endif %}</a>{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
             <td class="nowrap">{{ r.date_to|date or "–" }}{% if r.date_to and r.time_to %} {{ r.time_to.strftime("%H:%M") }}{% endif %}</td>
             <td class="num nowrap">{% if r.odometer_from is not none or r.odometer_to is not none %}{{ r.odometer_from|km }} → {{ r.odometer_to|km }}{% else %}–{% endif %}</td>
             <td class="num nowrap">{{ r.distance|km if r.distance is not none else "–" }}</td>
             <td class="num nowrap">{{ r.price_local|czk(0) }}{% if r.currency_code != "CZK" and r.price_paid is not none %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
-            {% if can_edit %}<td class="actions-cell"><a class="btn btn-sm" href="/rentals/{{ r.id }}/edit">Upravit</a></td>{% endif %}
         </tr>
         {% endfor %}
         </tbody>
@@ -74,10 +70,11 @@
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card manage">
     <h2>Správa vozidla</h2>
     <div class="actions">
         {% if can_edit %}
+        <a class="btn btn-sm" href="/vehicles/{{ vid }}/edit">{{ m.icon("edit") }} Upravit údaje</a>
         <form method="post" action="/vehicles/{{ vid }}/{{ 'deactivate' if vehicle.is_active else 'activate' }}">
             {{ m.csrf() }}
             <button class="btn btn-sm" type="submit">{{ "Deaktivovat" if vehicle.is_active else "Aktivovat" }}</button>
@@ -92,5 +89,12 @@
         </form>
         {% endif %}
     </div>
-    {% if is_owner %}<p class="small muted">Smazání vozidla najdete v úpravě údajů.</p>{% endif %}
+    {% if is_owner %}
+    <details class="danger-zone">
+        <summary>Smazání vozidla</summary>
+        <p class="small muted">Smaže vozidlo včetně všech tankování, servisů, výdajů, upomínek a poznámek. Nelze vrátit.
+            Prodané nebo nepoužívané vozidlo raději jen deaktivujte – historie i statistiky zůstanou.</p>
+        {{ m.delete_button("/vehicles/%d/delete"|format(vid), "Opravdu nenávratně smazat vozidlo " ~ vehicle.display_name ~ " včetně všech záznamů?", "Smazat vozidlo") }}
+    </details>
+    {% endif %}
 </div>

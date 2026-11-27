@@ -73,12 +73,4 @@
     </div>
 </form>
 
-{% if tire %}
-<details class="danger-zone">
-    <summary>Smazání pneumatiky</summary>
-    <p class="small muted">Smaže pneumatiku včetně historie nasazení a poškození, výdaje za nákup a opravy a přezutí,
-        ve kterých nic jiného nebylo. Opotřebenou pneumatiku raději vyřaďte – historie zůstane.</p>
-    {{ m.delete_button("/tires/%d/delete"|format(tire.id), "Opravdu smazat pneumatiku " ~ tire.label ~ "?", "Smazat pneumatiku") }}
-</details>
-{% endif %}
 {% endblock %}

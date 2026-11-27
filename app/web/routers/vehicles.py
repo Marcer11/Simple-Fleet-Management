@@ -14,6 +14,7 @@ from services.maintenance_service import (
     ServiceIntervalService, ServiceRecordService, ReminderService, ExpenseService, VehicleNoteService,
     collect_alerts,
 )
+from services.insights import insights, year_overview
 from services.stats_service import StatsService
 from services.vehicle_service import VehicleService
 from web.deps import get_db, get_current_user, flash, render
@@ -340,4 +341,5 @@ async def vehicle_stats(request: Request, vehicle_id: int, period: Optional[str]
     return render(request, "vehicles/stats.html", summary=summary,
                   breakdown=stats_service.fuel_breakdown(vehicle.id, date_from, date_to), period=period, years=years,
                   date_from=date_from, date_to=date_to, tab="stats",
+                  insights=insights(db, [vehicle], date_from, date_to),
                   **vehicle_head(db, vehicle, service.get_role(vehicle, user)))

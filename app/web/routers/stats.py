@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Request
 
 from models import FuelRecord, ServiceRecord, Expense
+from services.insights import insights
 from services.stats_service import StatsService
 from web.common import visible_vehicles
 from web.deps import get_db, get_current_user, render
@@ -64,5 +65,6 @@ async def fleet_stats(request: Request, period: Optional[str] = None, date_from:
     period, date_from, date_to = parse_period(period, None, date_from, date_to)
     summary = StatsService(db).fleet_summary(vehicles, date_from, date_to)
     return render(request, "stats/fleet.html", summary=summary, period=period,
+                  insights=insights(db, vehicles, date_from, date_to),
                   date_from=date_from, date_to=date_to, period_query=period_query(period, date_from, date_to),
                   years=_years(db, [v.id for v in vehicles]), vehicles=vehicles)

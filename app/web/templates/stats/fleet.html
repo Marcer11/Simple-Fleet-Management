@@ -68,6 +68,8 @@
     </div>
 </div>
 
+{% with show_vehicle=true %}{% include "stats/_insights.html" %}{% endwith %}
+
 <div class="viz-root">
 {% if summary.charts.monthly_labels %}
 <div class="card">

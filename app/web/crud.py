@@ -8,7 +8,7 @@ from fastapi.responses import RedirectResponse
 from models.vehicle import ROLE_EDITOR
 from services.errors import ValidationError, NotFoundError
 from services.vehicle_service import VehicleService
-from web.common import editable_vehicles, check_record_access, flash_vehicle_alerts, COMMON_CURRENCIES
+from web.common import editable_vehicles, check_record_access, flash_vehicle_alerts, render_record, COMMON_CURRENCIES
 from web.deps import get_db, get_current_user, flash, render
 from web.forms import FormReader
 
@@ -26,6 +26,7 @@ class CrudConfig:
     prefill_params: tuple = ()       # pole formuláře, která lze předvyplnit z URL (?category=...)
     track_author: bool = False       # uložit created_by_id (kdo záznam zapsal)
     redirect: Callable = None        # (vehicle) -> URL po uložení / smazání; výchozí detail vozidla
+    view: Callable = None            # (record) -> detail záznamu jen pro čtení (web/record_views.py)
 
 
 def register_crud(router: APIRouter, cfg: CrudConfig):
@@ -92,6 +93,13 @@ def register_crud(router: APIRouter, cfg: CrudConfig):
         flash(request, cfg.messages.get("deleted", "Záznam byl smazán."))
         return RedirectResponse(done_url(vehicle), status_code=303)
 
+    async def detail(request: Request, record_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+        record = cfg.service_cls(db).get(record_id)
+        check_record_access(db, user, record)
+        return render_record(request, db, user, record, cfg.view(record))
+
+    if cfg.view:
+        router.add_api_route(f"{cfg.prefix}/{{record_id:int}}", detail, methods=["GET"])
     router.add_api_route(f"{cfg.prefix}/add", add_form, methods=["GET"])
     router.add_api_route(f"{cfg.prefix}/add", add_post, methods=["POST"])
     router.add_api_route(f"{cfg.prefix}/{{record_id}}/edit", edit_form, methods=["GET"])

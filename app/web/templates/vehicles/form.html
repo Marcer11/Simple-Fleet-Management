@@ -56,12 +56,4 @@
     </div>
 </form>
 
-{% if vehicle and is_owner %}
-<details class="danger-zone">
-    <summary>Smazání vozidla</summary>
-    <p class="small muted">Smaže vozidlo včetně všech tankování, servisů, výdajů, upomínek a poznámek. Nelze vrátit.
-        Prodané nebo nepoužívané vozidlo raději jen deaktivujte – historie i statistiky zůstanou.</p>
-    {{ m.delete_button("/vehicles/%d/delete"|format(vehicle.id), "Opravdu nenávratně smazat vozidlo " ~ vehicle.display_name ~ " včetně všech záznamů?", "Smazat vozidlo") }}
-</details>
-{% endif %}
 {% endblock %}

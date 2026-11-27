@@ -2,6 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% set heading = "Upravit pravidelný servis" if record else "Nový pravidelný servis" %}
 {% set back_url = "/services" %}
+{% set allow_delete = true %}
 {% set delete_url = "/intervals/%d/delete"|format(record.id) if record else "" %}
 {% block fields %}
 <div class="field">

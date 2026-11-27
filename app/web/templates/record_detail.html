@@ -1,0 +1,47 @@
+{# Detail záznamu jen pro čtení; úprava a smazání jsou dole ve „Správě záznamu“. Vstup: view (web/record_views.py), can_edit #}
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ view.kind_label }} – {{ view.title }}{% endblock %}
+{% block content %}
+{% set v = view.vehicle %}
+<div class="page-head">
+    <div>
+        {% if view.back_url %}{{ m.back(view.back_url, v.display_name if v else "Pneumatika") }}{% endif %}
+        <h1>{{ m.icon(view.icon) }} {{ view.title }}</h1>
+        <div class="sub">{{ view.kind_label }} · {{ view.when }}{% if v %} · {{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.display_name }}</a>{% endif %}</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="details">
+        {% for label, value in view.rows if value is not none and value != "" %}
+        <div><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
+        {% endfor %}
+    </div>
+    {% for heading, items in view.sections %}
+    <h3 class="fold-subhead">{{ heading }}</h3>
+    <ul class="plain-list">{% for item in items %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% endfor %}
+    {% if view.text %}
+    <h3 class="fold-subhead">{{ view.text_label }}</h3>
+    <p class="note-text">{{ view.text }}</p>
+    {% endif %}
+</div>
+
+{% if can_edit %}
+<div class="card manage">
+    <h2>Správa záznamu</h2>
+    <div class="actions">
+        <a class="btn btn-sm" href="{{ view.edit_url }}">{{ m.icon("edit") }} Upravit</a>
+    </div>
+    {% if view.can_delete %}
+    <details class="danger-zone">
+        <summary>Smazání záznamu</summary>
+        {{ m.delete_button(view.delete_url, view.delete_confirm, "Smazat " ~ view.kind_label|lower) }}
+    </details>
+    {% else %}
+    <p class="small muted">Přezutí nejde smazat, protože z něj už byly pneumatiky později sundány.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

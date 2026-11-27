@@ -233,7 +233,7 @@ def test_fuel_filter_dates(app, db):
     def shows(url):
         page = client.get(url)
         assert page.status_code == 200, url
-        return "/fuel-records/" in page.text and "/edit" in page.text
+        return 'href="/fuel-records/1"' in page.text  # odkaz na detail tankování
 
     assert shows("/fuel-records")
     assert shows(f"/fuel-records?date_from={today.isoformat()}&date_to={today.isoformat()}")

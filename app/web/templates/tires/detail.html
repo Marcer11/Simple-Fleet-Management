@@ -15,7 +15,6 @@
         </div>
     </div>
     <div class="actions">
-        <a class="btn" href="/tires/{{ tire.id }}/edit">{{ m.icon("edit") }} Upravit</a>
         {% if not tire.retired_date %}
         <details class="menu" data-menu>
             <summary class="btn btn-primary">{{ m.icon("plus") }} Zapsat</summary>
@@ -42,10 +41,7 @@
 {% if stats.warnings %}<div class="card">{% for level, text in stats.warnings %}<span class="badge badge-{{ level }}">{{ text }}</span> {% endfor %}</div>{% endif %}
 
 <div class="card">
-    <div class="card-head">
-        <h2>Údaje</h2>
-        <a class="btn btn-sm" href="/tires/{{ tire.id }}/edit">{{ m.icon("edit") }} Upravit údaje</a>
-    </div>
+    <h2>Údaje</h2>
     <div class="details">
         <div><div class="label">Typ</div><div class="value">{{ tire.season }}</div></div>
         <div><div class="label">Výrobce a model</div><div class="value">{{ [tire.manufacturer, tire.model]|select|join(" ") }}</div></div>
@@ -90,15 +86,14 @@
     <h2>Kontroly dezénu</h2>
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Naměřeno (mm)</th><th></th></tr></thead>
+        <thead><tr><th>Datum</th><th>Vozidlo</th><th class="num">Tachometr</th><th>Naměřeno (mm)</th></tr></thead>
         <tbody>
         {% for c, readings in checks %}
         <tr>
-            <td class="nowrap">{{ c.check_date|date }}</td>
+            <td class="nowrap"><a href="/tire-checks/{{ c.id }}">{{ c.check_date|date }}</a></td>
             <td>{{ m.color_dot(c.vehicle) }} <a href="/vehicles/{{ c.vehicle_id }}?tab=tires">{{ c.vehicle.display_name }}</a></td>
             <td class="num">{{ c.odometer|km }}</td>
             <td class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</td>
-            <td class="actions-cell">{% if c.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/tire-checks/{{ c.id }}/edit">Upravit</a>{% endif %}</td>
         </tr>
         {% endfor %}
         </tbody>
@@ -112,11 +107,25 @@
     <h2>Poškození</h2>
     <ul class="alert-list">
         {% for d in defects %}
-        <li><span class="what"><strong>{{ d.description }}</strong> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}{% if d.vehicle %} · {{ d.vehicle.display_name }}{% endif %}</span></span>
+        <li><span class="what"><a href="/tire-defects/{{ d.id }}"><strong>{{ d.description }}</strong></a> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}{% if d.vehicle %} · {{ d.vehicle.display_name }}{% endif %}</span></span>
             <span class="small">{{ d.expense.price_local|czk(0) if d.expense else "" }}</span>
-            <span class="actions"><a class="btn btn-sm" href="/tire-defects/{{ d.id }}/edit">Upravit</a></span></li>
+</li>
         {% endfor %}
     </ul>
 </div>
 {% endif %}
+
+<div class="card manage">
+    <h2>Správa pneumatiky</h2>
+    <div class="actions">
+        <a class="btn btn-sm" href="/tires/{{ tire.id }}/edit">{{ m.icon("edit") }} Upravit údaje</a>
+    </div>
+    <p class="small muted">V úpravě údajů pneumatiku také vyřadíte (prodej, opotřebení…) – historie zůstane.</p>
+    <details class="danger-zone">
+        <summary>Smazání pneumatiky</summary>
+        <p class="small muted">Smaže pneumatiku včetně historie nasazení a poškození, výdaje za nákup a opravy a přezutí,
+            ve kterých nic jiného nebylo. Opotřebenou pneumatiku raději vyřaďte – historie zůstane.</p>
+        {{ m.delete_button("/tires/%d/delete"|format(tire.id), "Opravdu smazat pneumatiku " ~ tire.label ~ "?", "Smazat pneumatiku") }}
+    </details>
+</div>
 {% endblock %}

@@ -5,6 +5,24 @@
 {{ m.settings_head("account") }}
 
 <div class="grid grid-2">
+    <div class="card" id="app-install">
+        <h2>Aplikace v telefonu a počítači</h2>
+        <p class="small muted" data-install-state="installed" hidden>Aplikace je nainstalovaná – spouštíte ji z plochy jako samostatnou aplikaci.</p>
+        <div data-install-state="available" hidden>
+            <p class="small muted">Nainstalujte si evidenci jako aplikaci: ikona na ploše, vlastní okno bez lišty prohlížeče
+                a zkratky (dlouhé podržení ikony) pro rychlé přidání tankování, servisu nebo výdaje.</p>
+            <button class="btn btn-primary" type="button" data-install>Nainstalovat aplikaci</button>
+        </div>
+        <div data-install-state="manual">
+            <p class="small muted">Instalace z prohlížeče:</p>
+            <ul class="small plain-list">
+                <li><strong>Android (Chrome)</strong>: nabídka ⋮ → <em>Přidat na plochu</em> / <em>Nainstalovat aplikaci</em></li>
+                <li><strong>iPhone (Safari)</strong>: tlačítko Sdílet → <em>Přidat na plochu</em></li>
+                <li><strong>Počítač (Chrome, Edge)</strong>: ikona instalace vpravo v adresním řádku</li>
+            </ul>
+        </div>
+    </div>
+
     <div class="card">
         <h2>Osobní údaje</h2>
         <form method="post" action="/profile">

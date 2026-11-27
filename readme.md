@@ -34,7 +34,12 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
   a *Statistiky*; v hlavičce je „Upravit“ a nabídka „Zapsat“ s předvyplněným vozidlem
   (včetně Nepojízdné / Opět pojízdné)
 - **detail pneumatiky** jen pro čtení (stav, životnost, údaje, historie nasazení, kontroly dezénu,
-  poškození); úprava je samostatný formulář přes „Upravit“
+  poškození); úprava a smazání jsou jen dole ve „Správě pneumatiky“
+- **záznamy se otevírají k prohlížení**: tankování, servis, výdaj, poznámka, půjčení, přezutí, kontrola
+  dezénu a poškození mají vlastní detail jen pro čtení (`/fuel-records/<id>`, `/services/<id>`…); seznamy,
+  časová osa i místa vedou na detail, úprava a smazání jsou dole ve „Správě záznamu“ (jen pro editory)
+- **úprava a smazání vždy na jednom místě**: vozidlo ve „Správě vozidla“ (záložka Údaje), pneumatika ve
+  „Správě pneumatiky“, záznam ve „Správě záznamu“; smazání je sbalené a formuláře úprav ho nenabízejí
 - **Místa** (`/places`): servisy, čerpací stanice a místa výdajů podle názvů zapsaných u záznamů (stejný
   název s jinou velikostí písmen je stejné místo, pumpa se rozlišuje podle adresy); detail místa ukáže
   počet návštěv, útratu, první a poslední návštěvu, rozpis po vozidlech a po letech a všechny návštěvy;
@@ -198,6 +203,12 @@ Smazání vozidla je schované dole ve formuláři úprav.
   celá historie nebo vlastní rozsah od–do (pole od–do se ukážou po volbě „Vlastní rozsah…“)
 - statistiky vozidla: náklady (palivo / servis / výdaje), náklady na km, ujetá vzdálenost,
   průměrná spotřeba, grafy nákladů, spotřeby a ceny paliva (každé tankování)
+- **přehledy ve statistikách** (vozidla i všech vozidel, pro zvolené období): *Po letech* (ujeto, palivo,
+  servis, výdaje, celkem, Kč/km, natankované litry, průměrná cena za litr), *Kam jdou peníze* (palivo,
+  servis, výdaje podle kategorie, půjčovné s podílem), *Servis podle typu* (kolikrát a za kolik; u servisu
+  s více položkami je cena rozdělená rovným dílem), *Tankování* (průměrné množství a útrata, nejlevnější /
+  nejdražší palivo, největší tankování, nejnižší / nejvyšší spotřeba) a *Nejčastější místa*
+- **přehled** (výchozí obrazovka) ukazuje letošní náklady, ujeté km, náklady na km a počet tankování
 - **náklady a najeté km po měsících nebo po letech** (přepínač u grafu, i v tabulce) za celé zvolené období;
   období delší než 36 měsíců se otevře po letech
 - **vývoj najetých kilometrů** ve statistice vozidla: stav tachometru v čase (ze všech záznamů se stavem
@@ -216,7 +227,11 @@ Smazání vozidla je schované dole ve formuláři úprav.
   tachometrem) a cena paliva u každého tankování
 
 ### Instalace jako aplikace (PWA)
-Na mobilu i v desktopovém Chrome/Edge lze aplikaci „nainstalovat“ (vyžaduje HTTPS).
+Na mobilu i v desktopovém Chrome/Edge lze aplikaci „nainstalovat“ (vyžaduje HTTPS). V **Nastavení → Účet**
+je tlačítko „Nainstalovat aplikaci“ (když ho prohlížeč nabídne) a návod pro Android, iPhone a počítač.
+Manifest má ikony (i maskovatelnou), screenshoty pro instalační dialog a zkratky na ikoně (tankování,
+servis, výdaj, vozidla). Widgety na plochu Androidu webová aplikace neumí (manifest `widgets` funguje jen
+ve Windows 11); šlo by to jen přes nativní obal aplikace (např. Trusted Web Activity) s vlastním widgetem.
 
 ## Instalace a spuštění
 

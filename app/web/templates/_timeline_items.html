@@ -12,7 +12,7 @@
     <div class="tl-icon" title="{{ e.kind_label }}">{{ m.icon(e.icon, e.kind_label) }}</div>
     <div class="tl-body">
         <div class="tl-line">
-            {% if e.url and e.vehicle.id in editable_ids %}<a class="tl-title" href="{{ e.url }}">{{ e.title }}</a>
+            {% if e.url %}<a class="tl-title" href="{{ e.url }}">{{ e.title }}</a>
             {% else %}<span class="tl-title">{{ e.title }}</span>{% endif %}
             <span class="tl-meta">
                 {%- if show_vehicle %}{{ m.color_dot(e.vehicle) }} {{ e.vehicle.brand }} {{ e.vehicle.model }}{% endif -%}

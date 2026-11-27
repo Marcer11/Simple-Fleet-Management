@@ -32,6 +32,16 @@ def check_record_access(db, user, record, min_role=ROLE_VIEWER):
     return VehicleService(db).get_vehicle_for_user(record.vehicle_id, user, min_role)
 
 
+def render_record(request, db, user, record, view):
+    """Detail záznamu jen pro čtení (web/record_views.py); úprava jen pro editory vozidla."""
+    from models.vehicle import ROLE_LEVELS
+    from web.deps import render
+    vehicle = check_record_access(db, user, record)
+    role = VehicleService(db).get_role(vehicle, user)
+    return render(request, "record_detail.html", view=view,
+                  can_edit=ROLE_LEVELS.get(role, 0) >= ROLE_LEVELS[ROLE_EDITOR])
+
+
 def flash_vehicle_alerts(request, db, vehicle):
     """Po uložení záznamu upozorní na blížící se servis a upomínky (zadání z readme)."""
     for alert in collect_alerts(db, [vehicle])[:5]:

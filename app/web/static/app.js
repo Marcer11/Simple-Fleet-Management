@@ -860,6 +860,38 @@
         if (y !== null) window.addEventListener("load", function () { window.scrollTo(0, +y); });
     })();
 
+    // PWA - instalace aplikace (Nastavení → Účet): tlačítko se ukáže, až prohlížeč instalaci nabídne
+    (function installPrompt() {
+        const box = document.getElementById("app-install");
+        let deferred = null;
+        function state(name) {
+            if (!box) return;
+            box.querySelectorAll("[data-install-state]").forEach(function (el) {
+                el.hidden = el.getAttribute("data-install-state") !== name;
+            });
+        }
+        const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+            || window.navigator.standalone === true;
+        if (standalone) state("installed");
+        window.addEventListener("beforeinstallprompt", function (event) {
+            event.preventDefault();
+            deferred = event;
+            state("available");
+        });
+        window.addEventListener("appinstalled", function () {
+            deferred = null;
+            state("installed");
+        });
+        if (box) {
+            const button = box.querySelector("[data-install]");
+            if (button) button.addEventListener("click", function () {
+                if (!deferred) return;
+                deferred.prompt();
+                deferred.userChoice.then(function () { deferred = null; }).catch(function () { /* nevadí */ });
+            });
+        }
+    })();
+
     // PWA - registrace service workeru
     if ("serviceWorker" in navigator && window.isSecureContext) {
         window.addEventListener("load", function () {

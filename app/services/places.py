@@ -78,13 +78,13 @@ def _visit(kind, r):
     if kind == "service":
         return Visit(kind, datetime.combine(r.service_date, r.service_time or time.min), r.service_time is not None,
                      r.vehicle, r.service_type, r.duration and f"v servisu {r.duration}" or "", r.odometer,
-                     r.own_cost, f"/services/{r.id}/edit", normalize(r.place))
+                     r.own_cost, f"/services/{r.id}", normalize(r.place))
     if kind == "expense":
         return Visit(kind, datetime.combine(r.expense_date, time.min), False, r.vehicle, r.category,
-                     normalize(r.description), r.odometer, r.own_cost, f"/expenses/{r.id}/edit", normalize(r.place))
+                     normalize(r.description), r.odometer, r.own_cost, f"/expenses/{r.id}", normalize(r.place))
     volume = f"{r.volume_liters:.2f}".rstrip("0").rstrip(".").replace(".", ",") if r.volume_liters else ""
     return Visit(kind, r.refuel_datetime, True, r.vehicle, r.fuel_type, f"{volume} {r.unit}" if volume else "",
-                 r.odometer, r.price_local, f"/fuel-records/{r.id}/edit", normalize(r.station_name),
+                 r.odometer, r.price_local, f"/fuel-records/{r.id}", normalize(r.station_name),
                  normalize(r.station_address), r.volume_liters, r.unit)
 
 

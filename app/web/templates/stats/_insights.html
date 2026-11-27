@@ -1,0 +1,127 @@
+{# Doplňkové přehledy statistik (services/insights.py). Vstup: insights, show_vehicle #}
+{% import "_macros.html" as m with context %}
+{% macro share(value, max) -%}
+<span class="share" aria-hidden="true"><span style="width: {{ ((value / max * 100) if max else 0)|round(1) }}%"></span></span>
+{%- endmacro %}
+{% macro fuel_record(label, r, value) -%}
+{% if r %}
+<div class="record-tile">
+    <div class="label">{{ label }}</div>
+    <div class="value">{{ value }}</div>
+    <div class="hint"><a href="/fuel-records/{{ r.id }}">{{ r.refuel_datetime|date }}</a>{% if show_vehicle %} · {{ r.vehicle.display_name }}{% endif %}{% if r.station_name %} · {{ r.station_name }}{% endif %}</div>
+</div>
+{% endif %}
+{%- endmacro %}
+{% set has_rental = insights.by_year|selectattr("rental")|list %}
+
+{% if insights.by_year %}
+<div class="card">
+    <h2>Po letech</h2>
+    <div class="table-wrap">
+    <table class="by-year">
+        <thead><tr>
+            <th>Rok</th><th class="num">Ujeto</th><th class="num">Palivo</th><th class="num">Servis</th><th class="num">Výdaje</th>
+            {% if has_rental %}<th class="num">Půjčovné</th>{% endif %}<th class="num">Celkem</th><th class="share-col"></th>
+            <th class="num">Kč/km</th><th class="num">Natankováno</th><th class="num" title="Průměrná cena za litr (vážená množstvím)">Kč/l</th>
+        </tr></thead>
+        <tbody>
+        {% for y in insights.by_year %}
+        <tr>
+            <td>{{ y.year }}</td>
+            <td class="num nowrap">{{ y.km|km if y.km else "–" }}</td>
+            <td class="num nowrap">{{ y.fuel|czk(0) }}</td>
+            <td class="num nowrap">{{ y.service|czk(0) }}</td>
+            <td class="num nowrap">{{ y.expense|czk(0) }}</td>
+            {% if has_rental %}<td class="num nowrap">{{ y.rental|czk(0) }}</td>{% endif %}
+            <td class="num nowrap"><strong>{{ y.total|czk(0) }}</strong></td>
+            <td class="share-col">{{ share(y.total, insights.max_year_total) }}</td>
+            <td class="num nowrap">{{ y.cost_per_km|num(2) if y.cost_per_km else "–" }}</td>
+            <td class="num nowrap">{{ (y.volume_l|num(0) ~ " l") if y.volume_l else "–" }}</td>
+            <td class="num nowrap">{{ y.avg_price_l|num(2) if y.avg_price_l else "–" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="grid grid-2">
+    {% if insights.costs %}
+    <div class="card">
+        <h2>Kam jdou peníze</h2>
+        <table class="share-table">
+            <tbody>
+            {% set top = insights.costs|map(attribute="amount")|max %}
+            {% for c in insights.costs %}
+            <tr>
+                <td>{{ m.icon(c.icon) }} {{ c.name }}</td>
+                <td class="share-col">{{ share(c.amount, top) }}</td>
+                <td class="num nowrap">{{ c.amount|czk(0) }}</td>
+                <td class="num nowrap muted">{{ c.share|num(0) }} %</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot><tr><td>Celkem</td><td></td><td class="num nowrap">{{ insights.total|czk(0) }}</td><td></td></tr></tfoot>
+        </table>
+    </div>
+    {% endif %}
+    {% if insights.service_types %}
+    <div class="card">
+        <h2>Servis podle typu</h2>
+        <table class="share-table">
+            <thead><tr><th>Typ</th><th class="share-col"></th><th class="num">Kolikrát</th><th class="num" title="U servisu s více položkami je cena rozdělená rovným dílem">Cena</th></tr></thead>
+            <tbody>
+            {% set top = insights.service_types[0].cost %}
+            {% for t in insights.service_types[:12] %}
+            <tr>
+                <td>{{ t.name }}</td>
+                <td class="share-col">{{ share(t.cost, top) }}</td>
+                <td class="num">{{ t.count }}×</td>
+                <td class="num nowrap">{{ t.cost|czk(0) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% if insights.service_types|length > 12 %}<p class="small muted">a dalších {{ insights.service_types|length - 12 }} typů</p>{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% if insights.fuel %}
+{% set f = insights.fuel %}
+<div class="card">
+    <h2>Tankování</h2>
+    <div class="record-tiles">
+        <div class="record-tile"><div class="label">Průměrně natankováno</div><div class="value">{{ f.avg_volume|num(1) }} l</div><div class="hint">{{ f.count }} tankování</div></div>
+        <div class="record-tile"><div class="label">Průměrná útrata</div><div class="value">{{ f.avg_cost|czk(0) }}</div><div class="hint">za jedno tankování</div></div>
+        {{ fuel_record("Nejlevnější palivo", f.cheapest, (f.cheapest.unit_price_local|num(2) ~ " Kč/l") if f.cheapest else "") }}
+        {{ fuel_record("Nejdražší palivo", f.priciest, (f.priciest.unit_price_local|num(2) ~ " Kč/l") if f.priciest else "") }}
+        {{ fuel_record("Největší tankování", f.biggest, f.biggest.volume_liters|qty ~ " l") }}
+        {{ fuel_record("Nejnižší spotřeba", f.best, (f.best.consumption|num(1) ~ " l/100 km") if f.best else "") }}
+        {{ fuel_record("Nejvyšší spotřeba", f.worst, (f.worst.consumption|num(1) ~ " l/100 km") if f.worst else "") }}
+    </div>
+</div>
+{% endif %}
+
+{% set place_titles = {"station": "Nejčastější pumpy", "service": "Nejčastější servisy", "expense": "Nejčastější místa výdajů"} %}
+{% if insights.places.values()|select|list %}
+<div class="card">
+    <div class="card-head">
+        <h2>Nejčastější místa</h2>
+        <a class="small" href="/places">Všechna místa</a>
+    </div>
+    <div class="grid places-grid">
+        {% for kind, items in insights.places.items() if items %}
+        <div>
+            <h3 class="fold-subhead">{{ place_titles[kind] }}</h3>
+            <ol class="top-list">
+                {% for p in items %}
+                <li><a href="{{ p.url }}">{{ p.name or p.address }}</a><span class="muted small nowrap">{{ p.count }}× · {{ p.cost|czk(0) }}</span></li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

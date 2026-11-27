@@ -5,7 +5,7 @@
 <div class="page-head">
     <div>
         <h1>Přehled</h1>
-        <div class="sub">Aktivní vozidla: {{ active|length }} · Náklady {{ year }}: {{ total_year_cost|czk(0) }}</div>
+        <div class="sub">Aktivní vozidla: {{ active|length }}</div>
     </div>
     {% if editable %}<div class="actions">{{ m.add_menu() }}</div>{% endif %}
 </div>
@@ -16,6 +16,15 @@
     <a class="btn btn-primary" href="/vehicles/add">Přidat první vozidlo</a>
 </div>
 {% else %}
+
+{% if overview %}
+<div class="kpis kpis-compact">
+    <div class="kpi"><div class="label">Náklady {{ year }}</div><div class="value">{{ overview.total_cost|czk(0) }}</div><div class="hint"><a href="/stats?period={{ year }}">Statistiky roku</a></div></div>
+    <div class="kpi"><div class="label">Ujeto {{ year }}</div><div class="value">{{ overview.distance|km if overview.distance else "–" }}</div></div>
+    <div class="kpi"><div class="label">Náklady na km</div><div class="value">{{ overview.cost_per_km|czk(2) if overview.cost_per_km else "–" }}</div></div>
+    <div class="kpi"><div class="label">Tankování {{ year }}</div><div class="value">{{ overview.fuel_count }}×</div><div class="hint">{{ overview.fuel_cost|czk(0) }}</div></div>
+</div>
+{% endif %}
 
 <div class="card">
     <div class="card-head">

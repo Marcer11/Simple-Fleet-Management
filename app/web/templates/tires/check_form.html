@@ -114,10 +114,5 @@
     {% endif %}
 </form>
 
-{% if check %}
-<div class="card">
-    {{ m.delete_button("/tire-checks/%d/delete"|format(check.id), "Smazat kontrolu dezénu?", "Smazat kontrolu", small=false) }}
-</div>
-{% endif %}
 {% endif %}
 {% endblock %}

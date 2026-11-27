@@ -5,12 +5,12 @@
 <table>
     <thead><tr>
         <th>Datum</th>{% if with_vehicle %}<th>Vozidlo</th>{% endif %}<th class="num">Tachometr</th><th>Palivo</th><th class="num">Množství</th>
-        <th class="num">Cena/jedn.</th><th class="num">Cena</th><th class="num">Spotřeba</th><th>Stanice</th><th></th>
+        <th class="num">Cena/jedn.</th><th class="num">Cena</th><th class="num">Spotřeba</th><th>Stanice</th>
     </tr></thead>
     <tbody>
     {% for r in records %}
     <tr>
-        <td class="nowrap">{{ r.refuel_datetime|datetime }}</td>
+        <td class="nowrap"><a href="/fuel-records/{{ r.id }}">{{ r.refuel_datetime|datetime }}</a></td>
         {% if with_vehicle %}<td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.brand }} {{ r.vehicle.model }}</a></td>{% endif %}
         <td class="num">{{ r.odometer|km }}</td>
         <td>{{ r.fuel_type }}{% if not r.full_tank %} <span class="badge">částečně</span>{% endif %}{% if r.skipped_refuel %} <span class="badge badge-warning">vynecháno</span>{% endif %}</td>
@@ -19,10 +19,9 @@
         <td class="num">{{ r.price_local|czk }}{% if r.currency_code != "CZK" %}<br><span class="muted small">{{ r.price_paid|money(r.currency_code) }}</span>{% endif %}</td>
         <td class="num">{% if r.consumption %}{{ r.consumption|num(2) }}{% else %}<span class="muted">–</span>{% endif %}</td>
         <td{% if r.station_address %} title="{{ r.station_address }}"{% endif %}>{{ m.place_link("station", r.station_name, r.station_address) if r.station_name or r.station_address else "" }}</td>
-        <td class="actions-cell">{% if r.vehicle_id in editable_ids %}<a class="btn btn-sm" href="/fuel-records/{{ r.id }}/edit">Upravit</a>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><td colspan="{{ 6 if with_vehicle else 5 }}">Celkem ({{ totals.count }} tankování)</td><td class="num">{{ totals.price|czk }}</td><td colspan="3"></td></tr></tfoot>
+    <tfoot><tr><td colspan="{{ 6 if with_vehicle else 5 }}">Celkem ({{ totals.count }} tankování)</td><td class="num">{{ totals.price|czk }}</td><td colspan="2"></td></tr></tfoot>
 </table>
 </div>

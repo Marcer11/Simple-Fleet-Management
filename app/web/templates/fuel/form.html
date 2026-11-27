@@ -76,13 +76,5 @@
     </div>
 </form>
 
-{% if record %}
-<div class="card">
-    <div class="card-head">
-        <span class="muted small">Smazáním se přepočítá spotřeba ostatních tankování.</span>
-        {{ m.delete_button("/fuel-records/%d/delete"|format(record.id), "Opravdu smazat toto tankování?", "Smazat tankování", small=false) }}
-    </div>
-</div>
-{% endif %}
 {% endif %}
 {% endblock %}

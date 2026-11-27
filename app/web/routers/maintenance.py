@@ -17,6 +17,7 @@ from services.vehicle_service import VehicleService
 from web.common import (
     visible_vehicles, check_record_access, default_filter_period, csv_response, decimal_csv,
 )
+from web import record_views
 from web.crud import CrudConfig, register_crud
 from web.deps import get_db, get_current_user, flash, render
 from services.errors import ValidationError
@@ -128,6 +129,7 @@ register_crud(router, CrudConfig(
     default_values=lambda vid: {"service_date": date.today().isoformat(), "currency_code": "CZK"},
     extra_context=_service_context,
     messages={"created": "Servis byl uložen.", "deleted": "Servisní záznam byl smazán."},
+    view=record_views.service,
 ))
 
 
@@ -259,6 +261,7 @@ register_crud(router, CrudConfig(
     default_values=lambda vid: {"date_from": date.today().isoformat(), "currency_code": "CZK"},
     extra_context=_rental_context,
     messages={"created": "Půjčení bylo uloženo.", "deleted": "Půjčení bylo smazáno."},
+    view=record_views.rental,
 ))
 
 
@@ -495,6 +498,7 @@ register_crud(router, CrudConfig(
         "places": places.known_names(db, "expense", VehicleService(db).get_accessible_ids(user)),
     },
     messages={"created": "Výdaj byl uložen.", "deleted": "Výdaj byl smazán."},
+    view=record_views.expense,
     prefill_params=("category", "valid_from"),
 ))
 
@@ -584,4 +588,5 @@ register_crud(router, CrudConfig(
               "deleted": "Poznámka byla smazána."},
     prefill_params=("category",),
     track_author=True,
+    view=record_views.note,
 ))

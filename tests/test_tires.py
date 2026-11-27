@@ -328,3 +328,54 @@ def test_tread_check_moto(app, db):
                                           "odometer": 3000, f"tread_{fm.id}_f": "4", f"tread_{rm.id}_r": "3,5"})
     assert r.status_code == 303, r.text
     assert "P 4,0" in client.get("/tires").text
+
+
+def test_custom_min_tread_and_retired_reasons(app, db):
+    client = register(app, "mt@example.com")
+    moto = add_vehicle(client, brand="Honda", model="CBF", kind="moto")
+    winter = add_tire(client, db, season="Zimní", quantity="1", new_tread_mm="6")
+    assert winter.legal_min_tread == 4.0 and winter.min_tread == 4.0  # zatím bez vozidla: podle typu
+    swap(client, moto, date.today() - timedelta(days=30), 1000, [(winter, "front")])
+    db.expire_all()
+    winter = db.get(Tire, winter.id)
+    assert winter.is_moto and winter.legal_min_tread == 1.6  # motorka: 1,6 mm i u zimních
+    stats = tire_stats(db, [winter])[0]
+    assert not any("minim" in text for _, text in stats["warnings"])
+
+    # vlastní minimum (vyšší než zákonné) - hlídá se místo zákonného
+    page = client.get(f"/tires/{winter.id}/edit").text
+    assert 'name="min_tread_mm"' in page and 'placeholder="zákonné 1,6"' in page.replace("\xa0", " ")
+    assert '<datalist id="retired-reasons">' in page and '<option value="Opotřebení">' in page
+    base = {"season": "Zimní", "manufacturer": "Michelin", "quantity": "1", "new_tread_mm": "6",
+            "currency_code": "CZK"}
+    r = post(client, f"/tires/{winter.id}/edit", {**base, "min_tread_mm": "7"})
+    assert r.status_code == 400 and "menší než dezén při nákupu" in r.text
+    r = post(client, f"/tires/{winter.id}/edit", {**base, "min_tread_mm": "6,5", "new_tread_mm": ""})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    winter = db.get(Tire, winter.id)
+    assert float(winter.min_tread_mm) == 6.5 and winter.min_tread == 6.5
+    r = post(client, f"/tires/{winter.id}/edit", {**base, "min_tread_mm": "3"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    winter = db.get(Tire, winter.id)
+    assert tire_stats(db, [winter])[0]["warnings"] == []
+    # dezén 3,5 mm: blíží se nastavenému minimu 3 mm
+    fm = db.query(TireMount).filter_by(tire_id=winter.id).one()
+    r = post(client, "/tire-checks/add", {"vehicle_id": moto, "check_date": date.today().isoformat(),
+                                          "odometer": 2000, f"tread_{fm.id}_f": "3,5"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    stats = tire_stats(db, [db.get(Tire, winter.id)])[0]
+    assert stats["warnings"][0] == ("warning", "dezén 3,5 mm – blíží se nastavenému minimu 3,0 mm")
+    fm.tire.min_tread_mm = 4
+    db.commit()
+    stats = tire_stats(db, [db.get(Tire, winter.id)])[0]
+    assert stats["warnings"][0] == ("danger", "dezén 3,5 mm – pod nastaveným minimem 4,0 mm")
+
+    # důvod vyřazení: nabídka + dříve použité vlastní důvody
+    r = post(client, f"/tires/{winter.id}/edit", {**base, "retired_date": date.today().isoformat(),
+                                                   "retired_reason": "Prasklý bok"})
+    assert r.status_code == 303, r.text
+    page = client.get(f"/tires/{winter.id}/edit").text
+    assert '<option value="Prodej">' in page and '<option value="Prasklý bok">' in page

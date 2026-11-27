@@ -83,7 +83,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
   výdaje, pneumatiky, poznámky, nákup a prodej v jednom seznamu po měsících, filtr podle vozidla, období
   a druhu události; každá událost má barvu a **ikonu** (tankování, servis, STK, výdaj, pojištění,
   dálniční známka, parkování, pneumatiky, kontrola dezénu, poškození, nehoda, garáž, půjčení…) a zabírá
-  jeden řádek + zkrácený detail (kliknutím se zobrazí celý)
+  jeden řádek + zkrácený detail (kliknutím se zobrazí celý); poznámka u záznamu (servis, výdaj, půjčení,
+  přezutí, kontrola dezénu) se na časové ose neukazuje – je v detailu záznamu
 
 ### Tankování
 - datum, čas, tachometr, palivo, množství (l / kWh / kg), cena za jednotku **nebo** celková cena
@@ -139,7 +140,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
   (stav, typ, vozidlo), historie přezutí a poškození
 - **pneumatika** = jedna guma, pár nebo sada (počet kusů) – patří uživateli, ne vozidlu, takže ji lze
   nasazovat na různá vozidla; typ (letní / zimní / univerzální), výrobce a model, rozměr, rok výroby
-  a DOT, alu / plechové disky / bez disků, dezén při nákupu, místo uložení, vyřazení s důvodem;
+  a DOT, alu / plechové disky / bez disků, dezén při nákupu, vlastní minimum dezénu (např. vyšší u motorky;
+  prázdné = zákonné), místo uložení, vyřazení s důvodem (nabídka Prodej, Poškození, Opotřebení, Jiné);
   cena nákupu se uloží a volitelně zapíše jako výdaj „Pneumatiky“ k vybranému vozidlu
 - **přezutí** na vozidle doma nebo v servisu (v servisu = servisní záznam „Přezutí pneumatik“ s cenou):
   pneumatiky se nasazují na pozice (všechna kola, přední / zadní náprava, jednotlivé kolo, rezerva);
@@ -157,10 +159,11 @@ Smazání vozidla je schované dole ve formuláři úprav.
   kolu zapíše hloubka (u kola je vidět i poslední naměřená hodnota); kontroly jsou na časové ose
 - **poškození** (pozice, popis, cena opravy jako výdaj k vozidlu, na kterém pneumatika byla)
 - **životnost**: najeto (i přes více vozidel), počet nasazení a doba na voze, stáří, dezén,
-  opotřebení na 1000 km a odhad km do zákonného minima (letní 1,6 mm, zimní a univerzální 4 mm),
+  opotřebení na 1000 km a odhad km do minima – vlastního, jinak zákonného (letní 1,6 mm, zimní
+  a univerzální 4 mm, motorka 1,6 mm podle vozidla, na kterém byla pneumatika naposledy),
   náklady na 1000 km; opotřebení se počítá z dezénu při nákupu a posledního měření (kontrola nebo sundání,
   nejmenší hodnota z kol, nejméně 3 000 km mezi měřeními)
-- **upozornění v přehledu pneumatik** („Pozor na“): dezén pod zákonným minimem, blížící se konec vzorku
+- **upozornění v přehledu pneumatik** („Pozor na“): dezén pod minimem (vlastním nebo zákonným), blížící se konec vzorku
   (méně než 5 000 km, i s odhadem v měsících podle průměrného nájezdu vozidla), stáří ≥ 6 let;
   typ pneumatik je všude jen jako ikona
 - **upozornění na zimní pneumatiky**: od 15. 10. a v období 1. 11. – 31. 3. u aktivních aut,

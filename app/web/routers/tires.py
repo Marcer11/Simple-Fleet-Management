@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from models.tire import (
-    DAMAGE_POSITIONS, LEGAL_MIN_TREAD, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
+    DAMAGE_POSITIONS, LEGAL_MIN_TREAD, LEGAL_MIN_TREAD_MOTO, TIRE_RETIRED_REASONS, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
     positions_for,
 )
 from models.vehicle import ROLE_EDITOR
@@ -95,8 +95,11 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
 # ----------------------------------------------------------------------
 
 def _tire_context(db, user, tire=None):
+    used = [t.retired_reason for t in TireService(db).list_for_user(user) if t.retired_reason]
     return {"tire": tire, "seasons": TIRE_SEASONS, "rims": TIRE_RIMS, "currencies": COMMON_CURRENCIES,
-            "vehicles": editable_vehicles(db, user)}
+            "vehicles": editable_vehicles(db, user), "legal_min": LEGAL_MIN_TREAD,
+            "legal_min_moto": LEGAL_MIN_TREAD_MOTO,
+            "retired_reasons": list(dict.fromkeys(TIRE_RETIRED_REASONS + sorted(used)))}
 
 
 def _read_tire(form):
@@ -111,6 +114,7 @@ def _read_tire(form):
         "quantity": form.int("quantity", "Počet kusů", min_value=1, max_value=8),
         "rim": form.str("rim", "Disky") or "",
         "new_tread_mm": form.decimal("new_tread_mm", "Hloubka dezénu", min_value=0),
+        "min_tread_mm": form.decimal("min_tread_mm", "Minimální dezén", positive=True),
         "purchase_date": form.date("purchase_date", "Datum nákupu"),
         "storage_location": form.str("storage_location", "Místo uložení", max_len=100),
         "retired_date": form.date("retired_date", "Vyřazeno"),
@@ -127,7 +131,8 @@ def _tire_values(t):
     return {
         "season": t.season, "manufacturer": t.manufacturer, "model": t.model or "", "size": t.size or "",
         "production_year": iso(t.production_year), "dot": t.dot or "", "quantity": str(t.quantity),
-        "rim": t.rim or "", "new_tread_mm": iso(t.new_tread_mm), "purchase_date": iso(t.purchase_date),
+        "rim": t.rim or "", "new_tread_mm": iso(t.new_tread_mm),
+        "min_tread_mm": iso(t.min_tread_mm), "purchase_date": iso(t.purchase_date),
         "storage_location": t.storage_location or "", "retired_date": iso(t.retired_date),
         "retired_reason": t.retired_reason or "", "note": t.note or "",
         "expense_vehicle_id": str(t.expense.vehicle_id) if t.expense else "",
@@ -154,6 +159,8 @@ async def _save_tire(request, db, user, tire):
     except (ValidationError, NotFoundError) as e:
         db.rollback()
         return render(request, "tires/tire_form.html", status_code=400, values=form.values, error=str(e),
+                      stats=tire_stats(db, [tire])[0] if tire else None,
+                      defects=TireDefectService(db).for_tires([tire.id]) if tire else [],
                       **_tire_context(db, user, tire))
     flash(request, f"Pneumatika {tire.label} byla uložena.")
     return RedirectResponse("/tires", status_code=303)

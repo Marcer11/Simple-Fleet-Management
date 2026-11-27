@@ -163,6 +163,12 @@ class TireService:
         retired = data.get("retired_date")
         if retired and data.get("purchase_date") and retired < data["purchase_date"]:
             raise ValidationError("Vyřazení nemůže být před nákupem.")
+        new_tread = _tread(data.get("new_tread_mm"))
+        min_tread = _tread(data.get("min_tread_mm"), "Minimální dezén")
+        if min_tread is not None and min_tread <= 0:
+            raise ValidationError("Minimální dezén musí být větší než nula.")
+        if min_tread is not None and new_tread is not None and min_tread >= new_tread:
+            raise ValidationError("Minimální dezén musí být menší než dezén při nákupu.")
         currency, price_paid, price_local = "CZK", None, None
         if _has_price(price):
             currency, price_paid, price_local = convert_price(
@@ -177,7 +183,8 @@ class TireService:
             "dot": _clean_str(data.get("dot"), 10, "DOT"),
             "quantity": quantity,
             "rim": rim,
-            "new_tread_mm": _tread(data.get("new_tread_mm")),
+            "new_tread_mm": new_tread,
+            "min_tread_mm": min_tread,
             "purchase_date": data.get("purchase_date"),
             "price_paid": price_paid,
             "currency_code": currency,
@@ -575,7 +582,8 @@ def tire_stats(session, tires, today=None):
             base = (tire.purchase_date, 0, tire.new_tread_mm)
         else:
             base = measurements[0] if len(measurements) > 1 else None
-        minimum = Decimal(str(tire.legal_min_tread))
+        minimum = Decimal(str(tire.min_tread))
+        custom = tire.min_tread_mm is not None
         wear = remaining_km = remaining_months = None
         if base is not None and last is not None and last[1] - base[1] >= WEAR_MIN_KM and base[2] > last[2]:
             wear = (base[2] - last[2]) / Decimal(last[1] - base[1]) * 1000  # mm na 1000 km
@@ -593,13 +601,14 @@ def tire_stats(session, tires, today=None):
         if status != "retired":
             when = f" (≈ {_months_text(remaining_months)})" if remaining_months is not None else ""
             if tread is not None and tread <= minimum:
-                warnings.append(("danger", f"dezén {tread} mm – pod zákonným minimem {tire.legal_min_tread} mm"))
+                warnings.append(("danger", f"dezén {_mm(tread)} mm – pod {'nastaveným' if custom else 'zákonným'} minimem {_mm(minimum)} mm"))
             elif remaining_km == 0:
                 warnings.append(("danger", "podle opotřebení už je vzorek na minimu – změřte dezén"))
             elif remaining_km is not None and remaining_km < TREAD_WARN_KM:
                 warnings.append(("warning", f"vzorek dojde za ≈ {remaining_km:,} km{when}".replace(",", " ")))
             elif tread is not None and tread <= minimum + 1:
-                warnings.append(("warning", f"dezén {tread} mm – blíží se minimum {tire.legal_min_tread} mm"))
+                warnings.append(("warning", f"dezén {_mm(tread)} mm – blíží se "
+                                            f"{'nastavenému' if custom else 'zákonnému'} minimu {_mm(minimum)} mm"))
             if tire.age_years is not None and tire.age_years >= TIRE_MAX_AGE_YEARS:
                 warnings.append(("warning", f"stáří {tire.age_years} let – doporučená výměna"))
         result.append({
@@ -611,6 +620,10 @@ def tire_stats(session, tires, today=None):
             "cost": cost, "cost_per_1000": (cost / km * 1000) if km and cost else None, "warnings": warnings,
         })
     return result
+
+
+def _mm(value):
+    return f"{Decimal(str(value)):.1f}".replace(".", ",")
 
 
 def _months_text(months):

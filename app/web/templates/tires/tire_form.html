@@ -21,7 +21,7 @@
         <div class="hint">{% if stats.mount %}{{ stats.mount.vehicle.display_name }} – {{ stats.mount.position_label|lower }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
     <div class="kpi"><div class="label">Najeto</div><div class="value">{{ stats.km|km }}</div><div class="hint">{{ stats.mounts }}× nasazeno, {{ stats.used_years|num(1) }} roku na voze</div></div>
     <div class="kpi"><div class="label">Dezén</div><div class="value">{{ (stats.tread|num(1) ~ " mm") if stats.tread is not none else "–" }}</div>
-        <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.legal_min_tread|num(1) }} mm{% endif %}</div></div>
+        <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.min_tread|num(1) }} mm{% endif %}</div></div>
     <div class="kpi"><div class="label">Náklady</div><div class="value">{{ stats.cost|czk(0) if stats.cost else "–" }}</div><div class="hint">{{ (stats.cost_per_1000|czk(0) ~ " / 1000 km") if stats.cost_per_1000 else "" }}</div></div>
 </div>
 {% if stats.warnings %}<div class="card">{% for level, text in stats.warnings %}<span class="badge badge-{{ level }}">{{ text }}</span> {% endfor %}</div>{% endif %}
@@ -52,6 +52,14 @@
         {{ m.field("production_year", "Rok výroby", "number", min=1990, max=today.year + 1) }}
         {{ m.field("dot", "DOT (týden a rok)", maxlength=10, autocomplete="off") }}
         {{ m.field("new_tread_mm", "Dezén při nákupu (mm)", inputmode="decimal", autocomplete="off") }}
+        <div class="field">
+            <label for="f-min_tread_mm">Minimální dezén (mm)</label>
+            <input id="f-min_tread_mm" name="min_tread_mm" type="text" inputmode="decimal" autocomplete="off"
+                   value="{{ m.val('min_tread_mm') }}" aria-describedby="h-min_tread_mm"
+                   placeholder="zákonné{% if tire %} {{ tire.legal_min_tread|num(1) }}{% endif %}">
+            <div id="h-min_tread_mm" class="small muted">Prázdné = zákonné minimum: letní {{ legal_min["Letní"]|num(1) }} mm,
+                zimní a univerzální {{ legal_min["Zimní"]|num(1) }} mm, motorka {{ legal_min_moto|num(1) }} mm.</div>
+        </div>
         {{ m.field("storage_location", "Místo uložení", maxlength=100, autocomplete="off") }}
     </div>
     <h3 class="form-section">Nákup</h3>
@@ -71,7 +79,8 @@
         <summary>Vyřazení</summary>
         <div class="form-grid" style="margin-top: 10px">
             {{ m.field("retired_date", "Vyřazeno dne", "date") }}
-            {{ m.field("retired_reason", "Důvod", maxlength=200, autocomplete="off") }}
+            {{ m.field("retired_reason", "Důvod", maxlength=200, autocomplete="off", list="retired-reasons") }}
+            {{ m.datalist("retired-reasons", retired_reasons) }}
         </div>
     </details>
     <div class="form-actions">

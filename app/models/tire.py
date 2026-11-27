@@ -30,6 +30,9 @@ MOTO_WHEELS = [("f", "P", "přední"), ("r", "Z", "zadní")]
 DAMAGE_POSITIONS = ["Levá přední", "Pravá přední", "Levá zadní", "Pravá zadní", "Přední", "Zadní", "Rezerva"]
 # Zákonné minimum hloubky dezénu (mm): zimní a univerzální (v zimním období) 4 mm, letní 1,6 mm
 LEGAL_MIN_TREAD = {"Zimní": 4.0, "Univerzální": 4.0, "Letní": 1.6}
+# Motorka: 1,6 mm bez ohledu na typ (povinnost zimních pneumatik se na motorky nevztahuje)
+LEGAL_MIN_TREAD_MOTO = 1.6
+TIRE_RETIRED_REASONS = ["Prodej", "Poškození", "Opotřebení", "Jiné"]
 TIRE_EXPENSE_CATEGORY = "Pneumatiky"
 TIRE_SERVICE_TYPE = "Přezutí pneumatik"
 TIRE_MAX_AGE_YEARS = 6  # starší pneumatiky tvrdnou - doporučená výměna
@@ -115,6 +118,7 @@ class Tire(Base):
     quantity = Column(Integer, nullable=False, default=2)
     rim = Column(String(10), nullable=False, default="")
     new_tread_mm = Column(DECIMAL(3, 1), nullable=True)  # hloubka dezénu při nákupu
+    min_tread_mm = Column(DECIMAL(3, 1), nullable=True)  # vlastní minimum dezénu (prázdné = zákonné)
     purchase_date = Column(Date, nullable=True)
     price_paid = Column(DECIMAL(12, 3), nullable=True)
     currency_code = Column(CHAR(3), nullable=False, default="CZK")
@@ -160,8 +164,21 @@ class Tire(Base):
         return (date.today().year - year) if year else None
 
     @property
+    def is_moto(self):
+        """Pneumatika z motorky - podle vozidla, na kterém byla nasazená naposledy."""
+        mount = self.mounts[-1] if self.mounts else None
+        return mount is not None and mount.vehicle is not None and mount.vehicle.kind == "moto"
+
+    @property
     def legal_min_tread(self):
+        if self.is_moto:
+            return LEGAL_MIN_TREAD_MOTO
         return LEGAL_MIN_TREAD.get(self.season, 1.6)
+
+    @property
+    def min_tread(self):
+        """Hlídané minimum dezénu: vlastní, jinak zákonné."""
+        return float(self.min_tread_mm) if self.min_tread_mm is not None else self.legal_min_tread
 
     @property
     def open_mount(self):

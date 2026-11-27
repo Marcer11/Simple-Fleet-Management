@@ -101,6 +101,12 @@ def test_dashboard_alerts_and_timeline(app, db):
     assert 'id="timeline-filter" hidden' in page and 'data-toggle="timeline-filter"' in page
     assert 'aria-label="Tankování"' in page  # ikona události
     assert "tl-note" in page and "ťukanec" in page
+    # poznámka u záznamu (servis) se v časové ose neukazuje - jen v detailu záznamu
+    assert post(client, "/services/add", {"vehicle_id": car, "service_date": date.today().isoformat(),
+                                          "odometer": 1100, "service_type": "Výměna oleje", "price_paid": "2500",
+                                          "note": "dlouhá poznámka mechanika"}).status_code == 303
+    page = client.get("/").text
+    assert "Výměna oleje" in page and "dlouhá poznámka mechanika" not in page
     # stará adresa časové osy přesměruje i s filtrem
     r = client.get(f"/timeline?vehicle_id={car}", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == f"/?vehicle_id={car}#timeline"

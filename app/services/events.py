@@ -157,8 +157,6 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                     for m in removed))
             where = s.place_label + (f" – {s.service_record.place}" if s.service_record and s.service_record.place else "")
             parts.append(where)
-            if s.note:
-                parts.append(s.note.strip())
             events.append(Event(KIND_TIRES, _day(s.swap_date), False, by_id[s.vehicle_id], "Přezutí pneumatik",
                                 "\n".join(parts), s.odometer,
                                 s.service_record.price_local if s.service_record else None,
@@ -176,8 +174,6 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         for c in dated(query, TireTreadCheck.check_date, False):
             lines = [f"{tire.label}: " + " · ".join(r.text for r in readings) + " mm"
                      for tire, readings in c.by_tire()]
-            if c.note:
-                lines.append(c.note.strip())
             detail = "\n".join(lines)
             events.append(Event(KIND_TIRES, _day(c.check_date), False, by_id[c.vehicle_id], "Kontrola dezénu",
                                 detail, c.odometer, None, f"/tire-checks/{c.id}/edit", icon="gauge"))
@@ -211,7 +207,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                     stay.append(f"servis najel {r.distance:,} km".replace(",", " "))
                 if not more_days and ("service", r.id) in ended:
                     stay.append(f"opět pojízdné (nepojízdné {ended['service', r.id].duration})")
-                detail = " · ".join(x for x in (r.place, *stay, _insurance_text(r), (r.note or "").strip()) if x)
+                detail = " · ".join(x for x in (r.place, *stay, _insurance_text(r)) if x)
                 events.append(Event(KIND_SERVICE, datetime.combine(r.service_date, r.service_time or time(0, 0)),
                                     r.service_time is not None, by_id[r.vehicle_id], r.service_type,
                                     detail, r.odometer, r.own_cost, url, icon=_service_icon(r.types)))
@@ -236,8 +232,6 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
                 parts.append(f"platí do {r.valid_until.day}. {r.valid_until.month}. {r.valid_until.year}")
             if r.insurance_claim:
                 parts.append(_insurance_text(r))
-            if r.note:
-                parts.append(r.note.strip())
             events.append(Event(KIND_EXPENSE, _day(r.expense_date), False, by_id[r.vehicle_id], r.category,
                                 " · ".join(parts), r.odometer, r.own_cost, f"/expenses/{r.id}/edit",
                                 icon=EXPENSE_ICONS.get(r.category.lower(), "expense")))
@@ -250,8 +244,6 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             if in_range(_day(r.date_from)):
                 parts = [f"do {r.date_to.day}. {r.date_to.month}. {r.date_to.year}"
                          + (f" {r.time_to:%H:%M}" if r.time_to else "") if r.date_to else "zatím nevráceno"]
-                if r.note:
-                    parts.append(r.note.strip())
                 events.append(Event(KIND_RENTAL, datetime.combine(r.date_from, r.time_from or time(0, 0)),
                                     r.time_from is not None, by_id[r.vehicle_id],
                                     _rental_title("Půjčení", r), " · ".join(parts), r.odometer_from,

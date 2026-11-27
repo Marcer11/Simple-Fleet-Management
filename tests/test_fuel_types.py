@@ -66,6 +66,7 @@ def test_fuel_types_are_private(app, db):
 
 def test_station_overview(app):
     assert station_brand("Benzina ORLEN Praha") == "ORLEN"
+    assert station_brand("Benzina Praha Chodov") == "Benzina"  # samostatná značka, ne ORLEN
     assert station_brand("MOL Štěrboholská spojka") == "MOL"
     assert station_brand("Pumpa U Lesa") == "Pumpa"
     assert station_brand("") == "Neuvedeno"

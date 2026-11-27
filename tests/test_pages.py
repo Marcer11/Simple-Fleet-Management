@@ -207,3 +207,23 @@ def test_manifest_is_installable(app):
     assert len(manifest["shortcuts"]) <= 4
     profile = client.get("/profile").text
     assert "Nainstalovat aplikaci" in profile and 'name="apple-mobile-web-app-capable"' in profile
+
+
+def test_stations_without_address_and_brands(app, db):
+    client = register(app, "brands@example.com")
+    car = add_vehicle(client, model="Octavia")
+    today = date.today()
+    add_fuel(client, car, today - timedelta(days=40), 1000, "40", station_name="MOL")
+    add_fuel(client, car, today - timedelta(days=30), 1500, "40", station_name="MOL Brno")
+    add_fuel(client, car, today - timedelta(days=20), 2000, "40", station_name="MOL", station_address="Vídeňská 5, Brno")
+    add_fuel(client, car, today - timedelta(days=10), 2500, "40", station_name="Benzina Praha",
+             station_address="Chodovská 1, Praha")
+    page = client.get("/places?kind=station").text
+    # MOL: jedna adresa + jedna položka „bez adresy“ (oba názvy pod ní); Benzina zvlášť, ne pod ORLENem
+    assert page.count("<em>bez adresy</em>") == 1 and "MOL, MOL Brno" in page
+    assert "Benzina" in page and "ORLEN" not in page
+    assert "data-collapsible" in page and 'aria-controls="brand-1"' in page and "Rozbalit vše" in page
+    detail = client.get("/places/station?key=~mol").text
+    assert "MOL – bez adresy" in detail and "zapsáno jako MOL, MOL Brno" in detail
+    stats = client.get("/stats?period=all").text
+    assert "Nejoblíbenější značky pump" in stats and "Vídeňská 5, Brno" in stats and "MOL – bez adresy" in stats

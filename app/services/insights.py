@@ -4,6 +4,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from services import places
+from services.stations import UNKNOWN, station_overview
 from services.stats_service import StatsService
 
 ZERO = Decimal("0")
@@ -83,6 +84,7 @@ def insights(session, vehicles, date_from=None, date_to=None):
 
     # --- nejčastější místa ---
     result["places"] = {kind: places.overview(session, kind, ids, date_from, date_to)[:5] for kind in places.KINDS}
+    result["brands"] = [b for b in station_overview(fuel) if b["brand"] != UNKNOWN][:5]
 
     # --- tankování: průměry a rekordy (jen litry, ať se nemíchá kWh a kg) ---
     liters = [f for f in fuel if f.unit == "l"]

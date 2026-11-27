@@ -656,3 +656,12 @@ fieldset.field legend { padding: 0; font-weight: 600; font-size: .9rem; margin-b
 .places-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .top-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 .top-list li { display: flex; justify-content: space-between; gap: 10px; }
+
+/* ---------- sbalitelné skupiny (pumpy podle značky) ---------- */
+.group-tools { display: flex; gap: 8px; justify-content: flex-end; margin: 4px 0 8px; }
+.group-toggle { background: none; border: 0; padding: 2px 0; font: inherit; font-weight: 600; color: var(--text);
+                cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-align: left; }
+.group-toggle:hover { color: var(--primary); }
+.group-toggle .chevron { width: 16px; height: 16px; align-self: center; color: var(--muted); transition: transform .15s; }
+.group-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.top-sub { display: block; }

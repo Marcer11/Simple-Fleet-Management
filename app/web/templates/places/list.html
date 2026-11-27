@@ -23,30 +23,38 @@
 
     {% if kind == "station" %}
     {% if brands %}
+    <div class="group-tools">
+        <button type="button" class="btn btn-sm" data-groups-toggle="stations" data-expand="1">Rozbalit vše</button>
+        <button type="button" class="btn btn-sm" data-groups-toggle="stations" data-expand="0">Sbalit vše</button>
+    </div>
     <div class="table-wrap">
-    <table class="stations">
+    <table class="stations" id="stations" data-collapsible>
         <thead><tr>
             <th>Značka / stanice</th><th class="num">Tankování</th><th class="num">Množství</th>
             <th class="num">Celkem</th><th class="num" title="Průměrná cena za litr (vážená množstvím)">Kč/l</th>
             <th class="num">Naposledy</th>
         </tr></thead>
         {% for b in brands %}
+        {% set group = "brand-" ~ loop.index %}
         <tbody>
         <tr class="group-row">
-            <td>{{ b.brand }}{% if b.stations|length > 1 %} <span class="muted small">({{ b.stations|length }} {{ "stanice" if b.stations|length < 5 else "stanic" }})</span>{% endif %}</td>
+            <td><button type="button" class="group-toggle" aria-expanded="true" aria-controls="{{ group }}" data-group="{{ group }}">
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg> {{ b.brand }}
+                <span class="muted small">({{ b.stations|length }} {{ "místo" if b.stations|length == 1 else ("místa" if b.stations|length < 5 else "míst") }})</span></button></td>
             <td class="num">{{ b.count }}</td>
             <td class="num">{{ volumes(b.volume) }}</td>
             <td class="num">{{ b.cost|czk(0) }}</td>
             <td class="num">{{ b.avg_price|num(2) if b.avg_price else "–" }}</td>
             <td class="num">{{ b.last|date }}</td>
         </tr>
+        </tbody>
+        <tbody id="{{ group }}" class="group-rows">
         {% for s in b.stations %}
         {% set url = place_url("station", s.name, s.address) %}
         <tr class="child-row">
             <td>
-                {% if s.address %}{% if url %}<a href="{{ url }}">{{ s.address }}</a>{% else %}{{ s.address }}{% endif %}{% if s.name and s.name != b.brand %}<div class="muted small">{{ s.name }}</div>{% endif %}
-                {% elif url %}<a href="{{ url }}">{{ s.name }}</a><div class="muted small">adresa neuvedena</div>
-                {% else %}<span class="muted">bez názvu</span>{% endif %}
+                {% if s.address %}<a href="{{ url }}">{{ s.address }}</a>{% if s.name and s.name != b.brand %}<div class="muted small">{{ s.name }}</div>{% endif %}
+                {% else %}<a href="{{ url }}"><em>bez adresy</em></a>{% if s.names %}<div class="muted small">{{ s.names|sort|join(", ") }}</div>{% endif %}{% endif %}
             </td>
             <td class="num">{{ s.count }}</td>
             <td class="num">{{ volumes(s.volume) }}</td>

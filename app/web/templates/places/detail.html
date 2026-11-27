@@ -7,7 +7,8 @@
     <div>
         {{ m.back("/places?kind=" ~ kind, kinds[kind]) }}
         <h1>{{ m.icon("pin") }} {{ summary.name or summary.address }}</h1>
-        <div class="sub">{{ kind_label }}{% if summary.address and summary.name %} · {{ summary.address }}{% endif %}</div>
+        <div class="sub">{{ kind_label }}{% if summary.address and summary.name %} · {{ summary.address }}{% endif %}
+            {%- if is_station and not summary.address and summary.names %} · zapsáno jako {{ summary.names|join(", ") }}{% endif %}</div>
     </div>
 </div>
 

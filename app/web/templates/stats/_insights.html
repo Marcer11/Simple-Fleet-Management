@@ -105,19 +105,31 @@
 {% endif %}
 
 {% set place_titles = {"station": "Nejčastější pumpy", "service": "Nejčastější servisy", "expense": "Nejčastější místa výdajů"} %}
-{% if insights.places.values()|select|list %}
+{% if insights.places.values()|select|list or insights.brands %}
 <div class="card">
     <div class="card-head">
         <h2>Nejčastější místa</h2>
         <a class="small" href="/places">Všechna místa</a>
     </div>
     <div class="grid places-grid">
+        {% if insights.brands %}
+        <div>
+            <h3 class="fold-subhead">Nejoblíbenější značky pump</h3>
+            <ol class="top-list">
+                {% for b in insights.brands %}
+                <li><span>{{ b.brand }}<span class="muted small top-sub">{{ b.stations|length }} {{ "místo" if b.stations|length == 1 else ("místa" if b.stations|length < 5 else "míst") }}{% if b.avg_price %} · ⌀ {{ b.avg_price|num(2) }} Kč/l{% endif %}</span></span>
+                    <span class="muted small nowrap">{{ b.count }}× · {{ b.cost|czk(0) }}</span></li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
         {% for kind, items in insights.places.items() if items %}
         <div>
             <h3 class="fold-subhead">{{ place_titles[kind] }}</h3>
             <ol class="top-list">
                 {% for p in items %}
-                <li><a href="{{ p.url }}">{{ p.name or p.address }}</a><span class="muted small nowrap">{{ p.count }}× · {{ p.cost|czk(0) }}</span></li>
+                <li><span><a href="{{ p.url }}">{{ p.name or p.address }}</a>{% if kind == "station" and p.address %}<span class="muted small top-sub">{{ p.address }}</span>{% endif %}</span>
+                    <span class="muted small nowrap">{{ p.count }}× · {{ p.cost|czk(0) }}</span></li>
                 {% endfor %}
             </ol>
         </div>

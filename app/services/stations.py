@@ -8,7 +8,8 @@ UNKNOWN = "Neuvedeno"
 
 # (vzor v názvu stanice, značka) - první shoda vyhrává
 _BRANDS = [
-    (r"orlen|benzina", "ORLEN"),
+    (r"orlen", "ORLEN"),
+    (r"benzina", "Benzina"),  # dřívější značka - stanice pod ní se vedou zvlášť (ORLEN v názvu má přednost)
     (r"\bmol\b", "MOL"),
     (r"\bomv\b", "OMV"),
     (r"\bshell\b", "Shell"),
@@ -83,24 +84,28 @@ def _finish(bucket):
 
 def station_overview(records):
     """Seznam značek [{brand, count, cost, volume, avg_price, last, stations: [...]}],
-    nejčastější nahoře. Stanice v rámci značky se rozlišují podle adresy (bez ní podle názvu)."""
+    nejčastější nahoře. Stanice v rámci značky se rozlišují podle adresy; tankování bez adresy jsou
+    u každé značky jedna položka „bez adresy“ (address = "", names = zapsané názvy)."""
     brands = defaultdict(lambda: {"total": _new_bucket(), "stations": {}})
     for record in records:
         brand = station_brand(record.station_name)
         address = " ".join((record.station_address or "").split())
         name = " ".join((record.station_name or "").split())
-        key = (address or name).lower()
+        key = address.lower()
         group = brands[brand]
         station = group["stations"].get(key)
         if station is None:
-            station = group["stations"][key] = {**_new_bucket(), "name": name, "address": address}
+            station = group["stations"][key] = {**_new_bucket(), "name": name, "address": address, "names": []}
+        if name and name not in station["names"]:
+            station["names"].append(name)
+        station["name"] = station["name"] or name
         _add(station, record)
         _add(group["total"], record)
 
     result = []
     for brand, group in brands.items():
         stations = sorted((_finish(s) for s in group["stations"].values()),
-                          key=lambda s: (-s["count"], -s["cost"], s["address"] or s["name"]))
+                          key=lambda s: (not s["address"], -s["count"], -s["cost"], s["address"]))
         result.append({"brand": brand, **_finish(group["total"]), "stations": stations})
     result.sort(key=lambda b: (b["brand"] == UNKNOWN, -b["count"], -b["cost"], b["brand"]))
     return result

@@ -27,7 +27,16 @@ def place_key(text):
 
 
 def station_key(name, address):
-    return place_key(address) or place_key(name)
+    """Pumpa se pozná podle adresy; tankování bez adresy jsou jedno místo za značku („MOL – bez adresy“)."""
+    if place_key(address):
+        return place_key(address)
+    return "~" + station_brand(name).lower()
+
+
+def _station_label(summary):
+    if not summary["address"]:
+        summary["name"] = f"{station_brand(summary['name'])} – bez adresy"
+    return summary
 
 
 def place_url(kind, name, address=None):
@@ -127,6 +136,7 @@ def overview(session, kind, vehicle_ids, date_from=None, date_to=None):
         summary.update(key=key, url=f"/places/{kind}?{urlencode({'key': key})}")
         if kind == "station":
             summary["brand"] = station_brand(summary["name"])
+            _station_label(summary)
         result.append(summary)
     return sorted(result, key=lambda p: (-p["count"], -p["cost"], p["name"].lower()))
 
@@ -134,6 +144,9 @@ def overview(session, kind, vehicle_ids, date_from=None, date_to=None):
 def detail(items):
     """Souhrn návštěv místa: celkem, po vozidlech a po letech."""
     summary = _summary(items)
+    if items and items[0].kind == "station":
+        summary["names"] = sorted({v.name for v in items if v.name})
+        _station_label(summary)
     by_vehicle = defaultdict(list)
     by_year = defaultdict(list)
     for v in items:

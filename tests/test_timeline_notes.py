@@ -79,7 +79,8 @@ def test_fuel_station_brands(app, db):
                                          "station_brands": "orlen, Benzina;  ORLEN"})
     assert r.status_code == 303, r.text
     verva = db.query(FuelType).filter_by(name="Verva 100").one()
-    assert verva.station_brands == "ORLEN" and verva.brands == ["ORLEN"]
+    # Benzina je samostatná značka (dřív se slučovala s ORLENem)
+    assert verva.station_brands == "ORLEN,Benzina" and verva.brands == ["ORLEN", "Benzina"]
     post(client, f"/fuel-types/{verva.id}/edit", {"name": "Verva 100", "category": "Benzín",
                                                    "station_brands": "ORLEN, Shell"})
     db.expire_all()

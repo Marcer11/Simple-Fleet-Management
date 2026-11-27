@@ -860,6 +860,31 @@
         if (y !== null) window.addEventListener("load", function () { window.scrollTo(0, +y); });
     })();
 
+    // Sbalitelné skupiny v tabulce (<table data-collapsible>): tlačítko ve skupině ukáže / schová její řádky.
+    // Bez JavaScriptu zůstane vše rozbalené; výchozí je sbaleno.
+    (function collapsibleGroups() {
+        function setGroup(button, open) {
+            const rows = document.getElementById(button.getAttribute("aria-controls"));
+            button.setAttribute("aria-expanded", String(open));
+            if (rows) rows.hidden = !open;
+        }
+        document.querySelectorAll("table[data-collapsible] .group-toggle").forEach(function (button) {
+            setGroup(button, false);
+            button.addEventListener("click", function () {
+                setGroup(button, button.getAttribute("aria-expanded") !== "true");
+            });
+        });
+        document.querySelectorAll("[data-groups-toggle]").forEach(function (control) {
+            control.addEventListener("click", function () {
+                const table = document.getElementById(control.getAttribute("data-groups-toggle"));
+                if (!table) return;
+                table.querySelectorAll(".group-toggle").forEach(function (button) {
+                    setGroup(button, control.getAttribute("data-expand") === "1");
+                });
+            });
+        });
+    })();
+
     // PWA - instalace aplikace (Nastavení → Účet): tlačítko se ukáže, až prohlížeč instalaci nabídne
     (function installPrompt() {
         const box = document.getElementById("app-install");

@@ -155,3 +155,15 @@ def test_out_of_order_moved_to_notes(tmp_path):
         _upgrade(conn)
         rows = conn.execute(text("SELECT vehicle_id, note_datetime, category, text FROM vehicle_notes")).all()
     assert [(r[0], str(r[1])[:16], r[2], r[3]) for r in rows] == [(1, "2026-11-24 00:00", "Nepojízdné", "nestartuje")]
+
+
+def test_orlen_fuels_allow_benzina(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'benzina.db'}")
+    with engine.begin() as conn:
+        _upgrade(conn, "0027_expense_place")
+        conn.execute(text("INSERT INTO fuel_types (id, user_id, name, category, station_brands) VALUES "
+                          "(1, 1, 'Verva 100', 'Benzín', 'ORLEN'), (2, 1, 'V-Power', 'Benzín', 'Shell'),"
+                          " (3, 1, 'Natural 95', 'Benzín', NULL)"))
+        _upgrade(conn)
+        rows = conn.execute(text("SELECT id, station_brands FROM fuel_types ORDER BY id")).all()
+    assert [tuple(r) for r in rows] == [(1, "ORLEN,Benzina"), (2, "Shell"), (3, None)]

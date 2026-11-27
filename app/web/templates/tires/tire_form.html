@@ -60,7 +60,7 @@
             <label for="f-expense_vehicle_id">Zapsat jako výdaj k vozidlu</label>
             <select id="f-expense_vehicle_id" name="expense_vehicle_id">
                 <option value="">– nezapisovat –</option>
-                {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('expense_vehicle_id') == v.id|string %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('expense_vehicle_id') == v.id|string %} selected{% endif %}>{{ v.short_name }}</option>{% endfor %}
             </select>
         </div>
     </div>

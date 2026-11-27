@@ -119,7 +119,7 @@ class TireService:
         mount = tire.open_mount
         if mount and mount.vehicle and values["kind"] != (mount.vehicle.kind or "car"):
             raise ValidationError(f"Pneumatika je nasazená na {'motorce' if mount.vehicle.kind == 'moto' else 'autě'} "
-                                  f"{mount.vehicle.display_name} – nejdřív ji sundejte.")
+                                  f"{mount.vehicle.short_name} – nejdřív ji sundejte.")
         for key, value in values.items():
             setattr(tire, key, value)
         self.session.commit()
@@ -586,8 +586,8 @@ def tire_stats(session, tires, today=None):
             days += max(((m.removed_date or today) - m.mounted_date).days, 0)
             if m.removed_tread_mm is not None:
                 measurements.append((m.removed_date, km, m.removed_tread_mm))
-            if m.vehicle.display_name not in vehicle_names:
-                vehicle_names.append(m.vehicle.display_name)
+            if m.vehicle.short_name not in vehicle_names:
+                vehicle_names.append(m.vehicle.short_name)
         measurements.sort(key=lambda x: (x[0], x[1]))
         last = measurements[-1] if measurements else None
         if tire.new_tread_mm is not None:

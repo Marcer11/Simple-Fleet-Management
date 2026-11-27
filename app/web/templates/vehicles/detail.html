@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}{{ vehicle.display_name }}{% if tab %} · {{ vehicle_tabs[tab] }}{% endif %}{% endblock %}
+{% block title %}{{ vehicle.short_name }}{% if tab %} · {{ vehicle_tabs[tab] }}{% endif %}{% endblock %}
 {% block content %}
 {% include "vehicles/_head.html" %}
 {% include "vehicles/tab_" ~ (tab or "overview") ~ ".html" %}

@@ -46,7 +46,7 @@ def flash_vehicle_alerts(request, db, vehicle):
     """Po uložení záznamu upozorní na blížící se servis a upomínky (zadání z readme)."""
     for alert in collect_alerts(db, [vehicle])[:5]:
         category = "danger" if alert.status.level == "overdue" else "warning"
-        flash(request, f"{vehicle.display_name}: {alert.title} – {alert.status.summary}", category)
+        flash(request, f"{vehicle.short_name}: {alert.title} – {alert.status.summary}", category)
 
 
 def default_filter_period(date_from, date_to):

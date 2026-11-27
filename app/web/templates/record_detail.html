@@ -6,9 +6,9 @@
 {% set v = view.vehicle %}
 <div class="page-head">
     <div>
-        {% if view.back_url %}{{ m.back(view.back_url, v.display_name if v else "Pneumatika") }}{% endif %}
+        {% if view.back_url %}{{ m.back(view.back_url, v.short_name if v else "Pneumatika") }}{% endif %}
         <h1>{{ m.icon(view.icon) }} {{ view.title }}</h1>
-        <div class="sub">{{ view.kind_label }} · {{ view.when }}{% if v %} · {{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.display_name }}</a>{% endif %}</div>
+        <div class="sub">{{ view.kind_label }} · {{ view.when }}{% if v %} · {{ m.color_dot(v) }} <a href="/vehicles/{{ v.id }}">{{ v.short_name }}</a>{% endif %}</div>
     </div>
 </div>
 

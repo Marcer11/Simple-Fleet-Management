@@ -38,7 +38,7 @@
         <tbody>
         {% for r in summary.rows %}
         <tr>
-            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}/stats?{{ period_query }}">{{ r.vehicle.display_name }}</a>{% if r.vehicle.is_rental %} <span class="badge badge-muted">půjčené</span>{% endif %}</td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}/stats?{{ period_query }}">{{ r.vehicle.short_name }}</a>{% if r.vehicle.is_rental %} <span class="badge badge-muted">půjčené</span>{% endif %}</td>
             <td class="num nowrap">{{ r.distance|km if r.distance else "–" }}</td>
             <td class="num nowrap">{{ r.fuel_cost|czk(0) }}</td>
             <td class="num nowrap">{{ r.service_cost|czk(0) }}</td>

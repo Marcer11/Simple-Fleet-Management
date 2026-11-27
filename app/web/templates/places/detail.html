@@ -32,7 +32,7 @@
             <tbody>
             {% for row in summary.by_vehicle %}
             <tr>
-                <td>{{ m.color_dot(row.vehicle) }} <a href="/vehicles/{{ row.vehicle.id }}">{{ row.vehicle.display_name }}</a></td>
+                <td>{{ m.color_dot(row.vehicle) }} <a href="/vehicles/{{ row.vehicle.id }}">{{ row.vehicle.short_name }}</a></td>
                 <td class="num">{{ row.count }}</td>
                 <td class="num">{{ row.cost|czk(0) }}</td>
                 <td class="num nowrap">{{ row.last|date }}</td>
@@ -67,7 +67,7 @@
         {% for v in visits %}
         <tr>
             <td class="nowrap"><a href="{{ v.url }}">{{ v.when|datetime if v.has_time else v.when|date }}</a></td>
-            <td>{{ m.color_dot(v.vehicle) }} <a href="/vehicles/{{ v.vehicle.id }}">{{ v.vehicle.display_name }}</a></td>
+            <td>{{ m.color_dot(v.vehicle) }} <a href="/vehicles/{{ v.vehicle.id }}">{{ v.vehicle.short_name }}</a></td>
             <td>{{ v.title }}{% if v.detail %}<div class="small muted">{{ v.detail }}</div>{% endif %}{% if is_station and v.address and v.name != summary.name %}<div class="small muted">{{ v.name }}</div>{% endif %}</td>
             <td class="num">{{ v.odometer|km if v.odometer is not none else "–" }}</td>
             <td class="num">{{ v.amount|czk(0) if v.amount is not none else "–" }}</td>

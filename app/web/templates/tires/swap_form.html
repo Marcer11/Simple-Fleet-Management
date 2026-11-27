@@ -5,7 +5,7 @@
 <div class="page-head">
     <div>
         <h1>{{ "Upravit přezutí" if swap else "Přezutí pneumatik" }}</h1>
-        {% if vehicle %}<div class="sub">{{ vehicle.display_name }}{% if odometer is not none %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
+        {% if vehicle %}<div class="sub">{{ vehicle.short_name }}{% if odometer is not none %} · tachometr {{ odometer|km }}{% endif %}</div>{% endif %}
     </div>
 </div>
 
@@ -19,11 +19,11 @@
             <label for="f-vehicle_id">Vozidlo <span class="req">*</span></label>
             {% if swap %}
             <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
-            <input id="f-vehicle_id" type="text" value="{{ vehicle.display_name }}" disabled>
+            <input id="f-vehicle_id" type="text" value="{{ vehicle.short_name }}" disabled>
             {% else %}
             <select id="f-vehicle_id" name="vehicle_id" required data-reload>
                 <option value="">– vyberte –</option>
-                {% for v in vehicles %}<option value="{{ v.id }}"{% if vehicle and vehicle.id == v.id %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if vehicle and vehicle.id == v.id %} selected{% endif %}>{{ v.short_name }}</option>{% endfor %}
             </select>
             {% endif %}
         </div>

@@ -25,7 +25,7 @@
         <tr>
             <td>{% if r.is_done %}<span class="badge">Vyřízeno</span>{% else %}{{ m.status_badge(s) }}{% endif %}</td>
             <td><strong>{{ r.title }}</strong></td>
-            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.display_name }}</a></td>
+            <td>{{ m.color_dot(r.vehicle) }} <a href="/vehicles/{{ r.vehicle.id }}">{{ r.vehicle.short_name }}</a></td>
             <td class="nowrap">{% if r.due_date %}{{ r.due_date|date }}{% endif %}{% if r.due_odometer %}<br><span class="small">{{ r.due_odometer|km }}</span>{% endif %}
                 {% if not r.is_done %}<br><span class="muted small">{{ s.summary }}</span>{% endif %}</td>
             <td class="small">{{ repeat_options[r.repeat] }}{% if r.repeat_km %}<br>po {{ r.repeat_km|km }}{% endif %}</td>

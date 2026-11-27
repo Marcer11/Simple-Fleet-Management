@@ -118,7 +118,7 @@ def _summary(items):
         "count": len(items), "cost": cost,
         "first": min(v.when for v in items) if items else None,
         "last": max(v.when for v in items) if items else None,
-        "vehicles": sorted({v.vehicle.display_name for v in items}),
+        "vehicles": sorted({v.vehicle.short_name for v in items}),
     }
 
 
@@ -155,7 +155,7 @@ def detail(items):
     summary["by_vehicle"] = sorted(
         ({"vehicle": group[0].vehicle, "count": len(group), "cost": sum((v.amount or ZERO for v in group), ZERO),
           "last": max(v.when for v in group)} for group in by_vehicle.values()),
-        key=lambda x: (-x["count"], x["vehicle"].display_name))
+        key=lambda x: (-x["count"], x["vehicle"].short_name))
     summary["by_year"] = [(year, len(group), sum((v.amount or ZERO for v in group), ZERO))
                           for year, group in sorted(by_year.items(), reverse=True)]
     return summary

@@ -8,7 +8,7 @@
 <div class="record-tile">
     <div class="label">{{ label }}</div>
     <div class="value">{{ value }}</div>
-    <div class="hint"><a href="/fuel-records/{{ r.id }}">{{ r.refuel_datetime|date }}</a>{% if show_vehicle %} · {{ r.vehicle.display_name }}{% endif %}{% if r.station_name %} · {{ r.station_name }}{% endif %}</div>
+    <div class="hint"><a href="/fuel-records/{{ r.id }}">{{ r.refuel_datetime|date }}</a>{% if show_vehicle %} · {{ r.vehicle.short_name }}{% endif %}{% if r.station_name %} · {{ r.station_name }}{% endif %}</div>
 </div>
 {% endif %}
 {%- endmacro %}

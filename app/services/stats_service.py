@@ -408,7 +408,7 @@ class StatsService:
     def _vehicle_names(vehicles):
         names = {}
         for v in vehicles:
-            name = v.display_name
+            name = v.short_name
             names[v.id] = f"{name} ({v.license_plate or v.id})" if name in names.values() else name
         return names
 

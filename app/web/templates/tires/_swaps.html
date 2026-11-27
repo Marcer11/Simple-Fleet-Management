@@ -11,7 +11,7 @@
         {% for s in swaps %}
         <tr>
             <td class="nowrap"><a href="/tire-swaps/{{ s.id }}">{{ s.swap_date|date }}</a></td>
-            {% if with_vehicle %}<td>{{ m.color_dot(s.vehicle) }} <a href="/vehicles/{{ s.vehicle.id }}">{{ s.vehicle.display_name }}</a></td>{% endif %}
+            {% if with_vehicle %}<td>{{ m.color_dot(s.vehicle) }} <a href="/vehicles/{{ s.vehicle.id }}">{{ s.vehicle.short_name }}</a></td>{% endif %}
             <td class="num">{{ s.odometer|km }}</td>
             {% set stayed = s.removed|map(attribute="tire_id")|list %}
             <td>{% for mnt in s.mounted %}{% if mnt.tire_id in stayed %}<span class="muted"><a href="/tires/{{ mnt.tire_id }}">{{ mnt.tire.label }}</a> <span class="small">(zůstává – {{ mnt.position_label|lower }})</span></span>{% else %}<a href="/tires/{{ mnt.tire_id }}">{{ mnt.tire.label }}</a> <span class="small muted">({{ mnt.position_label|lower }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">jen sundáno</span>{% endfor %}</td>

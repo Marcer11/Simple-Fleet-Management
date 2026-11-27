@@ -31,7 +31,7 @@
 {% if rows is not none %}
 <div class="card">
     <div class="card-head">
-        <h2>Náhled – {{ vehicle.display_name }}</h2>
+        <h2>Náhled – {{ vehicle.short_name }}</h2>
         <span class="small muted">{{ rows|rejectattr("duplicate")|list|length }} k importu{% if rows|selectattr("duplicate")|list %} · {{ rows|selectattr("duplicate")|list|length }} už zapsáno{% endif %}{% if errors %} · {{ errors|length }} chybných řádků{% endif %}</span>
     </div>
     {% if warning %}<div class="alert alert-warning">{{ warning }}</div>{% endif %}

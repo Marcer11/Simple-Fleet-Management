@@ -3,7 +3,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, Date, DateTime, Text, CHAR, DECIMAL, ForeignKey, UniqueConstraint, func
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
 from .base import Base
 
 
@@ -66,6 +66,21 @@ class Vehicle(Base):
     def display_name(self):
         name = f"{self.brand} {self.model}"
         return f"{name} ({self.license_plate})" if self.license_plate else name
+
+    @property
+    def short_name(self):
+        """Název pro tabulky a časovou osu: značka a model; rok nebo SPZ jen když je potřeba rozlišit
+        vozidla uživatele (viz vehicle_names). Bez přihlášeného uživatele jen značka a model."""
+        session = object_session(self)
+        info = session.info if session is not None else {}
+        names = info.get("vehicle_names")
+        if (names is None or self.id not in names) and info.get("vehicles_loader") and not info.get("vehicle_names_busy"):
+            info["vehicle_names_busy"] = True
+            try:
+                names = info["vehicle_names"] = vehicle_names(info["vehicles_loader"]())
+            finally:
+                info["vehicle_names_busy"] = False
+        return (names or {}).get(self.id) or f"{self.brand} {self.model}"
 
     @property
     def is_sold(self):
@@ -184,3 +199,27 @@ class VehicleShare(Base):
 
     vehicle = relationship("Vehicle", back_populates="shares")
     user = relationship("User", back_populates="shares")
+
+
+def vehicle_names(vehicles):
+    """{id: název} - značka a model; má-li uživatel další vozidlo v provozu stejné značky a modelu, přidá se
+    rok výroby, a shoduje-li se i rok, SPZ (bez roku také SPZ)."""
+    def key(v):
+        return (v.brand or "").strip().lower(), (v.model or "").strip().lower()
+    groups = {}
+    for v in vehicles:
+        if v.in_use:
+            groups.setdefault(key(v), []).append(v)
+    names = {}
+    for v in vehicles:
+        base = f"{v.brand} {v.model}"
+        others = [o for o in groups.get(key(v), []) if o.id != v.id]
+        if not others:
+            names[v.id] = base
+        elif v.production_year and not any(o.production_year == v.production_year for o in others):
+            names[v.id] = f"{base} ({v.production_year})"
+        elif v.license_plate:
+            names[v.id] = f"{base} ({v.license_plate})"
+        else:
+            names[v.id] = f"{base} ({v.production_year})" if v.production_year else base
+    return names

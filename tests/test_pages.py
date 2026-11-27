@@ -264,7 +264,7 @@ def test_notes_only_in_record_detail(app, db):
                                    "note": "TAJNA-SERVIS"})
     tire = add_tire(client, db)
     swap(client, car, today - timedelta(days=4), 1100, [(tire, "all")])
-    mount = db.query(Tire).get(tire.id).mounts[0]
+    mount = db.get(Tire, tire.id).mounts[0]
     post(client, "/tire-checks/add", {"vehicle_id": car, "check_date": (today - timedelta(days=3)).isoformat(),
                                       "odometer": 1200, f"tread_{mount.id}_fl": "7", "note": "TAJNA-KONTROLA"})
     post(client, "/notes/add", {"vehicle_id": car, "note_date": today.isoformat(), "note_time": "09:00",
@@ -282,3 +282,25 @@ def test_notes_only_in_record_detail(app, db):
     # v detailu záznamu poznámka je
     assert "TAJNA-SERVIS" in client.get(f"/services/{service.id}").text
     assert "TAJNA-KONTROLA" in client.get(f"/tire-checks/{check.id}").text
+
+
+def test_vehicle_names_without_plate_unless_needed(app, db):
+    from models.vehicle import Vehicle, vehicle_names
+    client = register(app, "names@example.com")
+    a = add_vehicle(client, brand="Škoda", model="Octavia", license_plate="1A11111", production_year="2018")
+    b = add_vehicle(client, brand="Škoda", model="Octavia", license_plate="2B22222", production_year="2020")
+    c = add_vehicle(client, brand="Škoda", model="Octavia", license_plate="3C33333", production_year="2020")
+    d = add_vehicle(client, brand="Honda", model="CBF", license_plate="4D44444", kind="moto")
+    names = vehicle_names([db.get(Vehicle, i) for i in (a, b, c, d)])
+    assert names == {a: "Škoda Octavia (2018)", b: "Škoda Octavia (2B22222)", c: "Škoda Octavia (3C33333)",
+                     d: "Honda CBF"}
+    add_fuel(client, d, date.today(), 1000, "10")
+    page = client.get("/fuel-records").text
+    assert "Honda CBF" in page and "4D44444" not in page
+    # neaktivní vozidlo se do rozlišení nepočítá
+    vehicle = db.get(Vehicle, c)
+    vehicle.is_active = False
+    db.commit()
+    names = vehicle_names([db.get(Vehicle, i) for i in (a, b, c)])
+    assert names[a] == "Škoda Octavia (2018)" and names[b] == "Škoda Octavia (2020)"
+    assert names[c] == "Škoda Octavia (3C33333)"  # sám se pořád plete s Octavií 2020

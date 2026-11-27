@@ -7,7 +7,7 @@
         <span class="what">
             <strong>{{ a.title }}</strong>
             <span class="muted small">· {{ {"interval": "Pravidelný servis", "tires": "Pneumatiky"}.get(a.kind, "Upomínka") }}</span>
-            {% if show_vehicle %}<br><a class="small" href="/vehicles/{{ a.vehicle.id }}">{{ m.color_dot(a.vehicle) }} {{ a.vehicle.display_name }}</a>{% endif %}
+            {% if show_vehicle %}<br><a class="small" href="/vehicles/{{ a.vehicle.id }}">{{ m.color_dot(a.vehicle) }} {{ a.vehicle.short_name }}</a>{% endif %}
         </span>
         <span class="small">
             {% if a.kind == "tires" %}

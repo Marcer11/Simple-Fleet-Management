@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-head">
     <div>
-        {% if vehicle %}{{ m.back("/vehicles/%d?tab=detail"|format(vehicle.id), vehicle.display_name) }}{% else %}{{ m.back("/vehicles", "Vozidla") }}{% endif %}
+        {% if vehicle %}{{ m.back("/vehicles/%d?tab=detail"|format(vehicle.id), vehicle.short_name) }}{% else %}{{ m.back("/vehicles", "Vozidla") }}{% endif %}
         <h1>{{ "Upravit vozidlo" if vehicle else "Nové vozidlo" }}</h1>
     </div>
 </div>

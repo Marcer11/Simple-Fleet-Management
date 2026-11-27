@@ -26,7 +26,7 @@
         <li>
             <span class="badge badge-{{ level }}">{{ "Výměna" if level == "danger" else "Brzy" }}</span>
             <span class="what">{{ m.season_icon(r.tire.season) }} <a href="/tires/{{ r.tire.id }}"><strong>{{ r.tire.label }}</strong></a>
-                {% if r.mount %}<span class="small muted">· {{ r.mount.vehicle.display_name }}, {{ r.mount.position_label|lower }}</span>{% endif %}</span>
+                {% if r.mount %}<span class="small muted">· {{ r.mount.vehicle.short_name }}, {{ r.mount.position_label|lower }}</span>{% endif %}</span>
             <span class="small">{{ text }}</span>
         </li>
         {% endfor %}
@@ -44,7 +44,7 @@
     {% for vid, mounts in on_cars %}
     {% set v = mounts[0].vehicle %}
     <div class="tire-car">
-        <div class="tire-car-head">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.display_name }}</a></div>
+        <div class="tire-car-head">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.short_name }}</a></div>
         <ul>
         {% for mnt in mounts %}
         <li>{{ m.season_icon(mnt.tire.season) }} <span class="muted small">{{ mnt.position_label }}:</span> {{ mnt.tire.label }}</li>
@@ -84,7 +84,7 @@
             <label for="flt-vehicle">Vozidlo</label>
             <select id="flt-vehicle" name="vehicle_id">
                 <option value="">Všechna</option>
-                {% for v in vehicles %}<option value="{{ v.id }}"{% if filters.vehicle_id == v.id %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if filters.vehicle_id == v.id %} selected{% endif %}>{{ v.short_name }}</option>{% endfor %}
             </select>
         </div>
         <noscript><button class="btn" type="submit">Filtrovat</button></noscript>
@@ -104,12 +104,12 @@
         {% set t = r.tire %}
         <tr{% if r.status == "retired" %} class="muted-row"{% endif %}>
             <td>
-                {{ m.season_icon(t.season) }} {{ m.tire_kind_icon(t) }} <a href="/tires/{{ t.id }}"><strong>{{ t.label }}</strong></a>
-                <div class="small muted">{{ [t.quantity_label, t.size, t.rim_label, ("DOT " ~ t.dot) if t.dot]|select|join(" · ") }}</div>
+                <span class="nowrap">{{ m.season_icon(t.season) }} {{ m.tire_kind_icon(t) }} <a href="/tires/{{ t.id }}"><strong>{{ t.name }}</strong></a></span>
+                <div class="small muted nowrap">{{ [t.quantity_label, t.size, ("DOT " ~ t.dot) if t.dot]|select|join(" · ") }}</div>
             </td>
             <td class="where">
-                {% if r.status == "mounted" %}{% set text = "Na voze: " ~ r.mount.vehicle.display_name ~ " – " ~ r.mount.position_label|lower %}
-                    <span class="where-ok" title="{{ text }}">{{ m.vehicle_icon(r.mount.vehicle, text) }} {{ r.mount.vehicle.display_name }}</span>
+                {% if r.status == "mounted" %}{% set text = "Na voze: " ~ r.mount.vehicle.short_name ~ " – " ~ r.mount.position_label|lower %}
+                    <span class="where-ok" title="{{ text }}">{{ m.vehicle_icon(r.mount.vehicle, text) }} {{ r.mount.vehicle.short_name }}</span>
                 {% elif r.status == "stored" %}{% set text = "Uskladněno" ~ (": " ~ t.storage_location if t.storage_location else "") %}
                     <span class="muted" title="{{ text }}">{{ m.icon("box", text) }} {{ t.storage_location or "Uskladněno" }}</span>
                 {% else %}{% set text = "Vyřazeno " ~ t.retired_date|date ~ (" – " ~ t.retired_reason if t.retired_reason else "") %}

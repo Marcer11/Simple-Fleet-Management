@@ -39,7 +39,7 @@ def timeline_context(request, db, user):
                                       f"do {fmt_date(date_to)}" if date_to else "") if x)
     else:
         period = "posledních 12 měsíců"
-    summary = [vehicle.display_name if vehicle else "všechna vozidla", period]
+    summary = [vehicle.short_name if vehicle else "všechna vozidla", period]
     if len(kinds) < len(KINDS):
         summary.append(", ".join(KINDS[k].lower() for k in kinds))
     return {

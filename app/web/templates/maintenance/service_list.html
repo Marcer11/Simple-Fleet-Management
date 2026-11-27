@@ -29,7 +29,7 @@
         {% for i, s in intervals %}
         <tr>
             <td>{% if i.is_active %}{{ m.status_badge(s) }}{% else %}<span class="badge">Vypnuto</span>{% endif %}</td>
-            <td>{{ m.color_dot(i.vehicle) }} <a href="/vehicles/{{ i.vehicle.id }}">{{ i.vehicle.display_name }}</a></td>
+            <td>{{ m.color_dot(i.vehicle) }} <a href="/vehicles/{{ i.vehicle.id }}">{{ i.vehicle.short_name }}</a></td>
             <td>{{ i.service_type }}{% if i.is_default %} <span class="badge badge-muted" title="Univerzální interval">univerzální</span>{% endif %}</td>
             <td class="nowrap">{% if i.interval_months %}{{ i.interval_months }} měs.{% endif %}{% if i.interval_months and i.interval_km %} / {% endif %}{% if i.interval_km %}{{ i.interval_km|km }}{% endif %}</td>
             <td class="nowrap">{{ s.last_date|date or "–" }}{% if s.last_km is not none %}<br><span class="muted small">{{ s.last_km|km }}</span>{% endif %}</td>

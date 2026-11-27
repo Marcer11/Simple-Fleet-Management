@@ -46,6 +46,9 @@ upomínky a výdaje. Vznikla jako projekt kurzu Python (Robodream).
   názvy míst v tabulkách jsou odkazy na detail; ve formuláři servisu a výdaje se nabízí dříve zapsaná místa
 - **podstránky a detaily** mají nad nadpisem odkaz zpět („‹ Vozidla“, „‹ Pneumatiky“, „‹ Místa“…);
   tlačítka pro přidání jsou vždy „+ Co“ (+ Tankování, + Servis, + Pneumatika…)
+- **názvy vozidel** v tabulkách, přehledech a na časové ose jsou jen značka a model; má-li uživatel v provozu
+  víc vozidel stejné značky a modelu, přidá se v závorce rok výroby, a shoduje-li se i rok, SPZ
+  (SPZ je vždy v hlavičce detailu vozidla a v seznamu vozidel; exporty CSV mají název se SPZ)
 - **tabulky** lze řadit kliknutím na záhlaví sloupce (datum, číslo i text, prázdné hodnoty vždy na konci); řazení se drží v adrese
   stránky (`?sort=`)
 - **návrat po úpravě**: z formuláře (přidání, úprava, smazání i Zrušit) se aplikace vrátí na stránku, odkud
@@ -161,7 +164,8 @@ Smazání vozidla je schované dole ve formuláři úprav.
 ### Pneumatiky (`/tires`)
 - vlastní stránka v menu: co je teď na kterém vozidle, sklad všech pneumatik s filtrem
   (stav, typ, auto / motorka, vozidlo), historie přezutí a poškození; sloupec „Kde je“ ukazuje ikonu
-  (vozidlo, sklad, vyřazeno) s jedním řádkem textu, podrobnosti jsou v bublině po najetí myší
+  (vozidlo, sklad, vyřazeno) s jedním řádkem textu, podrobnosti jsou v bublině po najetí myší; název pneumatiky
+  je bez typu (ten ukazuje ikona) a bez disků
 - **pneumatika** = jedna guma, pár nebo sada (počet kusů) – patří uživateli, ne vozidlu, takže ji lze
   nasazovat na různá vozidla; pro auto, nebo motorku (ikona v seznamu i detailu; na vozidlo jiného
   druhu ji nelze nasadit a přezutí nabízí jen pneumatiky pro daný druh vozidla); typ (letní / zimní / univerzální), výrobce a model, rozměr, rok výroby

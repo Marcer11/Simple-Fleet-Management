@@ -47,6 +47,10 @@ def get_optional_user(request: Request, db=Depends(get_db)):
     if user is not None and not user.is_active:
         user = None
     request.state.user = user
+    if user is not None:  # pro Vehicle.short_name - rozlišení stejných vozidel uživatele
+        from services.vehicle_service import VehicleService
+        db.info.pop("vehicle_names", None)
+        db.info["vehicles_loader"] = lambda: VehicleService(db).get_vehicles_for_user(user)
     return user
 
 

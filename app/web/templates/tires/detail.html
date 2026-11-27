@@ -32,7 +32,7 @@
 
 <div class="kpis kpis-compact">
     <div class="kpi"><div class="label">Kde je</div><div class="value">{% if mount %}Na voze{% elif tire.retired_date %}Vyřazeno{% else %}Uskladněno{% endif %}</div>
-        <div class="hint">{% if mount %}<a href="/vehicles/{{ mount.vehicle_id }}?tab=tires">{{ mount.vehicle.display_name }}</a> – {{ mount.position_label|lower }}{% elif tire.retired_date %}{{ tire.retired_reason or "" }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
+        <div class="hint">{% if mount %}<a href="/vehicles/{{ mount.vehicle_id }}?tab=tires">{{ mount.vehicle.short_name }}</a> – {{ mount.position_label|lower }}{% elif tire.retired_date %}{{ tire.retired_reason or "" }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
     <div class="kpi"><div class="label">Najeto</div><div class="value">{{ stats.km|km }}</div><div class="hint">{{ stats.mounts }}× nasazeno, {{ stats.used_years|num(1) }} roku na voze</div></div>
     <div class="kpi"><div class="label">Dezén</div><div class="value">{{ (stats.tread|num(1) ~ " mm") if stats.tread is not none else "–" }}</div>
         <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.min_tread|num(1) }} mm{% endif %}</div></div>
@@ -67,7 +67,7 @@
         <tbody>
         {% for mnt in tire.mounts|reverse %}
         <tr>
-            <td>{{ m.color_dot(mnt.vehicle) }} <a href="/vehicles/{{ mnt.vehicle_id }}?tab=tires">{{ mnt.vehicle.display_name }}</a></td>
+            <td>{{ m.color_dot(mnt.vehicle) }} <a href="/vehicles/{{ mnt.vehicle_id }}?tab=tires">{{ mnt.vehicle.short_name }}</a></td>
             <td>{{ mnt.position_label }}</td>
             <td class="nowrap">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
             <td class="nowrap">{% if mnt.removed_date %}{{ mnt.removed_date|date }}<div class="small muted">{{ mnt.removed_km|km }}</div>{% else %}<span class="badge badge-ok">na voze</span>{% endif %}</td>
@@ -91,7 +91,7 @@
         {% for c, readings in checks %}
         <tr>
             <td class="nowrap"><a href="/tire-checks/{{ c.id }}">{{ c.check_date|date }}</a></td>
-            <td>{{ m.color_dot(c.vehicle) }} <a href="/vehicles/{{ c.vehicle_id }}?tab=tires">{{ c.vehicle.display_name }}</a></td>
+            <td>{{ m.color_dot(c.vehicle) }} <a href="/vehicles/{{ c.vehicle_id }}?tab=tires">{{ c.vehicle.short_name }}</a></td>
             <td class="num">{{ c.odometer|km }}</td>
             <td class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</td>
         </tr>
@@ -107,7 +107,7 @@
     <h2>Poškození</h2>
     <ul class="alert-list">
         {% for d in defects %}
-        <li><span class="what"><a href="/tire-defects/{{ d.id }}"><strong>{{ d.description }}</strong></a> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}{% if d.vehicle %} · {{ d.vehicle.display_name }}{% endif %}</span></span>
+        <li><span class="what"><a href="/tire-defects/{{ d.id }}"><strong>{{ d.description }}</strong></a> <span class="small muted">{{ d.defect_date|date }}{% if d.position %} · {{ d.position }}{% endif %}{% if d.vehicle %} · {{ d.vehicle.short_name }}{% endif %}</span></span>
             <span class="small">{{ d.expense.price_local|czk(0) if d.expense else "" }}</span>
 </li>
         {% endfor %}

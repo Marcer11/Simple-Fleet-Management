@@ -30,7 +30,7 @@
             <label for="f-vehicle_id">Vozidlo</label>
             <select id="f-vehicle_id" name="vehicle_id">
                 <option value="">podle nasazení k datu</option>
-                {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('vehicle_id') == v.id|string %} selected{% endif %}>{{ v.display_name }}</option>{% endfor %}
+                {% for v in vehicles %}<option value="{{ v.id }}"{% if m.val('vehicle_id') == v.id|string %} selected{% endif %}>{{ v.short_name }}</option>{% endfor %}
             </select>
         </div>
     </div>

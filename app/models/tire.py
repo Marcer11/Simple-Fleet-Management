@@ -140,9 +140,13 @@ class Tire(Base):
     tread_readings = relationship("TireTreadReading", back_populates="tire", cascade="all, delete-orphan")
 
     @property
+    def name(self):
+        """Výrobce a model bez typu (typ ukazuje ikona)."""
+        return " ".join(x for x in (self.manufacturer, self.model) if x)
+
+    @property
     def label(self):
-        name = " ".join(x for x in (self.manufacturer, self.model) if x)
-        return f"{self.season} {name}"
+        return f"{self.season} {self.name}"
 
     @property
     def quantity_label(self):

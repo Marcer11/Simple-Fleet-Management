@@ -117,7 +117,7 @@ async def add_vehicle_post(request: Request, user=Depends(get_current_user), db=
     except ValidationError as e:
         return render(request, "vehicles/form.html", status_code=400, vehicle=None, values=form.values, error=str(e),
                       lenders=_lenders(db, user))
-    flash(request, f"Vozidlo {vehicle.display_name} bylo přidáno.")
+    flash(request, f"Vozidlo {vehicle.short_name} bylo přidáno.")
     if vehicle.is_rental:  # u půjčeného vozidla rovnou zápis půjčení
         return RedirectResponse(f"/rentals/add?vehicle_id={vehicle.id}", status_code=303)
     return RedirectResponse(f"/vehicles/{vehicle.id}", status_code=303)
@@ -263,7 +263,7 @@ async def deactivate_vehicle(request: Request, vehicle_id: int, user=Depends(get
 async def delete_vehicle(request: Request, vehicle_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     service = VehicleService(db)
     vehicle = service.get_vehicle_for_user(vehicle_id, user, ROLE_OWNER)
-    name = vehicle.display_name
+    name = vehicle.short_name
     service.delete_vehicle(vehicle.id)
     flash(request, f"Vozidlo {name} bylo smazáno včetně všech záznamů.")
     return RedirectResponse("/vehicles", status_code=303)
@@ -313,7 +313,7 @@ async def leave_vehicle(request: Request, vehicle_id: int, user=Depends(get_curr
     service = VehicleService(db)
     vehicle = service.get_vehicle_for_user(vehicle_id, user, ROLE_VIEWER)
     service.leave_vehicle(vehicle, user)
-    flash(request, f"Vozidlo {vehicle.display_name} už s vámi není sdíleno.")
+    flash(request, f"Vozidlo {vehicle.short_name} už s vámi není sdíleno.")
     return RedirectResponse("/vehicles", status_code=303)
 
 

@@ -76,7 +76,7 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
     if vehicle_id:
         rows = [r for r in rows if any(m.vehicle_id == vehicle_id for m in r["tire"].mounts)]
     order = {"mounted": 0, "stored": 1, "retired": 2}
-    rows.sort(key=lambda r: (order[r["status"]], r["mount"].vehicle.display_name if r["mount"] else "",
+    rows.sort(key=lambda r: (order[r["status"]], r["mount"].vehicle.short_name if r["mount"] else "",
                              r["tire"].season, r["tire"].manufacturer))
 
     shown = [v for v in vehicles if vehicle_id in (None, v.id) and kind in ("", v.kind or "car")]
@@ -220,7 +220,7 @@ async def tire_delete(request: Request, tire_id: int, user=Depends(get_current_u
 def _tire_location(tire):
     mount = tire.open_mount
     if mount:
-        return f"na {mount.vehicle.display_name} – {mount.position_label.lower()}"
+        return f"na {mount.vehicle.short_name} – {mount.position_label.lower()}"
     return "uskladněno" + (f" – {tire.storage_location}" if tire.storage_location else "")
 
 

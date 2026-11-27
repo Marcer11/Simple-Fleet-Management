@@ -105,11 +105,11 @@
 <span class="color-dot {{ size }}" style="background: {{ vehicle.color_hex or '#FFFFFF' }}" title="{{ vehicle.color or '' }}"></span>
 {%- endmacro %}
 
-{% macro vehicle_icon(vehicle) -%}
+{% macro vehicle_icon(vehicle, label=none) -%}
 {% if vehicle.kind == "moto" -%}
-<svg class="icon icon-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Motorka"><title>Motorka</title><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 10h5.5l4 6M9 10 8 7H5.5M14.5 10 16 7h2.5"/></svg>
+<svg class="icon icon-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="{{ label or 'Motorka' }}"><title>{{ label or "Motorka" }}</title><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 10h5.5l4 6M9 10 8 7H5.5M14.5 10 16 7h2.5"/></svg>
 {%- else -%}
-<svg class="icon icon-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Auto"><title>Auto</title><path d="M5 16H3v-3.5L5 8a2 2 0 0 1 1.8-1.2h10.4A2 2 0 0 1 19 8l2 4.5V16h-2M9 16h6M4 12h16"/><circle cx="7" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/></svg>
+<svg class="icon icon-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="{{ label or 'Auto' }}"><title>{{ label or "Auto" }}</title><path d="M5 16H3v-3.5L5 8a2 2 0 0 1 1.8-1.2h10.4A2 2 0 0 1 19 8l2 4.5V16h-2M9 16h6M4 12h16"/><circle cx="7" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/></svg>
 {%- endif %}
 {%- endmacro %}
 
@@ -139,6 +139,11 @@
 
 {% macro alerts_icon(alerts) -%}
 {% if alerts %}{% set lines = [] %}{% for a in alerts %}{% set _ = lines.append(a.title ~ " – " ~ a.status.summary) %}{% endfor %}<span class="alert-icon alert-icon-{{ 'overdue' if alerts|selectattr('status.level', 'equalto', 'overdue')|list else 'warning' }}" title="{{ lines|join('\n') }}">{{ icon("warning", lines|join("; ")) }}{% if alerts|length > 1 %}<span class="alert-count">{{ alerts|length }}</span>{% endif %}</span>{% endif %}
+{%- endmacro %}
+
+{# Ikona druhu pneumatiky (pro auto / motorku) #}
+{% macro tire_kind_icon(tire) -%}
+{{ vehicle_icon(tire, "Pneumatiky pro motorku" if tire.kind == "moto" else "Pneumatiky pro auto") }}
 {%- endmacro %}
 
 {% macro tire_icons(entries) -%}
@@ -172,6 +177,7 @@
     "pin": '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
     "gear": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
     "stop": '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+    "box": '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
 } %}
 {% macro icon(name, label=none, cls="") -%}
 <svg class="icon {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"{% if label %} role="img" aria-label="{{ label }}"><title>{{ label }}</title>{% else %} aria-hidden="true">{% endif %}{{ ICON_PATHS.get(name, ICON_PATHS["note"])|safe }}</svg>

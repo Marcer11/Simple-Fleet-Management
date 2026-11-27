@@ -15,6 +15,12 @@
     {{ m.csrf() }}
     <div class="form-grid">
         <div class="field">
+            <label for="f-kind">Pro vozidlo <span class="req">*</span></label>
+            <select id="f-kind" name="kind" required>
+                {% for value, label in kinds.items() %}<option value="{{ value }}"{% if m.val('kind') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field">
             <label for="f-season">Typ <span class="req">*</span></label>
             <select id="f-season" name="season" required>
                 {% for s in seasons %}<option value="{{ s }}"{% if m.val('season') == s %} selected{% endif %}>{{ s }}</option>{% endfor %}

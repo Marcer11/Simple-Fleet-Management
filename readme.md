@@ -103,8 +103,10 @@ Smazání vozidla je schované dole ve formuláři úprav.
   výdaje, pneumatiky, poznámky, nákup a prodej v jednom seznamu po měsících, filtr podle vozidla, období
   a druhu události; každá událost má barvu a **ikonu** (tankování, servis, STK, výdaj, pojištění,
   dálniční známka, parkování, pneumatiky, kontrola dezénu, poškození, nehoda, garáž, půjčení…) a zabírá
-  jeden řádek + zkrácený detail (kliknutím se zobrazí celý); poznámka u záznamu (servis, výdaj, půjčení,
-  přezutí, kontrola dezénu) se na časové ose neukazuje – je v detailu záznamu
+  jeden řádek + zkrácený detail (kliknutím se zobrazí celý)
+- **poznámka u záznamu** (tankování, servis, výdaj, půjčení, přezutí, kontrola dezénu, upomínka) se ukazuje
+  jen v detailu toho záznamu – ne v tabulkách, přehledech ani na časové ose (exporty CSV ji obsahují);
+  záznamy typu Poznámka jsou na časové ose dál
 
 ### Tankování
 - datum, čas, tachometr, palivo, množství (l / kWh / kg), cena za jednotku **nebo** celková cena
@@ -158,9 +160,11 @@ Smazání vozidla je schované dole ve formuláři úprav.
 
 ### Pneumatiky (`/tires`)
 - vlastní stránka v menu: co je teď na kterém vozidle, sklad všech pneumatik s filtrem
-  (stav, typ, vozidlo), historie přezutí a poškození
+  (stav, typ, auto / motorka, vozidlo), historie přezutí a poškození; sloupec „Kde je“ ukazuje ikonu
+  (vozidlo, sklad, vyřazeno) s jedním řádkem textu, podrobnosti jsou v bublině po najetí myší
 - **pneumatika** = jedna guma, pár nebo sada (počet kusů) – patří uživateli, ne vozidlu, takže ji lze
-  nasazovat na různá vozidla; typ (letní / zimní / univerzální), výrobce a model, rozměr, rok výroby
+  nasazovat na různá vozidla; pro auto, nebo motorku (ikona v seznamu i detailu; na vozidlo jiného
+  druhu ji nelze nasadit a přezutí nabízí jen pneumatiky pro daný druh vozidla); typ (letní / zimní / univerzální), výrobce a model, rozměr, rok výroby
   a DOT, alu / plechové disky / bez disků, dezén při nákupu, vlastní minimum dezénu (např. vyšší u motorky;
   prázdné = zákonné), místo uložení, vyřazení s důvodem (nabídka Prodej, Poškození, Opotřebení, Jiné);
   cena nákupu se uloží a volitelně zapíše jako výdaj „Pneumatiky“ k vybranému vozidlu
@@ -181,7 +185,7 @@ Smazání vozidla je schované dole ve formuláři úprav.
 - **poškození** (pozice, popis, cena opravy jako výdaj k vozidlu, na kterém pneumatika byla)
 - **životnost**: najeto (i přes více vozidel), počet nasazení a doba na voze, stáří, dezén,
   opotřebení na 1000 km a odhad km do minima – vlastního, jinak zákonného (letní 1,6 mm, zimní
-  a univerzální 4 mm, motorka 1,6 mm podle vozidla, na kterém byla pneumatika naposledy),
+  a univerzální 4 mm, pneumatiky pro motorku 1,6 mm),
   náklady na 1000 km; opotřebení se počítá z dezénu při nákupu a posledního měření (kontrola nebo sundání,
   nejmenší hodnota z kol, nejméně 3 000 km mezi měřeními)
 - **upozornění v přehledu pneumatik** („Pozor na“): dezén pod minimem (vlastním nebo zákonným), blížící se konec vzorku

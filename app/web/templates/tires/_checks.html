@@ -13,8 +13,7 @@
             <td class="nowrap"><a href="/tire-checks/{{ c.id }}">{{ c.check_date|date }}</a></td>
             {% if with_vehicle %}<td>{{ m.color_dot(c.vehicle) }} <a href="/vehicles/{{ c.vehicle.id }}">{{ c.vehicle.display_name }}</a></td>{% endif %}
             <td class="num">{{ c.odometer|km }}</td>
-            <td>{% for tire, readings in c.by_tire() %}<div>{{ m.season_icon(tire.season) }} <a href="/tires/{{ tire.id }}">{{ tire.label }}</a>: <span class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</span></div>{% endfor %}
-                {% if c.note %}<div class="small muted">{{ c.note }}</div>{% endif %}</td>
+            <td>{% for tire, readings in c.by_tire() %}<div>{{ m.season_icon(tire.season) }} <a href="/tires/{{ tire.id }}">{{ tire.label }}</a>: <span class="nowrap">{{ readings|map(attribute="text")|join(" · ") }}</span></div>{% endfor %}</td>
         </tr>
         {% endfor %}
         </tbody>

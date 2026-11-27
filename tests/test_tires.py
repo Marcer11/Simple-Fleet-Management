@@ -217,12 +217,16 @@ def test_per_wheel_treads_and_moto(app, db):
     assert db.get(TireMount, mount.id).tread_map == {"fl": "6.0", "fr": "6.0"}
 
     # motorka: jen přední / zadní / obě kola; popisky "kolo"
-    front = add_tire(client, db, quantity="1", size="120/70 ZR17")
+    # pneumatika pro auto na motorku nejde a v nabídce přezutí motorky není
+    r = swap(client, moto, d0, 500, [(summer, "front")])
+    assert r.status_code == 400 and "je pro auto" in r.text
+    front = add_tire(client, db, quantity="1", size="120/70 ZR17", kind="moto")
     r = swap(client, moto, d0, 500, [(front, "fl")])
     assert r.status_code == 400 and "Na motorce" in r.text
     assert swap(client, moto, d0, 500, [(front, "front")]).status_code == 303
     page = client.get(f"/tire-swaps/add?vehicle_id={moto}").text
     assert "Přední kolo" in page and "Levé přední" not in page and '"kind": "moto"' in page
+    assert f">{front.full_label} (" in page and f">{summer.full_label} (" not in page
     # motorka nedostane upozornění na zimní pneumatiky
     alerts = [a for a in collect_alerts(db, [db.get(Vehicle, moto)], today=date(2026, 12, 1)) if a.kind == "tires"]
     assert not alerts
@@ -317,8 +321,8 @@ def test_tread_checks_and_wear_warning(app, db):
 def test_tread_check_moto(app, db):
     client = register(app, "tm@example.com")
     moto = add_vehicle(client, brand="Honda", model="CBF", kind="moto")
-    front = add_tire(client, db, quantity="1")
-    rear = add_tire(client, db, quantity="1")
+    front = add_tire(client, db, quantity="1", kind="moto")
+    rear = add_tire(client, db, quantity="1", kind="moto")
     swap(client, moto, date.today() - timedelta(days=30), 1000, [(front, "front"), (rear, "rear")])
     page = client.get(f"/tire-checks/add?vehicle_id={moto}").text
     assert "Nákres motorky" in page and "Přední kolo" in page.replace("přední kolo", "Přední kolo")
@@ -333,8 +337,10 @@ def test_tread_check_moto(app, db):
 def test_custom_min_tread_and_retired_reasons(app, db):
     client = register(app, "mt@example.com")
     moto = add_vehicle(client, brand="Honda", model="CBF", kind="moto")
-    winter = add_tire(client, db, season="Zimní", quantity="1", new_tread_mm="6")
-    assert winter.legal_min_tread == 4.0 and winter.min_tread == 4.0  # zatím bez vozidla: podle typu
+    car_winter = add_tire(client, db, season="Zimní", quantity="4", new_tread_mm="8")
+    assert car_winter.legal_min_tread == 4.0 and car_winter.min_tread == 4.0
+    winter = add_tire(client, db, season="Zimní", quantity="1", new_tread_mm="6", kind="moto")
+    assert winter.legal_min_tread == 1.6  # motorka: 1,6 mm i u zimních
     swap(client, moto, date.today() - timedelta(days=30), 1000, [(winter, "front")])
     db.expire_all()
     winter = db.get(Tire, winter.id)
@@ -346,8 +352,10 @@ def test_custom_min_tread_and_retired_reasons(app, db):
     page = client.get(f"/tires/{winter.id}/edit").text
     assert 'name="min_tread_mm"' in page and 'placeholder="zákonné 1,6"' in page.replace("\xa0", " ")
     assert '<datalist id="retired-reasons">' in page and '<option value="Opotřebení">' in page
-    base = {"season": "Zimní", "manufacturer": "Michelin", "quantity": "1", "new_tread_mm": "6",
-            "currency_code": "CZK"}
+    base = {"season": "Zimní", "kind": "moto", "manufacturer": "Michelin", "quantity": "1",
+            "new_tread_mm": "6", "currency_code": "CZK"}
+    r = post(client, f"/tires/{winter.id}/edit", {**base, "kind": "car"})
+    assert r.status_code == 400 and "nasazená na motorce" in r.text
     r = post(client, f"/tires/{winter.id}/edit", {**base, "min_tread_mm": "7"})
     assert r.status_code == 400 and "menší než dezén při nákupu" in r.text
     r = post(client, f"/tires/{winter.id}/edit", {**base, "min_tread_mm": "6,5", "new_tread_mm": ""})

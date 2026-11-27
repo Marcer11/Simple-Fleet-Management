@@ -8,6 +8,8 @@ from sqlalchemy.orm import relationship
 from .base import Base
 
 TIRE_SEASONS = ["Letní", "Zimní", "Univerzální"]
+# Pro jaký druh vozidla pneumatika je (stejné klíče jako Vehicle.kind)
+TIRE_KINDS = {"car": "Auto", "moto": "Motorka"}
 TIRE_RIMS = {"alu": "Alu disky", "steel": "Plechové disky", "": "Bez disků"}
 TIRE_PLACES = {"service": "V servisu", "home": "Doma"}
 # Pozice na vozidle -> (popisek, obsazená místa); u motorky stačí přední / zadní
@@ -110,6 +112,7 @@ class Tire(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     season = Column(String(15), nullable=False)
+    kind = Column(String(10), nullable=False, default="car", server_default="car")  # car / moto
     manufacturer = Column(String(50), nullable=False)
     model = Column(String(50), nullable=True)
     size = Column(String(30), nullable=True)            # 205/55 R16 91H
@@ -165,9 +168,11 @@ class Tire(Base):
 
     @property
     def is_moto(self):
-        """Pneumatika z motorky - podle vozidla, na kterém byla nasazená naposledy."""
-        mount = self.mounts[-1] if self.mounts else None
-        return mount is not None and mount.vehicle is not None and mount.vehicle.kind == "moto"
+        return self.kind == "moto"
+
+    @property
+    def kind_label(self):
+        return TIRE_KINDS.get(self.kind or "car", "Auto")
 
     @property
     def legal_min_tread(self):

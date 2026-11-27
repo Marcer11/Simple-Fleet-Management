@@ -167,3 +167,21 @@ def test_orlen_fuels_allow_benzina(tmp_path):
         _upgrade(conn)
         rows = conn.execute(text("SELECT id, station_brands FROM fuel_types ORDER BY id")).all()
     assert [tuple(r) for r in rows] == [(1, "ORLEN,Benzina"), (2, "Shell"), (3, None)]
+
+
+def test_tire_kind_from_mounted_vehicles(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'tirekind.db'}")
+    with engine.begin() as conn:
+        _upgrade(conn, "0028_benzina_brand")
+        conn.execute(text("INSERT INTO vehicles (id, brand, model, is_active, color_hex, is_rental, kind) VALUES "
+                          "(1, 'Škoda', 'Octavia', 1, '#ffffff', 0, 'car'), (2, 'Honda', 'CBF', 1, '#ffffff', 0, 'moto')"))
+        conn.execute(text("INSERT INTO tires (id, owner_id, season, manufacturer, quantity, rim, currency_code) VALUES "
+                          "(1, 1, 'Letní', 'Michelin', 4, 'alu', 'CZK'), (2, 1, 'Letní', 'Pirelli', 1, '', 'CZK'),"
+                          " (3, 1, 'Zimní', 'Nokian', 4, 'alu', 'CZK')"))
+        conn.execute(text("INSERT INTO tire_swaps (id, vehicle_id, swap_date, odometer, place) VALUES "
+                          "(1, 1, '2025-04-01', 1000, 'home'), (2, 2, '2025-04-02', 500, 'home')"))
+        conn.execute(text("INSERT INTO tire_mounts (tire_id, vehicle_id, position, swap_id, mounted_date, mounted_km)"
+                          " VALUES (1, 1, 'all', 1, '2025-04-01', 1000), (2, 2, 'front', 2, '2025-04-02', 500)"))
+        _upgrade(conn)
+        rows = conn.execute(text("SELECT id, kind FROM tires ORDER BY id")).all()
+    assert [tuple(r) for r in rows] == [(1, "car"), (2, "moto"), (3, "car")]

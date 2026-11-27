@@ -56,7 +56,7 @@
         <tbody>
         {% for r in rentals %}
         <tr>
-            <td><a class="nowrap" href="/rentals/{{ r.id }}">{{ r.date_from|date }}{% if r.time_from %} {{ r.time_from.strftime("%H:%M") }}{% endif %}</a>{% if r.note %}<br><span class="muted small">{{ r.note|truncate(80) }}</span>{% endif %}</td>
+            <td><a class="nowrap" href="/rentals/{{ r.id }}">{{ r.date_from|date }}{% if r.time_from %} {{ r.time_from.strftime("%H:%M") }}{% endif %}</a></td>
             <td class="nowrap">{{ r.date_to|date or "–" }}{% if r.date_to and r.time_to %} {{ r.time_to.strftime("%H:%M") }}{% endif %}</td>
             <td class="num nowrap">{% if r.odometer_from is not none or r.odometer_to is not none %}{{ r.odometer_from|km }} → {{ r.odometer_to|km }}{% else %}–{% endif %}</td>
             <td class="num nowrap">{{ r.distance|km if r.distance is not none else "–" }}</td>

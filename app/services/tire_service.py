@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 from models import Tire, TireDefect, TireMount, TireSwap, TireTreadCheck, TireTreadReading
 from models.tire import (
-    TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
+    TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS, TIRE_KINDS,
     TIRE_SERVICE_TYPE, CAR_WHEELS, MOTO_POSITIONS, MOTO_WHEELS, format_treads, slots_position,
 )
 from services.errors import NotFoundError, ValidationError
@@ -115,7 +115,12 @@ class TireService:
 
     def update(self, tire, data):
         price, expense_vehicle_id = data.pop("price", None), data.pop("expense_vehicle_id", None)
-        for key, value in self._validate(data, price).items():
+        values = self._validate(data, price)
+        mount = tire.open_mount
+        if mount and mount.vehicle and values["kind"] != (mount.vehicle.kind or "car"):
+            raise ValidationError(f"Pneumatika je nasazená na {'motorce' if mount.vehicle.kind == 'moto' else 'autě'} "
+                                  f"{mount.vehicle.display_name} – nejdřív ji sundejte.")
+        for key, value in values.items():
             setattr(tire, key, value)
         self.session.commit()
         self._sync(tire, price, expense_vehicle_id)
@@ -151,6 +156,9 @@ class TireService:
         season = data.get("season")
         if season not in TIRE_SEASONS:
             raise ValidationError("Vyberte typ pneumatik (letní, zimní, univerzální).")
+        kind = data.get("kind") or "car"
+        if kind not in TIRE_KINDS:
+            raise ValidationError("Vyberte, zda jsou pneumatiky pro auto, nebo motorku.")
         rim = data.get("rim") or ""
         if rim not in TIRE_RIMS:
             raise ValidationError("Neplatný typ disků.")
@@ -176,6 +184,7 @@ class TireService:
                 price.get("manual_rate"))
         return {
             "season": season,
+            "kind": kind,
             "manufacturer": _clean_str(data.get("manufacturer"), 50, "Výrobce", required=True),
             "model": _clean_str(data.get("model"), 50, "Model"),
             "size": _clean_str(data.get("size"), 30, "Rozměr"),
@@ -259,6 +268,9 @@ class TireSwapService:
                 raise ValidationError(f"Pneumatika {tire.label} je vybraná dvakrát.")
             if tire.retired_date:
                 raise ValidationError(f"Pneumatika {tire.label} je vyřazená.")
+            if (tire.kind or "car") != (vehicle.kind or "car"):
+                raise ValidationError(f"Pneumatika {tire.label} je pro {'motorku' if tire.is_moto else 'auto'} – "
+                                      f"na {'motorku' if vehicle.kind == 'moto' else 'auto'} ji nelze nasadit.")
             slots = TIRE_POSITIONS[position][1]
             if slots & new_slots:
                 raise ValidationError("Dvě pneumatiky nemohou být na stejné pozici.")

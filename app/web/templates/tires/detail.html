@@ -6,7 +6,7 @@
 <div class="page-head">
     <div>
         {{ m.back("/tires", "Pneumatiky") }}
-        <h1>{{ m.season_icon(tire.season) }} {{ tire.label }}</h1>
+        <h1>{{ m.season_icon(tire.season) }} {{ m.tire_kind_icon(tire) }} {{ tire.label }}</h1>
         <div class="sub plate-line">
             {{ [tire.quantity_label, tire.size, tire.rim_label, ("DOT " ~ tire.dot) if tire.dot]|select|join(" · ") }}
             {% if stats.status == "mounted" %}<span class="badge badge-ok">Na voze</span>
@@ -43,7 +43,7 @@
 <div class="card">
     <h2>Údaje</h2>
     <div class="details">
-        <div><div class="label">Typ</div><div class="value">{{ tire.season }}</div></div>
+        <div><div class="label">Typ</div><div class="value">{{ tire.season }} <span class="small muted">· pro {{ "motorku" if tire.is_moto else "auto" }}</span></div></div>
         <div><div class="label">Výrobce a model</div><div class="value">{{ [tire.manufacturer, tire.model]|select|join(" ") }}</div></div>
         <div><div class="label">Rozměr</div><div class="value">{{ tire.size or "–" }}</div></div>
         <div><div class="label">Počet kusů</div><div class="value">{{ tire.quantity }}</div></div>

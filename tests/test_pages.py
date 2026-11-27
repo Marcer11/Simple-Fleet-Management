@@ -227,3 +227,58 @@ def test_stations_without_address_and_brands(app, db):
     assert "MOL – bez adresy" in detail and "zapsáno jako MOL, MOL Brno" in detail
     stats = client.get("/stats?period=all").text
     assert "Nejoblíbenější značky pump" in stats and "Vídeňská 5, Brno" in stats and "MOL – bez adresy" in stats
+
+
+def test_tire_kind_filter_and_where_icons(app, db):
+    client = register(app, "kind@example.com")
+    car = add_vehicle(client, model="Octavia")
+    moto = add_vehicle(client, brand="Honda", model="CBF", kind="moto")
+    # nová pneumatika k motorce má předvybranou motorku
+    assert '<option value="moto" selected>' in client.get(f"/tires/add?vehicle_id={moto}").text
+    car_tire = add_tire(client, db)
+    moto_tire = add_tire(client, db, manufacturer="Pirelli", model="Angel GT", quantity="1", kind="moto")
+    stored = add_tire(client, db, season="Zimní", manufacturer="Nokian", storage_location="Sklep")
+    assert car_tire.kind == "car" and moto_tire.kind == "moto"
+    day = date.today() - timedelta(days=10)
+    swap(client, car, day, 1000, [(car_tire, "all")])
+    swap(client, moto, day, 500, [(moto_tire, "front")])
+
+    page = client.get("/tires").text
+    assert "Pneumatiky pro motorku" in page and "Pneumatiky pro auto" in page
+    assert 'title="Na voze: Honda CBF – přední kolo"' in page and 'title="Uskladněno: Sklep"' in page
+    assert 'name="kind"' in page
+    page = client.get("/tires?kind=moto").text
+    assert "Angel GT" in page and "Primacy 4" not in page and "Nokian" not in page
+    page = client.get("/tires?kind=car").text
+    assert "Angel GT" not in page and "Primacy 4" in page and "Nokian" in page
+    assert "Pneumatiky pro motorku" in client.get(f"/tires/{moto_tire.id}").text
+
+
+def test_notes_only_in_record_detail(app, db):
+    from models import ServiceRecord, TireTreadCheck
+    client = register(app, "notes@example.com")
+    car = add_vehicle(client, model="Octavia")
+    today = date.today()
+    post(client, "/services/add", {"vehicle_id": car, "service_date": (today - timedelta(days=5)).isoformat(),
+                                   "odometer": 1000, "st:Výměna oleje": "on", "currency_code": "CZK",
+                                   "note": "TAJNA-SERVIS"})
+    tire = add_tire(client, db)
+    swap(client, car, today - timedelta(days=4), 1100, [(tire, "all")])
+    mount = db.query(Tire).get(tire.id).mounts[0]
+    post(client, "/tire-checks/add", {"vehicle_id": car, "check_date": (today - timedelta(days=3)).isoformat(),
+                                      "odometer": 1200, f"tread_{mount.id}_fl": "7", "note": "TAJNA-KONTROLA"})
+    post(client, "/notes/add", {"vehicle_id": car, "note_date": today.isoformat(), "note_time": "09:00",
+                                "category": "Garáž", "text": "VIDITELNA-POZNAMKA"})
+    service = db.query(ServiceRecord).one()
+    check = db.query(TireTreadCheck).one()
+    assert service.note == "TAJNA-SERVIS" and check.note == "TAJNA-KONTROLA"
+    pages = [client.get(u).text for u in ("/services", "/tires", f"/vehicles/{car}", f"/vehicles/{car}?tab=service",
+                                          f"/vehicles/{car}?tab=tires", f"/vehicles/{car}?tab=detail", "/",
+                                          "/places?kind=service")]
+    for page in pages:
+        assert "TAJNA-" not in page
+    # záznam typu poznámka zůstává v časové ose
+    assert "VIDITELNA-POZNAMKA" in client.get(f"/vehicles/{car}").text
+    # v detailu záznamu poznámka je
+    assert "TAJNA-SERVIS" in client.get(f"/services/{service.id}").text
+    assert "TAJNA-KONTROLA" in client.get(f"/tire-checks/{check.id}").text

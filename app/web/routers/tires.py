@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from models.tire import (
-    DAMAGE_POSITIONS, LEGAL_MIN_TREAD, LEGAL_MIN_TREAD_MOTO, TIRE_RETIRED_REASONS, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS,
+    DAMAGE_POSITIONS, LEGAL_MIN_TREAD, LEGAL_MIN_TREAD_MOTO, TIRE_RETIRED_REASONS, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS, TIRE_KINDS,
     positions_for,
 )
 from models.vehicle import ROLE_EDITOR
@@ -60,6 +60,7 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
     q = request.query_params
     status = q.get("status") if q.get("status") in STATUSES else "active"
     season = q.get("season") if q.get("season") in TIRE_SEASONS else ""
+    kind = q.get("kind") if q.get("kind") in TIRE_KINDS else ""
     vehicle_id = parse_filter_int(q.get("vehicle_id"))
     vehicles = visible_vehicles(db, user)
     tires = TireService(db).list_for_user(user)
@@ -70,22 +71,25 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
         rows = [r for r in rows if r["status"] == status]
     if season:
         rows = [r for r in rows if r["tire"].season == season]
+    if kind:
+        rows = [r for r in rows if (r["tire"].kind or "car") == kind]
     if vehicle_id:
         rows = [r for r in rows if any(m.vehicle_id == vehicle_id for m in r["tire"].mounts)]
     order = {"mounted": 0, "stored": 1, "retired": 2}
     rows.sort(key=lambda r: (order[r["status"]], r["mount"].vehicle.display_name if r["mount"] else "",
                              r["tire"].season, r["tire"].manufacturer))
 
-    vehicle_ids = [v.id for v in vehicles if vehicle_id in (None, v.id)]
+    shown = [v for v in vehicles if vehicle_id in (None, v.id) and kind in ("", v.kind or "car")]
+    vehicle_ids = [v.id for v in shown]
     swap_service = TireSwapService(db)
     swaps = swap_service.for_vehicles(vehicle_ids, limit=50)
     defects = TireDefectService(db).for_tires([r["tire"].id for r in rows])
-    mounted = {v.id: open_mounts(db, v.id) for v in vehicles if vehicle_id in (None, v.id)}
+    mounted = {v.id: open_mounts(db, v.id) for v in shown}
     checks = TireTreadCheckService(db).for_vehicles(vehicle_ids, limit=30)
     return render(request, "tires/list.html", rows=rows, vehicles=vehicles, swaps=swaps, defects=defects,
                   checks=checks,
-                  mounted=mounted, statuses=STATUSES, seasons=TIRE_SEASONS,
-                  filters={"status": status, "season": season, "vehicle_id": vehicle_id},
+                  mounted=mounted, statuses=STATUSES, seasons=TIRE_SEASONS, kinds=TIRE_KINDS,
+                  filters={"status": status, "season": season, "kind": kind, "vehicle_id": vehicle_id},
                   can_delete_swap={s.id: swap_service.can_delete(s) for s in swaps},
                   editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)),
                   max_age=TIRE_MAX_AGE_YEARS, legal_min=LEGAL_MIN_TREAD)
@@ -97,7 +101,7 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
 
 def _tire_context(db, user, tire=None):
     used = [t.retired_reason for t in TireService(db).list_for_user(user) if t.retired_reason]
-    return {"tire": tire, "seasons": TIRE_SEASONS, "rims": TIRE_RIMS, "currencies": COMMON_CURRENCIES,
+    return {"tire": tire, "seasons": TIRE_SEASONS, "kinds": TIRE_KINDS, "rims": TIRE_RIMS, "currencies": COMMON_CURRENCIES,
             "vehicles": editable_vehicles(db, user), "legal_min": LEGAL_MIN_TREAD,
             "legal_min_moto": LEGAL_MIN_TREAD_MOTO,
             "retired_reasons": list(dict.fromkeys(TIRE_RETIRED_REASONS + sorted(used)))}
@@ -106,6 +110,7 @@ def _tire_context(db, user, tire=None):
 def _read_tire(form):
     data = {
         "season": form.str("season", "Typ", required=True),
+        "kind": form.str("kind", "Pro vozidlo") or "car",
         "manufacturer": form.str("manufacturer", "Výrobce", required=True, max_len=50),
         "model": form.str("model", "Model", max_len=50),
         "size": form.str("size", "Rozměr", max_len=30),
@@ -130,7 +135,7 @@ def _read_tire(form):
 
 def _tire_values(t):
     return {
-        "season": t.season, "manufacturer": t.manufacturer, "model": t.model or "", "size": t.size or "",
+        "season": t.season, "kind": t.kind or "car", "manufacturer": t.manufacturer, "model": t.model or "", "size": t.size or "",
         "production_year": iso(t.production_year), "dot": t.dot or "", "quantity": str(t.quantity),
         "rim": t.rim or "", "new_tread_mm": iso(t.new_tread_mm),
         "min_tread_mm": iso(t.min_tread_mm), "purchase_date": iso(t.purchase_date),
@@ -144,7 +149,12 @@ def _tire_values(t):
 @router.get("/tires/add")
 async def tire_add_form(request: Request, user=Depends(get_current_user), db=Depends(get_db)):
     winter = date.today().month in (9, 10, 11, 12, 1, 2)
-    values = {"season": "Zimní" if winter else "Letní", "quantity": "2", "rim": "alu", "currency_code": "CZK",
+    vehicles = editable_vehicles(db, user)
+    chosen = next((v for v in vehicles if str(v.id) == request.query_params.get("vehicle_id")), None)
+    kinds = {v.kind or "car" for v in vehicles}
+    kind = (chosen.kind or "car") if chosen else (kinds.pop() if len(kinds) == 1 else "car")
+    values = {"season": "Zimní" if winter else "Letní", "kind": kind, "quantity": "1" if kind == "moto" else "2",
+              "rim": "alu", "currency_code": "CZK",
               "purchase_date": date.today().isoformat(),
               "expense_vehicle_id": request.query_params.get("vehicle_id", "")}
     return render(request, "tires/tire_form.html", values=values, **_tire_context(db, user))
@@ -229,6 +239,8 @@ def _diagram(vehicle, current, tires):
 
 def _swap_context(db, user, vehicle, swap=None):
     tires = TireService(db).list_for_user(user, include_retired=False)
+    if vehicle:
+        tires = [t for t in tires if (t.kind or "car") == (vehicle.kind or "car")]
     current = open_mounts(db, vehicle.id) if vehicle and swap is None else []
     return {
         "vehicle": vehicle, "swap": swap, "vehicles": editable_vehicles(db, user),

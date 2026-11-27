@@ -5,7 +5,7 @@
 {# Kolo v nákresu: barva podle typu pneumatiky #}
 {% macro wheel_shape(w, x, y, wd=28, ht=62) -%}
 {%- set season = {"Letní": "summer", "Zimní": "winter", "Univerzální": "allseason"}.get(w.mount.tire.season, "other") if w.mount else "empty" %}
-<g class="wheel wheel-{{ season }}"><title>{{ w.label }}{% if w.mount %} – {{ w.mount.tire.label }}{% endif %}</title>
+<g class="wheel wheel-{{ season }}"><title>{{ w.label }}{% if w.mount %} – {{ w.mount.tire.text_label }}{% endif %}</title>
     <rect x="{{ x }}" y="{{ y }}" width="{{ wd }}" height="{{ ht }}" rx="8" class="wheel-tire"/>
     {% for ty in range(y + 9, y + ht - 4, 9) %}<line x1="{{ x + 5 }}" x2="{{ x + wd - 5 }}" y1="{{ ty }}" y2="{{ ty }}" class="wheel-tread"/>{% endfor %}
     <text x="{{ x + wd / 2 }}" y="{{ y + ht + 14 }}" text-anchor="middle" class="wheel-name">{{ w.short }}</text>
@@ -19,7 +19,7 @@
     {% if w.mount %}
     {% set name = "tread_%d_%s"|format(w.mount.id, w.key) %}
     {% set prev = last.get((w.mount.id, w.key)) %}
-    <div class="small">{{ m.season_icon(w.mount.tire.season) }} {{ w.mount.tire.label }}</div>
+    <div class="small">{{ m.season_icon(w.mount.tire.season) }} {{ w.mount.tire.name }}</div>
     <label class="tread-input">
         <input type="text" name="{{ name }}" value="{{ m.val(name) }}" inputmode="decimal" autocomplete="off" aria-label="Dezén {{ w.label }} (mm)">
         <span>mm</span>

@@ -13,10 +13,15 @@
             <td class="nowrap"><a href="/tire-swaps/{{ s.id }}">{{ s.swap_date|date }}</a></td>
             {% if with_vehicle %}<td>{{ m.color_dot(s.vehicle) }} <a href="/vehicles/{{ s.vehicle.id }}">{{ s.vehicle.short_name }}</a></td>{% endif %}
             <td class="num">{{ s.odometer|km }}</td>
+            {% if s.is_retirement %}
+            <td class="muted">–</td>
+            <td>{% for r in s.retirements %}{{ m.tire_name(r.tire) }} <span class="small muted">({{ r.wheels_label or r.quantity_label }}{% if r.reason %} – {{ r.reason }}{% endif %})</span>{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+            {% else %}
             {% set stayed = s.removed|map(attribute="tire_id")|list %}
-            <td>{% for mnt in s.mounted %}{% if mnt.tire_id in stayed %}<span class="muted"><a href="/tires/{{ mnt.tire_id }}">{{ mnt.tire.label }}</a> <span class="small">(zůstává – {{ mnt.position_label|lower }})</span></span>{% else %}<a href="/tires/{{ mnt.tire_id }}">{{ mnt.tire.label }}</a> <span class="small muted">({{ mnt.position_label|lower }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">jen sundáno</span>{% endfor %}</td>
+            <td>{% for mnt in s.mounted %}{% if mnt.tire_id in stayed %}<span class="muted">{{ m.tire_name(mnt.tire) }} <span class="small">(zůstává – {{ mnt.position_label|lower }})</span></span>{% else %}{{ m.tire_name(mnt.tire) }} <span class="small muted">({{ mnt.position_label|lower }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">jen sundáno</span>{% endfor %}</td>
             {% set gone = s.removed|selectattr("vehicle_id", "equalto", s.vehicle_id)|list %}
-            <td>{% for mnt in gone %}<a href="/tires/{{ mnt.tire_id }}">{{ mnt.tire.label }}</a>{% if mnt.tire_id in stayed %} <span class="small muted">(zčásti)</span>{% endif %}{% if mnt.treads_label %} <span class="small muted">({{ mnt.treads_label }} mm)</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">–</span>{% endfor %}</td>
+            <td>{% for mnt in gone %}{{ m.tire_name(mnt.tire) }}{% if mnt.tire_id in stayed %} <span class="small muted">(zčásti)</span>{% endif %}{% if mnt.treads_label %} <span class="small muted">({{ mnt.treads_label }} mm)</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">–</span>{% endfor %}</td>
+            {% endif %}
             <td>{{ s.place_label }}{% if s.service_record and s.service_record.place %} <span class="small">· {{ m.place_link("service", s.service_record.place) }}</span>{% endif %}</td>
             <td class="num">{{ s.service_record.price_local|czk(0) if s.service_record and s.service_record.price_local is not none else "–" }}</td>
         </tr>

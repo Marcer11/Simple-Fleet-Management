@@ -11,6 +11,7 @@ from models.fuel_record import FUEL_CATEGORIES
 from models.vehicle import ROLE_LEVELS, SHARE_ROLES
 from services import db as db_module
 from services.places import place_url
+from services.tire_service import tires_on_vehicle
 from services.user_service import UserService
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -193,6 +194,7 @@ templates.env.globals.update({
     "role_level": lambda role: ROLE_LEVELS.get(role, 0),
     "fuel_choices": [(c, c) for c in FUEL_CATEGORIES],  # druhy paliva (formulář vozidla)
     "place_url": place_url,  # odkaz na detail místa (servis, pumpa, místo výdaje)
+    "tires_on_vehicle": tires_on_vehicle,  # nasazené pneumatiky po pneumatikách se zkratkou kol
 })
 
 

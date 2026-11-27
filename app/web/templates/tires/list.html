@@ -25,7 +25,7 @@
         {% for level, text in r.warnings %}
         <li>
             <span class="badge badge-{{ level }}">{{ "Výměna" if level == "danger" else "Brzy" }}</span>
-            <span class="what">{{ m.season_icon(r.tire.season) }} <a href="/tires/{{ r.tire.id }}"><strong>{{ r.tire.label }}</strong></a>
+            <span class="what">{{ m.tire_name(r.tire, strong=true) }}
                 {% if r.mount %}<span class="small muted">· {{ r.mount.vehicle.short_name }}, {{ r.mount.position_label|lower }}</span>{% endif %}</span>
             <span class="small">{{ text }}</span>
         </li>
@@ -36,18 +36,16 @@
 {% endif %}
 
 {# ------------------------------------------------ co je teď na vozidlech #}
-{% set on_cars = mounted.items()|selectattr("1")|list %}
-{% if on_cars %}
+{% if on_vehicles %}
 <div class="card">
     <h2>Teď na vozidlech</h2>
     <div class="tire-cars">
-    {% for vid, mounts in on_cars %}
-    {% set v = mounts[0].vehicle %}
+    {% for v, items in on_vehicles %}
     <div class="tire-car">
         <div class="tire-car-head">{{ m.color_dot(v) }} {{ m.vehicle_icon(v) }} <a href="/vehicles/{{ v.id }}">{{ v.short_name }}</a></div>
         <ul>
-        {% for mnt in mounts %}
-        <li>{{ m.season_icon(mnt.tire.season) }} <span class="muted small">{{ mnt.position_label }}:</span> {{ mnt.tire.label }}</li>
+        {% for tire, short, positions, _ in items %}
+        <li>{{ m.tire_name(tire) }}{% if short %} <span class="pos" title="{{ positions }}">{{ short }}</span>{% endif %}</li>
         {% endfor %}
         </ul>
         {% if v.id in editable_ids %}<div class="tire-car-actions"><a class="btn btn-sm" href="/tire-checks/add?vehicle_id={{ v.id }}">Kontrola dezénu</a>

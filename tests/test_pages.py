@@ -164,7 +164,7 @@ def test_tire_records_and_manage(app, db):
     swap(client, car, date.today() - timedelta(days=10), 1000, [(tire, "all")])
     s = db.query(TireSwap).one()
     page = client.get(f"/tire-swaps/{s.id}").text
-    assert "Nasazeno" in page and "Letní Michelin Primacy 4" in page and f"/tire-swaps/{s.id}/edit" in page
+    assert "Nasazeno" in page and "Michelin Primacy 4" in page and "Letní Michelin" not in page and f"/tire-swaps/{s.id}/edit" in page
     detail = client.get(f"/tires/{tire.id}").text
     # úprava jen jednou, dole ve Správě pneumatiky
     assert detail.count(f'href="/tires/{tire.id}/edit"') == 1

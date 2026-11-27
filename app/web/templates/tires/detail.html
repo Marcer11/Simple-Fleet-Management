@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}{{ tire.label }}{% endblock %}
+{% block title %}{{ tire.text_label }}{% endblock %}
 {% block content %}
 {% set mount = stats.mount %}
 <div class="page-head">
     <div>
         {{ m.back("/tires", "Pneumatiky") }}
-        <h1>{{ m.season_icon(tire.season) }} {{ m.tire_kind_icon(tire) }} {{ tire.label }}</h1>
+        <h1>{{ m.season_icon(tire.season) }} {{ m.tire_kind_icon(tire) }} {{ tire.name }}</h1>
         <div class="sub plate-line">
             {{ [tire.quantity_label, tire.size, tire.rim_label, ("DOT " ~ tire.dot) if tire.dot]|select|join(" · ") }}
             {% if stats.status == "mounted" %}<span class="badge badge-ok">Na voze</span>
@@ -32,7 +32,7 @@
 
 <div class="kpis kpis-compact">
     <div class="kpi"><div class="label">Kde je</div><div class="value">{% if mount %}Na voze{% elif tire.retired_date %}Vyřazeno{% else %}Uskladněno{% endif %}</div>
-        <div class="hint">{% if mount %}<a href="/vehicles/{{ mount.vehicle_id }}?tab=tires">{{ mount.vehicle.short_name }}</a> – {{ mount.position_label|lower }}{% elif tire.retired_date %}{{ tire.retired_reason or "" }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
+        <div class="hint">{% if mount %}<a href="/vehicles/{{ mount.vehicle_id }}?tab=tires">{{ mount.vehicle.short_name }}</a> – {{ tire.open_mounts|map(attribute="position_label")|map("lower")|join(", ") }}{% elif tire.retired_date %}{{ tire.retired_reason or "" }}{% elif tire.storage_location %}{{ tire.storage_location }}{% endif %}</div></div>
     <div class="kpi"><div class="label">Najeto</div><div class="value">{{ stats.km|km }}</div><div class="hint">{{ stats.mounts }}× nasazeno, {{ stats.used_years|num(1) }} roku na voze</div></div>
     <div class="kpi"><div class="label">Dezén</div><div class="value">{{ (stats.tread|num(1) ~ " mm") if stats.tread is not none else "–" }}</div>
         <div class="hint">{% if stats.wear %}{{ stats.wear|num(2) }} mm/1000 km{% if stats.remaining_km %}, zbývá ≈ {{ stats.remaining_km|km }}{% endif %}{% else %}minimum {{ tire.min_tread|num(1) }} mm{% endif %}</div></div>
@@ -46,14 +46,14 @@
         <div><div class="label">Typ</div><div class="value">{{ tire.season }} <span class="small muted">· pro {{ "motorku" if tire.is_moto else "auto" }}</span></div></div>
         <div><div class="label">Výrobce a model</div><div class="value">{{ [tire.manufacturer, tire.model]|select|join(" ") }}</div></div>
         <div><div class="label">Rozměr</div><div class="value">{{ tire.size or "–" }}</div></div>
-        <div><div class="label">Počet kusů</div><div class="value">{{ tire.quantity }}</div></div>
+        <div><div class="label">Počet kusů</div><div class="value">{{ tire.quantity }}{% if tire.retired_quantity and not tire.retired_date %} <span class="small muted">· {{ tire.retired_quantity }} vyřazeno, zbývá {{ tire.active_quantity }}</span>{% endif %}</div></div>
         <div><div class="label">Disky</div><div class="value">{{ tire.rim_label or "–" }}</div></div>
         <div><div class="label">Rok výroby</div><div class="value">{{ tire.production_year or "–" }}{% if tire.dot %} <span class="small muted">· DOT {{ tire.dot }}</span>{% endif %}{% if tire.age_years is not none %} <span class="small muted">· {{ tire.age_years }} let</span>{% endif %}</div></div>
         <div><div class="label">Dezén při nákupu</div><div class="value">{{ (tire.new_tread_mm|num(1) ~ " mm") if tire.new_tread_mm is not none else "–" }}</div></div>
         <div><div class="label">Minimální dezén</div><div class="value">{{ tire.min_tread|num(1) }} mm <span class="small muted">· {{ "nastavené" if tire.min_tread_mm is not none else "zákonné" }}</span></div></div>
         <div><div class="label">Koupeno</div><div class="value">{{ tire.purchase_date|date or "–" }}{% if tire.price_local is not none %} <span class="small muted">· {{ tire.price_local|czk(0) }}</span>{% endif %}</div></div>
         <div><div class="label">Místo uložení</div><div class="value">{{ tire.storage_location or "–" }}</div></div>
-        {% if tire.retired_date %}<div><div class="label">Vyřazeno</div><div class="value">{{ tire.retired_date|date }}{% if tire.retired_reason %} <span class="small muted">· {{ tire.retired_reason }}</span>{% endif %}</div></div>{% endif %}
+        {% if tire.retirements %}<div><div class="label">Vyřazeno</div><div class="value">{% for r in tire.retirements %}<div>{{ r.retire_date|date }} · {{ r.wheels_label ~ " (" ~ r.quantity_label ~ ")" if r.wheels_label else r.quantity_label }}{% if r.reason %} <span class="small muted">· {{ r.reason }}</span>{% endif %}</div>{% endfor %}</div></div>{% endif %}
     </div>
     {% if tire.note %}<p style="white-space: pre-line">{{ tire.note }}</p>{% endif %}
 </div>
@@ -120,12 +120,64 @@
     <div class="actions">
         <a class="btn btn-sm" href="/tires/{{ tire.id }}/edit">{{ m.icon("edit") }} Upravit údaje</a>
     </div>
-    <p class="small muted">V úpravě údajů pneumatiku také vyřadíte (prodej, opotřebení…) – historie zůstane.</p>
+    {% if not tire.retired_date %}
+    <details class="manage-section" id="retire">
+        <summary>Vyřazení{% if tire.active_quantity > 1 %} – celé sady nebo jen některých kol{% endif %}</summary>
+        <form method="post" action="/tires/{{ tire.id }}/retire" class="retire-form">
+            {{ m.csrf() }}
+            {% if retire.wheels %}
+            <fieldset class="field-wide">
+                <legend>Kola na voze – {{ retire.vehicle.short_name }}</legend>
+                <div class="check-row">
+                {% for key, short, long in retire.wheels %}<label class="check" title="{{ long }}"><input type="checkbox" name="wheel_{{ key }}" value="on"> {{ short }} <span class="small muted">{{ long }}</span></label>{% endfor %}
+                </div>
+            </fieldset>
+            {% endif %}
+            <div class="form-grid">
+                {% if retire.in_stock and (retire.wheels or retire.in_stock > 1) %}
+                <div class="field">
+                    <label for="f-stored">Kusů ze skladu</label>
+                    <input id="f-stored" name="stored" type="number" min="0" max="{{ retire.in_stock }}" value="{{ 0 if retire.wheels else retire.in_stock }}">
+                    <div class="small muted">ve skladu {{ retire.in_stock }} ks</div>
+                </div>
+                {% elif retire.in_stock %}<input type="hidden" name="stored" value="{{ retire.in_stock }}">{% endif %}
+                <div class="field">
+                    <label for="f-retire_date">Datum <span class="req">*</span></label>
+                    <input id="f-retire_date" name="retire_date" type="date" required value="{{ today.isoformat() }}" max="{{ today.isoformat() }}">
+                </div>
+                {% if retire.wheels %}
+                <div class="field">
+                    <label for="f-retire_odometer">Tachometr (km)</label>
+                    <input id="f-retire_odometer" name="odometer" type="number" min="0" value="{{ retire.odometer if retire.odometer is not none else '' }}">
+                    <div class="small muted">vyřazená kola se sundají z vozidla</div>
+                </div>
+                {% endif %}
+                <div class="field">
+                    <label for="f-reason">Důvod</label>
+                    <input id="f-reason" name="reason" type="text" maxlength="200" list="retired-reasons" autocomplete="off">
+                    {{ m.datalist("retired-reasons", retired_reasons) }}
+                </div>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-sm">Vyřadit</button></div>
+        </form>
+    </details>
+    {% endif %}
+    {% if tire.retirements %}
+    <details class="manage-section">
+        <summary>Zrušení vyřazení</summary>
+        <ul class="plain-list">
+        {% for r in tire.retirements %}
+            <li class="retire-item"><span>{{ r.retire_date|date }} · {{ r.wheels_label ~ " (" ~ r.quantity_label ~ ")" if r.wheels_label else r.quantity_label }}{% if r.reason %} · {{ r.reason }}{% endif %}</span>
+                {{ m.delete_button("/tire-retirements/%d/delete"|format(r.id), "Zrušit vyřazení? " ~ ("Kola se vrátí na vozidlo." if r.swap_id else "Kusy se vrátí do skladu."), "Zrušit") }}</li>
+        {% endfor %}
+        </ul>
+    </details>
+    {% endif %}
     <details class="danger-zone">
         <summary>Smazání pneumatiky</summary>
         <p class="small muted">Smaže pneumatiku včetně historie nasazení a poškození, výdaje za nákup a opravy a přezutí,
             ve kterých nic jiného nebylo. Opotřebenou pneumatiku raději vyřaďte – historie zůstane.</p>
-        {{ m.delete_button("/tires/%d/delete"|format(tire.id), "Opravdu smazat pneumatiku " ~ tire.label ~ "?", "Smazat pneumatiku") }}
+        {{ m.delete_button("/tires/%d/delete"|format(tire.id), "Opravdu smazat pneumatiku " ~ tire.text_label ~ "?", "Smazat pneumatiku") }}
     </details>
 </div>
 {% endblock %}

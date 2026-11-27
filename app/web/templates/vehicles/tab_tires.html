@@ -18,7 +18,7 @@
         {% for mnt in mounted_tires %}
         <li>
             <span class="badge badge-muted">{{ mnt.position_label }}</span>
-            <span class="what">{{ m.season_icon(mnt.tire.season) }} <a href="/tires/{{ mnt.tire.id }}"><strong>{{ mnt.tire.label }}</strong></a>
+            <span class="what">{{ m.tire_name(mnt.tire, strong=true) }}
                 <span class="small muted">{{ [mnt.tire.quantity_label, mnt.tire.size, mnt.tire.rim_label]|select|join(" · ") }}</span>
             </span>
             <span class="small">od {{ mnt.mounted_date|date }}{% if odometer is not none and odometer >= mnt.mounted_km %} · {{ (odometer - mnt.mounted_km)|km }}{% endif %}{% if mnt.tire.age_years is not none %} · {{ mnt.tire.age_years }} let{% endif %}</span>

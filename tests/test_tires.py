@@ -74,12 +74,12 @@ def test_tires_mounts_partial_swap_and_lifetime(app, db):
     assert round(float(stats[summer.id]["wear"]), 4) == round(2 / 12000 * 1000, 4)
 
     page = client.get("/tires").text
-    assert "Teď na vozidlech" in page and "Zadní náprava" in page and "Přední náprava" in page
+    assert "Teď na vozidlech" in page and 'title="zadní náprava">Z</span>' in page and 'title="přední náprava">P</span>' in page
     assert "Pneumatiky" in client.get("/").text  # položka menu
     detail = client.get(f"/vehicles/{car}").text
-    assert "Nokian WR" in detail and "Zadní náprava" in detail
+    assert "Nokian WR" in detail and 'title="zadní náprava">Z</span>' in detail
     timeline = client.get("/timeline?all=1&kind=tires").text
-    assert "Přezutí pneumatik" in timeline and "nasazeno: Zimní Nokian WR (přední náprava)" in timeline
+    assert "Přezutí pneumatik" in timeline and "nasazeno: ❄ Nokian WR (přední náprava)" in timeline
     assert client.get(f"/tires/{summer.id}/edit").status_code == 200
 
     # smazat lze jen přezutí, jehož pneumatiky nikdo nesundal
@@ -231,7 +231,7 @@ def test_per_wheel_treads_and_moto(app, db):
     alerts = [a for a in collect_alerts(db, [db.get(Vehicle, moto)], today=date(2026, 12, 1)) if a.kind == "tires"]
     assert not alerts
     # ikony typu pneumatik na přehledu a v seznamu vozidel
-    assert "Letní pneumatiky: Letní Michelin Primacy 4 (všechna kola)" in client.get("/vehicles").text
+    assert "Letní pneumatiky: Michelin Primacy 4 (všechna kola)" in client.get("/vehicles").text
 
 
 def test_vehicle_tire_sizes(app, db):
@@ -300,7 +300,7 @@ def test_tread_checks_and_wear_warning(app, db):
     assert "Kontroly dezénu" in tires_page and "LP 2,2 · PP 2,3 · LZ 3,0 · PZ 3,0" in tires_page
     assert 'aria-label="Letní pneumatiky"' in tires_page  # ikona místo nápisu
     timeline = client.get("/timeline?all=1&kind=tires").text
-    assert "Kontrola dezénu" in timeline and "Letní Michelin Primacy 4: LP 2,2" in timeline
+    assert "Kontrola dezénu" in timeline and "☀ Michelin Primacy 4: LP 2,2" in timeline
 
     # úprava a smazání
     c = db.query(TireTreadCheck).order_by(TireTreadCheck.id.desc()).first()
@@ -351,7 +351,9 @@ def test_custom_min_tread_and_retired_reasons(app, db):
     # vlastní minimum (vyšší než zákonné) - hlídá se místo zákonného
     page = client.get(f"/tires/{winter.id}/edit").text
     assert 'name="min_tread_mm"' in page and 'placeholder="zákonné 1,6"' in page.replace("\xa0", " ")
-    assert '<datalist id="retired-reasons">' in page and '<option value="Opotřebení">' in page
+    assert "retired-reasons" not in page  # vyřazení je ve správě pneumatiky, ne v úpravě
+    detail = client.get(f"/tires/{winter.id}").text
+    assert '<datalist id="retired-reasons">' in detail and '<option value="Opotřebení">' in detail
     base = {"season": "Zimní", "kind": "moto", "manufacturer": "Michelin", "quantity": "1",
             "new_tread_mm": "6", "currency_code": "CZK"}
     r = post(client, f"/tires/{winter.id}/edit", {**base, "kind": "car"})
@@ -382,8 +384,102 @@ def test_custom_min_tread_and_retired_reasons(app, db):
     assert stats["warnings"][0] == ("danger", "dezén 3,5 mm – pod nastaveným minimem 4,0 mm")
 
     # důvod vyřazení: nabídka + dříve použité vlastní důvody
-    r = post(client, f"/tires/{winter.id}/edit", {**base, "retired_date": date.today().isoformat(),
-                                                   "retired_reason": "Prasklý bok"})
+    r = post(client, f"/tires/{winter.id}/retire", {"retire_date": date.today().isoformat(), "wheel_fl": "on",
+                                                     "odometer": "2100", "reason": "Prasklý bok"})
     assert r.status_code == 303, r.text
-    page = client.get(f"/tires/{winter.id}/edit").text
+    db.expire_all()
+    assert db.get(Tire, winter.id).retired_reason == "Prasklý bok"
+    page = client.get(f"/tires/{car_winter.id}").text
     assert '<option value="Prodej">' in page and '<option value="Prasklý bok">' in page
+
+
+def test_partial_retirement_of_mounted_set(app, db):
+    from models import TireRetirement, TireSwap
+    client = register(app, "retire@example.com")
+    car = add_vehicle(client, model="Octavia")
+    tire = add_tire(client, db)  # 4 ks
+    swap(client, car, date.today() - timedelta(days=30), 1000, [(tire, "all")])
+    page = client.get("/tires").text
+    assert 'class="pos"' not in page  # všechna kola - bez zkratky
+    detail = client.get(f"/tires/{tire.id}").text
+    assert "Kola na voze" in detail and 'name="wheel_fl"' in detail and 'name="wheel_rr"' in detail
+
+    # zničené levé přední: sundá se z vozu, zbytek zůstane (PP + zadní náprava)
+    r = post(client, f"/tires/{tire.id}/retire", {"retire_date": date.today().isoformat(), "wheel_fl": "on",
+                                                  "odometer": "1500", "reason": "Poškození"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    tire = db.get(Tire, tire.id)
+    assert tire.retired_date is None and tire.active_quantity == 3 and tire.quantity_label == "3 ks"
+    assert sorted(m.position for m in tire.open_mounts) == ["fr", "rear"]
+    page = client.get("/tires").text
+    assert 'title="pravé přední, zadní náprava">PP Z</span>' in page  # jedna pneumatika, jeden řádek
+    timeline = client.get(f"/vehicles/{car}").text
+    assert "Vyřazení pneumatik" in timeline and "☀ Michelin Primacy 4: LP – Poškození" in timeline
+    retire_swap = db.query(TireSwap).filter_by(place="retire").one()
+    assert client.get(f"/tire-swaps/{retire_swap.id}/edit", follow_redirects=False).status_code == 303  # neupravuje se jako přezutí
+    assert "Zrušit vyřazení" in client.get(f"/tire-swaps/{retire_swap.id}").text
+
+    # sjeté přední - zůstane jen zadní náprava
+    r = post(client, f"/tires/{tire.id}/retire", {"retire_date": date.today().isoformat(), "wheel_fr": "on",
+                                                  "odometer": "1500", "reason": "Opotřebení"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    tire = db.get(Tire, tire.id)
+    assert tire.active_quantity == 2 and [m.position for m in tire.open_mounts] == ["rear"]
+    assert "Kusů ze skladu" not in client.get(f"/tires/{tire.id}").text  # nic ve skladu
+
+    # zrušení posledního vyřazení vrátí PP na vůz
+    last = db.query(TireRetirement).order_by(TireRetirement.id.desc()).first()
+    assert post(client, f"/tire-retirements/{last.id}/delete", {}).status_code == 303
+    db.expire_all()
+    tire = db.get(Tire, tire.id)
+    assert tire.active_quantity == 3 and sorted(m.position for m in tire.open_mounts) == ["fr", "rear"]
+
+    # vyřazení všeho zbylého (kola na voze) = vyřazená pneumatika, z vozu sundaná
+    r = post(client, f"/tires/{tire.id}/retire", {"retire_date": date.today().isoformat(), "wheel_fr": "on",
+                                                  "wheel_rl": "on", "wheel_rr": "on", "odometer": "1600"})
+    assert r.status_code == 303, r.text
+    db.expire_all()
+    tire = db.get(Tire, tire.id)
+    assert tire.retired_date == date.today() and not tire.open_mounts
+    assert "Kola na voze" not in client.get(f"/tires/{tire.id}").text
+
+
+def test_partial_retirement_from_stock(app, db):
+    client = register(app, "retire2@example.com")
+    tire = add_tire(client, db, season="Zimní", manufacturer="Nokian", model="WR")
+    detail = client.get(f"/tires/{tire.id}").text
+    assert "Kola na voze" not in detail and 'name="stored"' in detail
+    r = post(client, f"/tires/{tire.id}/retire", {"retire_date": date.today().isoformat(), "stored": "5"})
+    assert r.status_code == 303
+    assert "Ve skladu je jen 4 ks" in client.get(f"/tires/{tire.id}").text
+    r = post(client, f"/tires/{tire.id}/retire", {"retire_date": date.today().isoformat(), "stored": "2",
+                                                  "reason": "Prodej"})
+    assert r.status_code == 303
+    db.expire_all()
+    tire = db.get(Tire, tire.id)
+    assert tire.quantity_label == "pár" and tire.retired_date is None
+    # počet kusů nejde snížit pod vyřazené
+    r = post(client, f"/tires/{tire.id}/edit", {"season": "Zimní", "manufacturer": "Nokian", "quantity": "1",
+                                                 "currency_code": "CZK"})
+    assert r.status_code == 400 and "Vyřazeno je už 2 ks" in r.text
+    r = post(client, f"/tires/{tire.id}/retire", {"retire_date": date.today().isoformat(), "stored": "2",
+                                                  "reason": "Prodej"})
+    db.expire_all()
+    tire = db.get(Tire, tire.id)
+    assert tire.retired_date == date.today() and tire.retired_reason == "Prodej" and tire.quantity_label == "4 ks"
+    assert len(tire.retirements) == 2
+
+
+def test_tire_names_without_season_word(app, db):
+    client = register(app, "seasonword@example.com")
+    car = add_vehicle(client, model="Octavia")
+    tire = add_tire(client, db)
+    swap(client, car, date.today() - timedelta(days=5), 1000, [(tire, "all")])
+    for url in ("/tires", f"/tires/{tire.id}", f"/vehicles/{car}?tab=tires", "/vehicles",
+                f"/tire-swaps/add?vehicle_id={car}", "/tire-defects/add", f"/tire-checks/add?vehicle_id={car}"):
+        page = client.get(url).text
+        assert "Letní Michelin" not in page, url
+    assert "☀ Michelin Primacy 4" in client.get("/tire-defects/add").text  # výběr: značka místo slova
+    assert "nasazeno: ☀ Michelin Primacy 4" in client.get(f"/vehicles/{car}").text

@@ -170,8 +170,18 @@ Smazání vozidla je schované dole ve formuláři úprav.
   nasazovat na různá vozidla; pro auto, nebo motorku (ikona v seznamu i detailu; na vozidlo jiného
   druhu ji nelze nasadit a přezutí nabízí jen pneumatiky pro daný druh vozidla); typ (letní / zimní / univerzální), výrobce a model, rozměr, rok výroby
   a DOT, alu / plechové disky / bez disků, dezén při nákupu, vlastní minimum dezénu (např. vyšší u motorky;
-  prázdné = zákonné), místo uložení, vyřazení s důvodem (nabídka Prodej, Poškození, Opotřebení, Jiné);
+  prázdné = zákonné), místo uložení;
   cena nákupu se uloží a volitelně zapíše jako výdaj „Pneumatiky“ k vybranému vozidlu
+- **název pneumatiky** je všude jen výrobce a model – typ (letní / zimní / univerzální) ukazuje ikona,
+  v čistém textu (výběry, časová osa, hlášky) značka ☀ / ❄ / ☀❄
+- **vyřazení** ve „Správě pneumatiky“ (ne v úpravě údajů): celá sada nebo jen některá kola – nasazená kola
+  se vyberou (LP, PP, LZ, PZ, R; u motorky P / Z) a sundají z vozidla, zbytek sady zůstane na voze (např. jen
+  zadní náprava); kusy ze skladu se zadají počtem; datum, tachometr a důvod (nabídka Prodej, Poškození,
+  Opotřebení, Jiné + dříve použité); vyřazení nasazených kol je v přehledu přezutí a na časové ose jako
+  „Vyřazení pneumatik“; když nezbude žádný kus, je pneumatika vyřazená; vyřazení jde zrušit (kola se
+  vrátí na vozidlo, kusy do skladu)
+- **Teď na vozidlech** (přehled pneumatik i souhrn vozidla): pneumatika jednou s ikonou typu a zkratkou kol
+  – všechna kola bez zkratky, náprava P / Z, kola LP, PP, LZ, PZ, rezerva R (např. „PP Z“)
 - **přezutí** na vozidle doma nebo v servisu (v servisu = servisní záznam „Přezutí pneumatik“ s cenou):
   pneumatiky se nasazují na pozice (všechna kola, přední / zadní náprava, jednotlivé kolo, rezerva);
   nasazení na obsazenou pozici původní pneumatiku sundá – při výměně jen předních zůstane zbytek sady

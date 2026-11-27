@@ -668,3 +668,15 @@ fieldset.field legend { padding: 0; font-weight: 600; font-size: .9rem; margin-b
 .group-toggle .chevron { width: 16px; height: 16px; align-self: center; color: var(--muted); transition: transform .15s; }
 .group-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
 .top-sub { display: block; }
+
+/* Správa pneumatiky: vyřazení (i jednotlivých kol) */
+.manage-section { margin-top: 14px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; }
+.manage-section summary { cursor: pointer; font-weight: 600; }
+.manage-section[open] summary { margin-bottom: 10px; }
+.retire-form fieldset { border: 0; padding: 0; margin: 0 0 10px; }
+.retire-form legend { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+.retire-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.retire-item form { margin: 0; }
+/* zkratka kol v přehledu „Teď na vozidlech“ (LP, P, R…) */
+.pos { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1px solid var(--border); border-radius: 6px;
+       font-size: .75rem; line-height: 1.5; text-align: center; color: var(--muted); vertical-align: 1px; }

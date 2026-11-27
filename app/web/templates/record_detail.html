@@ -31,13 +31,13 @@
 {% if can_edit %}
 <div class="card manage">
     <h2>Správa záznamu</h2>
-    <div class="actions">
+    {% if view.edit_url %}<div class="actions">
         <a class="btn btn-sm" href="{{ view.edit_url }}">{{ m.icon("edit") }} Upravit</a>
-    </div>
+    </div>{% endif %}
     {% if view.can_delete %}
     <details class="danger-zone">
-        <summary>Smazání záznamu</summary>
-        {{ m.delete_button(view.delete_url, view.delete_confirm, "Smazat " ~ view.kind_label|lower) }}
+        <summary>{{ "Zrušení vyřazení" if view.kind_label == "Vyřazení pneumatik" else "Smazání záznamu" }}</summary>
+        {{ m.delete_button(view.delete_url, view.delete_confirm, "Zrušit vyřazení" if view.kind_label == "Vyřazení pneumatik" else "Smazat " ~ view.kind_label|lower) }}
     </details>
     {% else %}
     <p class="small muted">Přezutí nejde smazat, protože z něj už byly pneumatiky později sundány.</p>

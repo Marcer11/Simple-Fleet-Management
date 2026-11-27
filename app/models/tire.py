@@ -12,6 +12,11 @@ TIRE_SEASONS = ["Letní", "Zimní", "Univerzální"]
 TIRE_KINDS = {"car": "Auto", "moto": "Motorka"}
 TIRE_RIMS = {"alu": "Alu disky", "steel": "Plechové disky", "": "Bez disků"}
 TIRE_PLACES = {"service": "V servisu", "home": "Doma"}
+# Vyřazení nasazených kol se zapisuje jako zvláštní „přezutí“ (sundání bez náhrady) - jen ze správy pneumatiky
+SWAP_RETIRE = "retire"
+SWAP_PLACE_LABELS = {**TIRE_PLACES, SWAP_RETIRE: "Vyřazení"}
+# Typ pneumatik v textu (výběry, časová osa, hlášky) - stejně jako ikona místo slova
+SEASON_SYMBOLS = {"Letní": "☀", "Zimní": "❄", "Univerzální": "☀❄"}
 # Pozice na vozidle -> (popisek, obsazená místa); u motorky stačí přední / zadní
 TIRE_POSITIONS = {
     "all": ("Všechna kola", frozenset({"fl", "fr", "rl", "rr"})),
@@ -25,6 +30,8 @@ TIRE_POSITIONS = {
 }
 # Motorka: stejné pozice (náprava = kolo), jen jiné popisky; jednotlivá kola a rezerva nedávají smysl
 MOTO_POSITIONS = {"all": "Obě kola", "front": "Přední kolo", "rear": "Zadní kolo"}
+# Zkratka pozice v přehledu „Teď na vozidlech“ (všechna kola = bez zkratky)
+POSITION_SHORT = {"all": "", "front": "P", "rear": "Z", "fl": "LP", "fr": "PP", "rl": "LZ", "rr": "PZ", "spare": "R"}
 # Kola pro zápis dezénu: klíč, krátký a dlouhý popis
 CAR_WHEELS = [("fl", "LP", "levé přední"), ("fr", "PP", "pravé přední"), ("rl", "LZ", "levé zadní"),
               ("rr", "PZ", "pravé zadní"), ("spare", "R", "rezerva")]
@@ -97,6 +104,33 @@ def position_slots(position):
     return TIRE_POSITIONS[position][1] if position in TIRE_POSITIONS else frozenset()
 
 
+def slots_positions(slots):
+    """Obsazená místa -> co nejméně pozic: {fr, rl, rr} -> ["fr", "rear"]."""
+    slots, result = set(slots), []
+    exact = slots_position(frozenset(slots))
+    if exact:
+        return [exact]
+    for key in ("front", "rear"):
+        if TIRE_POSITIONS[key][1] <= slots:
+            result.append(key)
+            slots -= TIRE_POSITIONS[key][1]
+    return result + [key for key in ("fl", "fr", "rl", "rr", "spare") if key in slots]
+
+
+def slot_pieces(slots, kind=None):
+    """Počet kusů na místech - u motorky je náprava jedno kolo."""
+    if kind == "moto":
+        return int(bool(slots & {"fl", "fr"})) + int(bool(slots & {"rl", "rr"}))
+    return len(slots)
+
+
+def slots_short(slots, kind=None):
+    """Místa -> zkratka kol: {fl} -> "LP", motorka {fl, fr} -> "P"."""
+    if kind == "moto":
+        return " ".join(x for x, keys in (("P", {"fl", "fr"}), ("Z", {"rl", "rr"})) if slots & keys)
+    return " ".join(short for key, short, _ in CAR_WHEELS if key in slots)
+
+
 def slots_position(slots):
     """Obsazená místa -> pozice (např. {rl, rr} -> "rear"), jinak None."""
     for key, (_, key_slots) in TIRE_POSITIONS.items():
@@ -138,6 +172,8 @@ class Tire(Base):
                           order_by="TireMount.mounted_date, TireMount.id")
     defects = relationship("TireDefect", back_populates="tire", cascade="all, delete-orphan")
     tread_readings = relationship("TireTreadReading", back_populates="tire", cascade="all, delete-orphan")
+    retirements = relationship("TireRetirement", back_populates="tire", cascade="all, delete-orphan",
+                               order_by="TireRetirement.retire_date, TireRetirement.id")
 
     @property
     def name(self):
@@ -146,15 +182,35 @@ class Tire(Base):
 
     @property
     def label(self):
-        return f"{self.season} {self.name}"
+        """Název do HTML vedle ikony typu - bez slova letní / zimní / univerzální."""
+        return self.name
+
+    @property
+    def symbol(self):
+        return SEASON_SYMBOLS.get(self.season, "")
+
+    @property
+    def text_label(self):
+        """Název pro čistý text (výběry, časová osa, hlášky): značka typu místo slova - „❄ Nokian WR“."""
+        return f"{self.symbol} {self.name}".strip()
+
+    @property
+    def retired_quantity(self):
+        return sum(r.quantity for r in self.retirements)
+
+    @property
+    def active_quantity(self):
+        """Kusy, které ještě nejsou vyřazené."""
+        return max(self.quantity - self.retired_quantity, 0)
 
     @property
     def quantity_label(self):
-        return {1: "1 ks", 2: "pár"}.get(self.quantity, f"{self.quantity} ks")
+        count = self.quantity if self.retired_date else self.active_quantity
+        return {1: "1 ks", 2: "pár"}.get(count, f"{count} ks")
 
     @property
     def full_label(self):
-        parts = [self.label, self.quantity_label]
+        parts = [self.text_label, self.quantity_label]
         if self.size:
             parts.append(self.size)
         if self.rim:
@@ -193,6 +249,10 @@ class Tire(Base):
     def open_mount(self):
         return next((m for m in self.mounts if m.removed_date is None), None)
 
+    @property
+    def open_mounts(self):
+        return [m for m in self.mounts if m.removed_date is None]
+
 
 class TireSwap(Base):
     """Přezutí - událost na vozidle (doma nebo v servisu), při které se pneumatiky nasazují / sundávají."""
@@ -213,9 +273,15 @@ class TireSwap(Base):
                            cascade="all, delete-orphan")
     removed = relationship("TireMount", foreign_keys="TireMount.removed_swap_id", back_populates="removed_swap")
 
+    retirements = relationship("TireRetirement", back_populates="swap")
+
     @property
     def place_label(self):
-        return TIRE_PLACES.get(self.place, self.place)
+        return SWAP_PLACE_LABELS.get(self.place, self.place)
+
+    @property
+    def is_retirement(self):
+        return self.place == SWAP_RETIRE
 
 
 class TireMount(Base):
@@ -247,6 +313,15 @@ class TireMount(Base):
     @property
     def position_label(self):
         return position_label(self.position, self.kind)
+
+    @property
+    def position_short(self):
+        """Zkratka kol pro přehled: všechna = "", náprava P / Z, kolo LP, PP, LZ, PZ, rezerva R."""
+        return POSITION_SHORT.get(self.position, "")
+
+    @property
+    def pieces(self):
+        return slot_pieces(self.slots, self.kind)
 
     @property
     def slots(self):
@@ -321,7 +396,7 @@ class TireTreadCheck(Base):
     @property
     def summary(self):
         """"Letní Michelin: LP 6,0 · PP 6,1; Zimní Nokian: LZ 7,0"."""
-        return "; ".join(f"{tire.label}: " + " · ".join(r.text for r in readings)
+        return "; ".join(f"{tire.text_label}: " + " · ".join(r.text for r in readings)
                          for tire, readings in self.by_tire())
 
 
@@ -347,3 +422,37 @@ class TireTreadReading(Base):
     @property
     def text(self):
         return f"{self.wheel_short} {self.tread_mm}".replace(".", ",")
+
+
+class TireRetirement(Base):
+    """Vyřazení části sady (jedno kolo, přední…) nebo všech zbývajících kusů. Vyřazení nasazených kol
+    je zároveň „přezutí“ s místem SWAP_RETIRE, které je sundá z vozidla (swap)."""
+    __tablename__ = "tire_retirements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tire_id = Column(Integer, ForeignKey("tires.id", ondelete="CASCADE"), nullable=False, index=True)
+    retire_date = Column(Date, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    wheels = Column(String(30), nullable=True)  # místa sundaná z vozidla: "fl" / "fl,fr"
+    reason = Column(String(200), nullable=True)
+    swap_id = Column(Integer, ForeignKey("tire_swaps.id", ondelete="SET NULL"), nullable=True, index=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="SET NULL"), nullable=True)
+    odometer = Column(Integer, nullable=True)
+
+    tire = relationship("Tire", back_populates="retirements")
+    swap = relationship("TireSwap", back_populates="retirements")
+    vehicle = relationship("Vehicle")
+
+    @property
+    def slots(self):
+        return frozenset(x for x in (self.wheels or "").split(",") if x)
+
+    @property
+    def wheels_label(self):
+        """Zkratka vyřazených kol (LP, P…); kusy ze skladu se nepopisují."""
+        kind = self.vehicle.kind if self.vehicle is not None else self.tire.kind
+        return slots_short(self.slots, kind)
+
+    @property
+    def quantity_label(self):
+        return f"{self.quantity} ks"

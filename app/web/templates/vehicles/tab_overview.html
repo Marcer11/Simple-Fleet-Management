@@ -47,8 +47,8 @@
     </section>
     <section class="summary-card">
         <h3>{{ m.icon("tire") }} <a href="/vehicles/{{ vid }}?tab=tires">Pneumatiky</a></h3>
-        {% for mnt in mounted_tires %}
-        <div class="line">{{ m.season_icon(mnt.tire.season) }} <a href="/tires/{{ mnt.tire.id }}">{{ mnt.tire.label }}</a> <span class="muted small">· {{ mnt.position_label }}{% if odometer is not none and odometer >= mnt.mounted_km %} · {{ (odometer - mnt.mounted_km)|km }}{% endif %}</span></div>
+        {% for tire, short, positions, mnt in tires_on_vehicle(mounted_tires) %}
+        <div class="line">{{ m.tire_name(tire) }}{% if short %} <span class="pos" title="{{ positions }}">{{ short }}</span>{% endif %}{% if odometer is not none and odometer >= mnt.mounted_km %} <span class="muted small">· {{ (odometer - mnt.mounted_km)|km }}</span>{% endif %}</div>
         {% else %}<div class="line muted">Na voze není zapsaná žádná pneumatika.</div>{% endfor %}
     </section>
 </div>

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-head">
     <div>
-        {% if tire %}{{ m.back("/tires/%d"|format(tire.id), tire.label) }}{% else %}{{ m.back("/tires", "Pneumatiky") }}{% endif %}
+        {% if tire %}{{ m.back("/tires/%d"|format(tire.id), tire.name) }}{% else %}{{ m.back("/tires", "Pneumatiky") }}{% endif %}
         <h1>{{ "Upravit pneumatiku" if tire else "Nová pneumatika" }}</h1>
         <div class="sub">Jedna guma, pár nebo celá sada – kterou nasazujete společně</div>
     </div>
@@ -65,14 +65,6 @@
         </div>
     </div>
     {{ m.textarea("note", "Poznámka") }}
-    <details class="form-after"{% if m.val('retired_date') %} open{% endif %}>
-        <summary>Vyřazení</summary>
-        <div class="form-grid" style="margin-top: 10px">
-            {{ m.field("retired_date", "Vyřazeno dne", "date") }}
-            {{ m.field("retired_reason", "Důvod", maxlength=200, autocomplete="off", list="retired-reasons") }}
-            {{ m.datalist("retired-reasons", retired_reasons) }}
-        </div>
-    </details>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Uložit</button>
         <a class="btn" href="{{ '/tires/%d'|format(tire.id) if tire else '/tires' }}">Zrušit</a>

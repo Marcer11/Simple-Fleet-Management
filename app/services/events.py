@@ -148,23 +148,28 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
             new = [m for m in mounted if not any(r.tire_id == m.tire_id for r in s.removed)]
             parts = []
             if new:
-                parts.append("nasazeno: " + ", ".join(f"{m.tire.label} ({m.position_label.lower()})" for m in new))
+                parts.append("nasazeno: " + ", ".join(f"{m.tire.text_label} ({m.position_label.lower()})" for m in new))
             removed = [m for m in s.removed if m.vehicle_id == s.vehicle_id
                        and not any(n.tire_id == m.tire_id for n in mounted)]
             if removed:
                 parts.append("sundáno: " + ", ".join(
-                    m.tire.label + (f" – dezén {m.treads_label} mm" if m.treads_label else "")
+                    m.tire.text_label + (f" – dezén {m.treads_label} mm" if m.treads_label else "")
                     for m in removed))
             where = s.place_label + (f" – {s.service_record.place}" if s.service_record and s.service_record.place else "")
-            parts.append(where)
-            events.append(Event(KIND_TIRES, _day(s.swap_date), False, by_id[s.vehicle_id], "Přezutí pneumatik",
+            if s.is_retirement:
+                parts = [f"{r.tire.text_label}: {r.wheels_label or r.quantity_label}" + (f" – {r.reason}" if r.reason else "")
+                         for r in s.retirements]
+            else:
+                parts.append(where)
+            events.append(Event(KIND_TIRES, _day(s.swap_date), False, by_id[s.vehicle_id],
+                                "Vyřazení pneumatik" if s.is_retirement else "Přezutí pneumatik",
                                 "\n".join(parts), s.odometer,
                                 s.service_record.price_local if s.service_record else None,
                                 f"/tire-swaps/{s.id}"))
         query = (session.query(TireDefect).options(joinedload(TireDefect.tire), joinedload(TireDefect.expense))
                  .filter(TireDefect.vehicle_id.in_(ids)))
         for d in dated(query, TireDefect.defect_date, False):
-            detail = " · ".join(x for x in (d.tire.label, d.position) if x)
+            detail = " · ".join(x for x in (d.tire.text_label, d.position) if x)
             events.append(Event(KIND_TIRES, _day(d.defect_date), False, by_id[d.vehicle_id],
                                 f"Poškození pneu: {d.description}", detail, d.odometer,
                                 d.expense.price_local if d.expense else None, f"/tire-defects/{d.id}",
@@ -172,7 +177,7 @@ def collect_events(session, vehicles, date_from=None, date_to=None, kinds=None, 
         query = (session.query(TireTreadCheck).options(joinedload(TireTreadCheck.readings))
                  .filter(TireTreadCheck.vehicle_id.in_(ids)))
         for c in dated(query, TireTreadCheck.check_date, False):
-            lines = [f"{tire.label}: " + " · ".join(r.text for r in readings) + " mm"
+            lines = [f"{tire.text_label}: " + " · ".join(r.text for r in readings) + " mm"
                      for tire, readings in c.by_tire()]
             detail = "\n".join(lines)
             events.append(Event(KIND_TIRES, _day(c.check_date), False, by_id[c.vehicle_id], "Kontrola dezénu",

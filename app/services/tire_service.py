@@ -10,10 +10,11 @@ from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
 
-from models import Tire, TireDefect, TireMount, TireSwap, TireTreadCheck, TireTreadReading
+from models import Tire, TireDefect, TireMount, TireRetirement, TireSwap, TireTreadCheck, TireTreadReading
 from models.tire import (
     TIRE_EXPENSE_CATEGORY, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS, TIRE_KINDS,
-    TIRE_SERVICE_TYPE, CAR_WHEELS, MOTO_POSITIONS, MOTO_WHEELS, format_treads, slots_position,
+    TIRE_SERVICE_TYPE, CAR_WHEELS, MOTO_POSITIONS, MOTO_WHEELS, SWAP_RETIRE, format_treads, slot_pieces,
+    slots_position, slots_positions,
 )
 from services.errors import NotFoundError, ValidationError
 from services.maintenance_service import (
@@ -58,7 +59,7 @@ def mounted_seasons(session, vehicle_ids):
     for m in sorted(mounts, key=lambda m: (list(TIRE_POSITIONS).index(m.position)
                                            if m.position in TIRE_POSITIONS else 99, m.id)):
         seasons = result.setdefault(m.vehicle_id, {})
-        seasons.setdefault(m.tire.season, []).append(f"{m.tire.label} ({m.position_label.lower()})")
+        seasons.setdefault(m.tire.season, []).append(f"{m.tire.name} ({m.position_label.lower()})")
     return {vid: list(seasons.items()) for vid, seasons in result.items()}
 
 
@@ -116,6 +117,10 @@ class TireService:
     def update(self, tire, data):
         price, expense_vehicle_id = data.pop("price", None), data.pop("expense_vehicle_id", None)
         values = self._validate(data, price)
+        if values["quantity"] < tire.retired_quantity:
+            raise ValidationError(f"Vyřazeno je už {tire.retired_quantity} ks – počet kusů nemůže být menší.")
+        if tire.retirements and values["purchase_date"] and values["purchase_date"] > tire.retirements[0].retire_date:
+            raise ValidationError("Nákup nemůže být po vyřazení.")
         mount = tire.open_mount
         if mount and mount.vehicle and values["kind"] != (mount.vehicle.kind or "car"):
             raise ValidationError(f"Pneumatika je nasazená na {'motorce' if mount.vehicle.kind == 'moto' else 'autě'} "
@@ -168,9 +173,6 @@ class TireService:
         quantity = _positive_int(data.get("quantity"), "Počet kusů") or 2
         if not 1 <= quantity <= 8:
             raise ValidationError("Počet kusů musí být 1–8.")
-        retired = data.get("retired_date")
-        if retired and data.get("purchase_date") and retired < data["purchase_date"]:
-            raise ValidationError("Vyřazení nemůže být před nákupem.")
         new_tread = _tread(data.get("new_tread_mm"))
         min_tread = _tread(data.get("min_tread_mm"), "Minimální dezén")
         if min_tread is not None and min_tread <= 0:
@@ -199,8 +201,6 @@ class TireService:
             "currency_code": currency,
             "price_local": price_local,
             "storage_location": _clean_str(data.get("storage_location"), 100, "Místo uložení"),
-            "retired_date": retired,
-            "retired_reason": _clean_str(data.get("retired_reason"), 200, "Důvod vyřazení") if retired else None,
             "note": _clean_str(data.get("note")),
         }
 
@@ -209,11 +209,25 @@ class TireService:
 # Přezutí
 # ----------------------------------------------------------------------
 
+DISPLAY_ORDER = ["all", "front", "fl", "fr", "rear", "rl", "rr", "spare"]
+
+
+def tires_on_vehicle(mounts):
+    """Nasazení seskupená po pneumatikách: [(pneumatika, zkratka kol, popis pozic, nejstarší nasazení)] -
+    zkratka „PP Z“, všechna kola bez zkratky."""
+    result = {}
+    for m in mounts:
+        result.setdefault(m.tire, []).append(m)
+    return [(tire, "" if any(m.position == "all" for m in items) else " ".join(m.position_short for m in items),
+             ", ".join(m.position_label.lower() for m in items), min(items, key=lambda m: m.mounted_km))
+            for tire, items in result.items()]
+
+
 def open_mounts(session, vehicle_id):
     """Pneumatiky právě nasazené na vozidle."""
     mounts = (session.query(TireMount).options(joinedload(TireMount.tire))
               .filter(TireMount.vehicle_id == vehicle_id, TireMount.removed_date.is_(None)).all())
-    order = list(TIRE_POSITIONS)
+    order = DISPLAY_ORDER
     return sorted(mounts, key=lambda m: (order.index(m.position) if m.position in order else 99, m.id))
 
 
@@ -231,13 +245,13 @@ class TireSwapService:
                  .order_by(TireSwap.swap_date.desc(), TireSwap.id.desc()))
         return query.limit(limit).all() if limit else query.all()
 
-    def _check_common(self, vehicle_id, swap_date, odometer, place, exclude_id=None):
+    def _check_common(self, vehicle_id, swap_date, odometer, place, exclude_id=None, retire=False):
         if not swap_date:
             raise ValidationError("Datum přezutí je povinné.")
         if swap_date > date.today():
             raise ValidationError("Datum přezutí nemůže být v budoucnosti.")
         odometer = _positive_int(odometer, "Stav tachometru", allow_none=False)
-        if place not in TIRE_PLACES:
+        if place not in TIRE_PLACES and not (retire and place == SWAP_RETIRE):
             raise ValidationError("Neplatné místo přezutí.")
         check_odometer_order(self.session, vehicle_id, datetime.combine(swap_date, datetime.min.time()), odometer,
                              has_time=False, exclude=("tire_swap", exclude_id))
@@ -265,18 +279,18 @@ class TireSwapService:
             if vehicle.kind == "moto" and position not in MOTO_POSITIONS:
                 raise ValidationError("Na motorce lze nasadit jen přední, zadní nebo obě kola.")
             if tire.id in seen:
-                raise ValidationError(f"Pneumatika {tire.label} je vybraná dvakrát.")
+                raise ValidationError(f"Pneumatika {tire.text_label} je vybraná dvakrát.")
             if tire.retired_date:
-                raise ValidationError(f"Pneumatika {tire.label} je vyřazená.")
+                raise ValidationError(f"Pneumatika {tire.text_label} je vyřazená.")
             if (tire.kind or "car") != (vehicle.kind or "car"):
-                raise ValidationError(f"Pneumatika {tire.label} je pro {'motorku' if tire.is_moto else 'auto'} – "
+                raise ValidationError(f"Pneumatika {tire.text_label} je pro {'motorku' if tire.is_moto else 'auto'} – "
                                       f"na {'motorku' if vehicle.kind == 'moto' else 'auto'} ji nelze nasadit.")
             slots = TIRE_POSITIONS[position][1]
             if slots & new_slots:
                 raise ValidationError("Dvě pneumatiky nemohou být na stejné pozici.")
             last_mount = max((m.mounted_date for m in tire.mounts), default=None)
             if last_mount and last_mount > swap_date:
-                raise ValidationError(f"Pneumatika {tire.label} byla nasazena až {last_mount:%d.%m.%Y}.")
+                raise ValidationError(f"Pneumatika {tire.text_label} byla nasazena až {last_mount:%d.%m.%Y}.")
             seen.add(tire.id)
             new_slots |= slots
 
@@ -357,6 +371,11 @@ class TireSwapService:
         for mount in list(swap.removed):
             mount.removed_swap = None
             mount.removed_date = mount.removed_km = mount.removed_tread_mm = mount.removed_treads = None
+        for retirement in list(swap.retirements):
+            tire = retirement.tire
+            tire.retirements.remove(retirement)
+            self.session.delete(retirement)
+            _sync_retired(tire)
         service_record = swap.service_record
         self.session.delete(swap)
         if service_record is not None:
@@ -372,7 +391,7 @@ class TireSwapService:
                 swap.service_record = None
                 services.delete(record)
             return
-        mounted = ", ".join(f"{m.tire.label} ({m.position_label.lower()})" for m in swap.mounted)
+        mounted = ", ".join(f"{m.tire.text_label} ({m.position_label.lower()})" for m in swap.mounted)
         data = {"vehicle_id": swap.vehicle_id, "service_date": swap.swap_date, "odometer": swap.odometer,
                 "service_type": TIRE_SERVICE_TYPE, "place": _clean_str(service_place, 100, "Servis"),
                 "note": f"Nasazeno: {mounted}" if mounted else "Sundání pneumatik",
@@ -381,6 +400,112 @@ class TireSwapService:
             services.update(swap.service_record, data)
         else:
             swap.service_record = services.create(**data)
+
+
+# ----------------------------------------------------------------------
+# Vyřazení (i jen části sady)
+# ----------------------------------------------------------------------
+
+def _sync_retired(tire):
+    """Pneumatika je vyřazená, když jsou vyřazené všechny kusy - datum a důvod podle posledního vyřazení."""
+    if tire.retirements and tire.active_quantity == 0:
+        last = tire.retirements[-1]
+        tire.retired_date, tire.retired_reason = last.retire_date, last.reason
+    else:
+        tire.retired_date = tire.retired_reason = None
+
+
+def mounted_pieces(tire):
+    """Kusy nasazené na vozidle (u motorky je náprava jedno kolo)."""
+    return sum(m.pieces for m in tire.open_mounts)
+
+
+class TireRetirementService:
+    """Vyřazení kusů pneumatiky. Nasazená kola se sundají z vozidla „přezutím“ typu vyřazení (zbytek sady
+    na voze zůstane), kusy ze skladu jen ubydou. Když nezbude nic, je vyřazená celá pneumatika."""
+
+    def __init__(self, session):
+        self.session = session
+
+    def retire(self, tire, retire_date, reason=None, slots=(), stored=0, odometer=None):
+        """slots = místa nasazených kol k vyřazení (fl, fr, rl, rr, spare; u motorky fl = přední, rl = zadní),
+        stored = počet kusů ze skladu."""
+        if tire.retired_date:
+            raise ValidationError("Pneumatika už je vyřazená.")
+        if not retire_date:
+            raise ValidationError("Datum vyřazení je povinné.")
+        if retire_date > date.today():
+            raise ValidationError("Datum vyřazení nemůže být v budoucnosti.")
+        if tire.purchase_date and retire_date < tire.purchase_date:
+            raise ValidationError("Vyřazení nemůže být před nákupem.")
+        reason = _clean_str(reason, 200, "Důvod vyřazení")
+        stored = _positive_int(stored, "Kusů ze skladu") or 0
+        in_stock = max(tire.active_quantity - mounted_pieces(tire), 0)
+        if stored > in_stock:
+            raise ValidationError(f"Ve skladu je jen {in_stock} ks.")
+        slots = set(slots)
+        mounts = [m for m in tire.open_mounts if m.slots & slots]
+        on_vehicle = set().union(*(m.slots for m in tire.open_mounts)) if tire.open_mounts else set()
+        if slots - on_vehicle:
+            raise ValidationError("Vybraná kola nejsou na vozidle.")
+        if not slots and not stored:
+            raise ValidationError("Vyberte kola nebo počet kusů k vyřazení.")
+        kind = mounts[0].kind if mounts else tire.kind
+        if kind == "moto":  # u motorky se vybírá celé kolo (náprava)
+            for keys in ({"fl", "fr"}, {"rl", "rr"}):
+                if slots & keys:
+                    slots |= keys & on_vehicle
+        pieces = min(slot_pieces(frozenset(slots), kind) + stored, tire.active_quantity)
+        everything = pieces >= tire.active_quantity
+        if everything:  # celá zbylá sada - z vozidla se sundá všechno
+            mounts = tire.open_mounts
+            slots = set().union(*(m.slots for m in mounts)) if mounts else set()
+
+        swap = None
+        if mounts:
+            vehicle = mounts[0].vehicle
+            swaps = TireSwapService(self.session)
+            for m in mounts:
+                if retire_date < m.mounted_date:
+                    raise ValidationError(f"Pneumatika byla nasazena až {m.mounted_date:%d.%m.%Y}.")
+            last = (self.session.query(TireSwap.swap_date).filter(TireSwap.vehicle_id == vehicle.id)
+                    .order_by(TireSwap.swap_date.desc()).first())
+            if last and retire_date < last[0]:
+                raise ValidationError(f"Na vozidle je novější přezutí ({last[0]:%d.%m.%Y}) – vyřazení nasazených kol "
+                                      "musí být až po něm.")
+            km = swaps._check_common(vehicle.id, retire_date, odometer, SWAP_RETIRE, retire=True)
+            if any(km < m.mounted_km for m in mounts):
+                raise ValidationError("Stav tachometru je menší než při nasazení pneumatiky.")
+            swap = TireSwap(vehicle_id=vehicle.id, swap_date=retire_date, odometer=km, place=SWAP_RETIRE)
+            self.session.add(swap)
+            self.session.flush()
+            for m in mounts:
+                swaps._close(m, swap, km, None)
+                for position in slots_positions(m.slots - slots):  # zbytek sady zůstává na voze
+                    self.session.add(TireMount(tire_id=tire.id, vehicle_id=vehicle.id, position=position, swap=swap,
+                                               mounted_date=retire_date, mounted_km=km))
+        retirement = TireRetirement(tire=tire, retire_date=retire_date, quantity=pieces, reason=reason,
+                                    wheels=",".join(sorted(slots)) or None, swap=swap,
+                                    vehicle_id=swap.vehicle_id if swap else None,
+                                    odometer=swap.odometer if swap else None)
+        self.session.add(retirement)
+        self.session.flush()
+        self.session.refresh(tire)
+        _sync_retired(tire)
+        self.session.commit()
+        return retirement
+
+    def cancel(self, retirement):
+        """Zruší vyřazení - nasazená kola se vrátí na vozidlo (smazáním vyřazovacího přezutí)."""
+        tire = retirement.tire
+        if retirement.swap is not None:
+            TireSwapService(self.session).delete(retirement.swap)  # smaže i vyřazení
+        else:
+            tire.retirements.remove(retirement)
+            self.session.delete(retirement)
+            _sync_retired(tire)
+            self.session.commit()
+        return tire
 
 
 # ----------------------------------------------------------------------
@@ -523,7 +648,7 @@ class TireTreadCheckService:
             if wheel not in [w[0] for w in mount.wheels]:
                 raise ValidationError("Neplatné kolo.")
             if odometer < mount.mounted_km:
-                raise ValidationError(f"Pneumatika {mount.tire.label} byla nasazena až při {mount.mounted_km} km.")
+                raise ValidationError(f"Pneumatika {mount.tire.text_label} byla nasazena až při {mount.mounted_km} km.")
             readings.append(TireTreadReading(tire_id=mount.tire_id, mount_id=mount.id, wheel=wheel, tread_mm=mm))
         if not readings:
             raise ValidationError("Zapište hloubku dezénu alespoň u jednoho kola.")

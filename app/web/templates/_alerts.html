@@ -11,7 +11,7 @@
         </span>
         <span class="small">
             {% if a.kind == "tires" %}
-            nasazené letní: {{ a.item.label }}
+            nasazené letní: {{ m.season_icon(a.item.season) }} {{ a.item.name }}
             <span class="muted">({{ "povinné od " ~ (a.status.due_date|date) if a.status.days_left > 0 else "zimní období od " ~ (a.status.due_date|date) }})</span>
             {% else %}
             {{ a.status.summary }}

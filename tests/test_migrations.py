@@ -185,3 +185,15 @@ def test_tire_kind_from_mounted_vehicles(tmp_path):
         _upgrade(conn)
         rows = conn.execute(text("SELECT id, kind FROM tires ORDER BY id")).all()
     assert [tuple(r) for r in rows] == [(1, "car"), (2, "moto"), (3, "car")]
+
+
+def test_retired_tires_get_retirement_record(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'retire.db'}")
+    with engine.begin() as conn:
+        _upgrade(conn, "0029_tire_kind")
+        conn.execute(text("INSERT INTO tires (id, owner_id, season, manufacturer, quantity, rim, currency_code, kind,"
+                          " retired_date, retired_reason) VALUES (1, 1, 'Letní', 'Michelin', 4, 'alu', 'CZK', 'car',"
+                          " '2025-10-01', 'Opotřebení'), (2, 1, 'Zimní', 'Nokian', 4, 'alu', 'CZK', 'car', NULL, NULL)"))
+        _upgrade(conn)
+        rows = conn.execute(text("SELECT tire_id, retire_date, quantity, reason FROM tire_retirements")).all()
+    assert [(r[0], str(r[1]), r[2], r[3]) for r in rows] == [(1, "2025-10-01", 4, "Opotřebení")]

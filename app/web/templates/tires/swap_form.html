@@ -53,7 +53,7 @@
     <h3 class="form-section">Sundané pneumatiky – naměřený dezén (mm)</h3>
     {% for mnt in removed_here %}
     <div class="tread-row">
-        <div><strong>{{ mnt.tire.label }}</strong> <span class="small muted">{{ mnt.position_label|lower }}</span></div>
+        <div>{{ m.season_icon(mnt.tire.season) }} <strong>{{ mnt.tire.name }}</strong> <span class="small muted">{{ mnt.position_label|lower }}</span></div>
         <div class="tread-inputs">
         {% for key, short, long in mnt.wheels %}
             <label title="{{ long }}"><span>{{ short }}</span><input type="text" name="tread_{{ mnt.id }}_{{ key }}" value="{{ m.val('tread_%d_%s'|format(mnt.id, key)) }}" inputmode="decimal" autocomplete="off" aria-label="Dezén {{ long }}"></label>
@@ -62,7 +62,7 @@
     </div>
     {% endfor %}
     {% endif %}
-    <p class="small muted">Nasazeno: {% for mnt in swap.mounted %}{{ mnt.tire.label }} ({{ mnt.position_label|lower }}){% if not loop.last %}, {% endif %}{% else %}nic{% endfor %}.</p>
+    <p class="small muted">Nasazeno: {% for mnt in swap.mounted %}{{ m.season_icon(mnt.tire.season) }} {{ mnt.tire.name }} ({{ mnt.position_label|lower }}){% if not loop.last %}, {% endif %}{% else %}nic{% endfor %}.</p>
     {% else %}
 
     {# Nákres vozidla - ovládá ho app.js nad stejnými poli formuláře, která jsou níže (bez JS fungují samostatně) #}
@@ -84,12 +84,12 @@
         <tbody>
         {% for mnt in current %}
         <tr>
-            <td>{{ mnt.tire.label }}<div class="small muted">{{ mnt.tire.quantity_label }}{% if mnt.tire.size %} · {{ mnt.tire.size }}{% endif %}</div></td>
+            <td>{{ m.season_icon(mnt.tire.season) }} {{ mnt.tire.name }}<div class="small muted">{{ mnt.tire.quantity_label }}{% if mnt.tire.size %} · {{ mnt.tire.size }}{% endif %}</div></td>
             <td>{{ mnt.position_label }}</td>
             <td class="num">{{ mnt.mounted_date|date }}<div class="small muted">{{ mnt.mounted_km|km }}</div></td>
             <td><div class="tread-inputs">
                 {% for key, short, long in mnt.wheels %}
-                <label title="{{ long }}"><span>{{ short }}</span><input type="text" name="tread_{{ mnt.id }}_{{ key }}" value="{{ m.val('tread_%d_%s'|format(mnt.id, key)) }}" inputmode="decimal" autocomplete="off" aria-label="Dezén {{ mnt.tire.label }} – {{ long }}"></label>
+                <label title="{{ long }}"><span>{{ short }}</span><input type="text" name="tread_{{ mnt.id }}_{{ key }}" value="{{ m.val('tread_%d_%s'|format(mnt.id, key)) }}" inputmode="decimal" autocomplete="off" aria-label="Dezén {{ mnt.tire.text_label }} – {{ long }}"></label>
                 {% endfor %}
             </div></td>
             <td><label class="check"><input type="checkbox" name="remove_{{ mnt.id }}" value="1"{% if m.val('remove_%d'|format(mnt.id)) %} checked{% endif %}> sundat</label></td>

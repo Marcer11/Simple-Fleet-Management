@@ -141,6 +141,11 @@
 {% if alerts %}{% set lines = [] %}{% for a in alerts %}{% set _ = lines.append(a.title ~ " – " ~ a.status.summary) %}{% endfor %}<span class="alert-icon alert-icon-{{ 'overdue' if alerts|selectattr('status.level', 'equalto', 'overdue')|list else 'warning' }}" title="{{ lines|join('\n') }}">{{ icon("warning", lines|join("; ")) }}{% if alerts|length > 1 %}<span class="alert-count">{{ alerts|length }}</span>{% endif %}</span>{% endif %}
 {%- endmacro %}
 
+{# Ikona typu + název pneumatiky s odkazem (typ se slovem nepíše - je ikona) #}
+{% macro tire_name(tire, strong=false) -%}
+{{ season_icon(tire.season) }} <a href="/tires/{{ tire.id }}">{% if strong %}<strong>{{ tire.name }}</strong>{% else %}{{ tire.name }}{% endif %}</a>
+{%- endmacro %}
+
 {# Ikona druhu pneumatiky (pro auto / motorku) #}
 {% macro tire_kind_icon(tire) -%}
 {{ vehicle_icon(tire, "Pneumatiky pro motorku" if tire.kind == "moto" else "Pneumatiky pro auto") }}

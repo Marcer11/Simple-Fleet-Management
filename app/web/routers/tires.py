@@ -5,14 +5,15 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from models.tire import (
-    DAMAGE_POSITIONS, LEGAL_MIN_TREAD, LEGAL_MIN_TREAD_MOTO, TIRE_RETIRED_REASONS, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS, TIRE_KINDS,
+    CAR_WHEELS, DAMAGE_POSITIONS, LEGAL_MIN_TREAD, LEGAL_MIN_TREAD_MOTO, TIRE_RETIRED_REASONS, TIRE_MAX_AGE_YEARS, TIRE_PLACES, TIRE_POSITIONS, TIRE_RIMS, TIRE_SEASONS, TIRE_KINDS,
     positions_for,
 )
+from models import TireRetirement
 from models.vehicle import ROLE_EDITOR
 from services.errors import NotFoundError, ValidationError
 from services.tire_service import (
-    TireDefectService, TireService, TireSwapService, TireTreadCheckService, last_readings, mounts_on,
-    open_mounts,
+    TireDefectService, TireRetirementService, TireService, TireSwapService, TireTreadCheckService, last_readings,
+    mounted_pieces, mounts_on, open_mounts, tires_on_vehicle,
     tire_stats, wheel_layout,
 )
 from services.vehicle_service import VehicleService
@@ -85,10 +86,11 @@ async def tires_page(request: Request, user=Depends(get_current_user), db=Depend
     swaps = swap_service.for_vehicles(vehicle_ids, limit=50)
     defects = TireDefectService(db).for_tires([r["tire"].id for r in rows])
     mounted = {v.id: open_mounts(db, v.id) for v in shown}
+    on_vehicles = [(v, tires_on_vehicle(mounted[v.id])) for v in shown if mounted[v.id]]
     checks = TireTreadCheckService(db).for_vehicles(vehicle_ids, limit=30)
     return render(request, "tires/list.html", rows=rows, vehicles=vehicles, swaps=swaps, defects=defects,
                   checks=checks,
-                  mounted=mounted, statuses=STATUSES, seasons=TIRE_SEASONS, kinds=TIRE_KINDS,
+                  on_vehicles=on_vehicles, statuses=STATUSES, seasons=TIRE_SEASONS, kinds=TIRE_KINDS,
                   filters={"status": status, "season": season, "kind": kind, "vehicle_id": vehicle_id},
                   can_delete_swap={s.id: swap_service.can_delete(s) for s in swaps},
                   editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)),
@@ -123,8 +125,6 @@ def _read_tire(form):
         "min_tread_mm": form.decimal("min_tread_mm", "Minimální dezén", positive=True),
         "purchase_date": form.date("purchase_date", "Datum nákupu"),
         "storage_location": form.str("storage_location", "Místo uložení", max_len=100),
-        "retired_date": form.date("retired_date", "Vyřazeno"),
-        "retired_reason": form.str("retired_reason", "Důvod vyřazení", max_len=200),
         "note": form.str("note", "Poznámka"),
         "expense_vehicle_id": form.int("expense_vehicle_id", "Vozidlo pro výdaj"),
     }
@@ -139,8 +139,7 @@ def _tire_values(t):
         "production_year": iso(t.production_year), "dot": t.dot or "", "quantity": str(t.quantity),
         "rim": t.rim or "", "new_tread_mm": iso(t.new_tread_mm),
         "min_tread_mm": iso(t.min_tread_mm), "purchase_date": iso(t.purchase_date),
-        "storage_location": t.storage_location or "", "retired_date": iso(t.retired_date),
-        "retired_reason": t.retired_reason or "", "note": t.note or "",
+        "storage_location": t.storage_location or "", "note": t.note or "",
         "expense_vehicle_id": str(t.expense.vehicle_id) if t.expense else "",
         **_price_values(t),
     }
@@ -171,7 +170,7 @@ async def _save_tire(request, db, user, tire):
         db.rollback()
         return render(request, "tires/tire_form.html", status_code=400, values=form.values, error=str(e),
                       **_tire_context(db, user, tire))
-    flash(request, f"Pneumatika {tire.label} byla uložena.")
+    flash(request, f"Pneumatika {tire.text_label} byla uložena.")
     return RedirectResponse(f"/tires/{tire.id}", status_code=303)
 
 
@@ -180,15 +179,75 @@ async def tire_add(request: Request, user=Depends(get_current_user), db=Depends(
     return await _save_tire(request, db, user, None)
 
 
+def _retire_context(db, tire):
+    """Formulář vyřazení ve správě pneumatiky: nasazená kola k výběru, kusy ve skladu, tachometr."""
+    wheels, vehicle = [], None
+    for m in tire.open_mounts:
+        vehicle = m.vehicle
+        if m.kind == "moto":
+            wheels += [(key, short, label) for key, short, label, keys in
+                       (("fl", "P", "přední kolo", {"fl", "fr"}), ("rl", "Z", "zadní kolo", {"rl", "rr"}))
+                       if m.slots & keys]
+        else:
+            wheels += [(key, short, label) for key, short, label in CAR_WHEELS if key in m.slots]
+    order = [w[0] for w in CAR_WHEELS]
+    wheels.sort(key=lambda w: order.index(w[0]))
+    return {"wheels": wheels, "vehicle": vehicle,
+            "in_stock": max(tire.active_quantity - mounted_pieces(tire), 0),
+            "odometer": VehicleService(db).get_current_odometer(vehicle.id) if vehicle else None}  # noqa: E501
+
+
 @router.get("/tires/{tire_id}")
 async def tire_detail(request: Request, tire_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     """Detail pneumatiky: stav, životnost, údaje, historie nasazení, měření dezénu a poškození."""
     tire = TireService(db).get_for_user(user, tire_id)
     checks = sorted({r.check for r in tire.tread_readings}, key=lambda c: (c.check_date, c.id), reverse=True)
+    used = [t.retired_reason for t in TireService(db).list_for_user(user) if t.retired_reason]
     return render(request, "tires/detail.html", tire=tire, stats=tire_stats(db, [tire])[0],
                   checks=[(c, [r for r in c.readings if r.tire_id == tire.id]) for c in checks],
                   defects=TireDefectService(db).for_tires([tire.id]),
-                  editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)))
+                  editable_ids=set(VehicleService(db).get_accessible_ids(user, ROLE_EDITOR)),
+                  retire=_retire_context(db, tire),
+                  retired_reasons=list(dict.fromkeys(TIRE_RETIRED_REASONS + sorted(used))))
+
+
+@router.post("/tires/{tire_id}/retire")
+async def tire_retire(request: Request, tire_id: int, user=Depends(get_current_user), db=Depends(get_db)):
+    """Vyřazení celé pneumatiky nebo jen některých kol (správa pneumatiky)."""
+    tire = TireService(db).get_for_user(user, tire_id)
+    form = FormReader(await request.form())
+    slots = [key[6:] for key, value in form.raw.items() if key.startswith("wheel_") and value]
+    try:
+        retire_date = form.date("retire_date", "Datum vyřazení", required=True)
+        reason = form.str("reason", "Důvod", max_len=200)
+        odometer = form.int("odometer", "Tachometr", min_value=0) if slots else None
+        stored = form.int("stored", "Kusů ze skladu", min_value=0, max_value=8)
+        form.check()
+        retirement = TireRetirementService(db).retire(tire, retire_date, reason, slots, stored or 0, odometer)
+    except ValidationError as e:
+        db.rollback()
+        flash(request, f"Vyřazení se neuložilo: {e}", "danger")
+        return RedirectResponse(f"/tires/{tire.id}#retire", status_code=303)
+    what = retirement.wheels_label or retirement.quantity_label
+    flash(request, f"Pneumatika {tire.text_label} je vyřazená." if tire.retired_date
+          else f"Vyřazeno: {tire.text_label} – {what}. Zbývá {tire.active_quantity} ks.")
+    return RedirectResponse(f"/tires/{tire.id}", status_code=303)
+
+
+@router.post("/tire-retirements/{retirement_id}/delete")
+async def retirement_cancel(request: Request, retirement_id: int, user=Depends(get_current_user),
+                            db=Depends(get_db)):
+    retirement = db.get(TireRetirement, retirement_id)
+    if retirement is None:
+        raise NotFoundError("Vyřazení nenalezeno.")
+    tire = TireService(db).get_for_user(user, retirement.tire_id)
+    try:
+        TireRetirementService(db).cancel(retirement)
+        flash(request, "Vyřazení bylo zrušeno" + (" – kola jsou zpět na vozidle." if retirement.swap_id else "."))
+    except ValidationError as e:
+        db.rollback()
+        flash(request, f"Vyřazení nejde zrušit: {e}", "danger")
+    return RedirectResponse(f"/tires/{tire.id}", status_code=303)
 
 
 @router.get("/tires/{tire_id}/edit")
@@ -207,7 +266,7 @@ async def tire_edit(request: Request, tire_id: int, user=Depends(get_current_use
 async def tire_delete(request: Request, tire_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     service = TireService(db)
     tire = service.get_for_user(user, tire_id)
-    label = tire.label
+    label = tire.text_label
     service.delete(tire)
     flash(request, f"Pneumatika {label} byla smazána.")
     return RedirectResponse("/tires", status_code=303)
@@ -230,10 +289,10 @@ def _diagram(vehicle, current, tires):
         "kind": vehicle.kind or "car",
         "slots": {k: sorted(v[1]) for k, v in TIRE_POSITIONS.items()},
         "positions": positions_for(vehicle.kind),
-        "current": [{"id": m.id, "tire": m.tire_id, "label": m.tire.label, "season": m.tire.season,
+        "current": [{"id": m.id, "tire": m.tire_id, "label": m.tire.text_label, "season": m.tire.season,
                      "position": m.position, "position_label": m.position_label,
                      "wheels": [list(w) for w in m.wheels]} for m in current],
-        "tires": {str(t.id): {"label": t.label, "season": t.season, "full": t.full_label} for t in tires},
+        "tires": {str(t.id): {"label": t.text_label, "season": t.season, "full": t.full_label} for t in tires},
     }
 
 
@@ -338,10 +397,21 @@ async def swap_detail(request: Request, swap_id: int, user=Depends(get_current_u
     return render_record(request, db, user, swap, record_views.tire_swap(swap, service.can_delete(swap)))
 
 
+def _retirement_swap(request, swap):
+    """Vyřazení kol se neupravuje jako přezutí - jen zrušit ve správě pneumatiky."""
+    if swap is not None and swap.is_retirement:
+        flash(request, "Vyřazení kol se upravuje zrušením a novým vyřazením ve správě pneumatiky.", "warning")
+        tire_id = swap.retirements[0].tire_id if swap.retirements else None
+        return RedirectResponse(f"/tires/{tire_id}" if tire_id else f"/tire-swaps/{swap.id}", status_code=303)
+    return None
+
+
 @router.get("/tire-swaps/{swap_id}/edit")
 async def swap_edit_form(request: Request, swap_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     swap = TireSwapService(db).get(swap_id)
     vehicle = check_record_access(db, user, swap, ROLE_EDITOR)
+    if redirect := _retirement_swap(request, swap):
+        return redirect
     return render(request, "tires/swap_form.html", values=_swap_values(swap), **_swap_context(db, user, vehicle, swap))
 
 
@@ -350,6 +420,8 @@ async def swap_edit(request: Request, swap_id: int, user=Depends(get_current_use
     service = TireSwapService(db)
     swap = service.get(swap_id)
     vehicle = check_record_access(db, user, swap, ROLE_EDITOR)
+    if redirect := _retirement_swap(request, swap):
+        return redirect
     form = FormReader(await request.form())
     try:
         data = _read_swap_base(form)

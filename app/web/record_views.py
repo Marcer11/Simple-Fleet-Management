@@ -151,16 +151,35 @@ def rental(r):
     return view
 
 
+def _tire(tire):
+    """Ikona typu + název pneumatiky s odkazem (bez slova letní / zimní)."""
+    from web.deps import templates
+    icon = templates.env.get_template("_macros.html").module.season_icon(tire.season)
+    return Markup('{} <a href="/tires/{}">{}</a>').format(Markup(icon), tire.id, tire.name)
+
+
 def _tire_line(mount, extra=""):
-    return Markup('<a href="/tires/{}">{}</a> <span class="small muted">{}{}</span>').format(
-        mount.tire_id, mount.tire.label, mount.position_label.lower(), extra)
+    return Markup('{} <span class="small muted">{}{}</span>').format(
+        _tire(mount.tire), mount.position_label.lower(), extra)
 
 
 def tire_swap(s, can_delete=True):
-    view = _base(s, "Přezutí pneumatik", "tire", "Přezutí pneumatik", fmt_date(s.swap_date),
+    title = "Vyřazení pneumatik" if s.is_retirement else "Přezutí pneumatik"
+    view = _base(s, title, "tire", title, fmt_date(s.swap_date),
                  f"/tire-swaps/{s.id}/edit", f"/tire-swaps/{s.id}/delete", "tires",
-                 "Smazat přezutí? Pneumatiky se vrátí, jak byly před ním.")
+                 "Zrušit vyřazení? Kola se vrátí na vozidlo." if s.is_retirement
+                 else "Smazat přezutí? Pneumatiky se vrátí, jak byly před ním.")
     view["can_delete"] = can_delete
+    if s.is_retirement:
+        view["edit_url"] = None
+        view["rows"] = [("Datum", fmt_date(s.swap_date)), ("Tachometr", fmt_km(s.odometer))]
+        view["sections"] = [("Vyřazeno", [
+            Markup("{} <span class=\"small muted\">{}{}</span>").format(
+                _tire(r.tire), r.wheels_label or r.quantity_label, f" – {r.reason}" if r.reason else "")
+            for r in s.retirements] or ["nic"]),
+            ("Zůstává na voze", [_tire_line(m) for m in s.mounted] or ["nic"])]
+        view["text"] = s.note
+        return view
     service_record = s.service_record
     where = TIRE_PLACES.get(s.place, s.place)
     if service_record and service_record.place:
@@ -187,7 +206,7 @@ def tire_check(c):
     view["rows"] = [("Datum", fmt_date(c.check_date)), ("Tachometr", fmt_km(c.odometer)),
                     ("Zapsal", c.created_by.name if c.created_by else None)]
     view["sections"] = [("Naměřeno (mm)", [
-        Markup('<a href="/tires/{}">{}</a>: {}').format(tire.id, tire.label, " · ".join(r.text for r in readings))
+        Markup('{}: {}').format(_tire(tire), " · ".join(r.text for r in readings))
         for tire, readings in c.by_tire()])]
     view["text"] = c.note
     return view
@@ -198,7 +217,7 @@ def tire_defect(d):
                  f"/tire-defects/{d.id}/edit", f"/tire-defects/{d.id}/delete", "tires",
                  "Smazat záznam o poškození?")
     view["rows"] = [
-        ("Pneumatika", _link(f"/tires/{d.tire_id}", d.tire.label)),
+        ("Pneumatika", _tire(d.tire)),
         ("Datum", fmt_date(d.defect_date)),
         ("Tachometr", fmt_km(d.odometer) if d.odometer is not None else None),
         ("Pozice", d.position),
